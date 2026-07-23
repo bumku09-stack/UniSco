@@ -1,66 +1,49 @@
 # UniSco
 
-Unisco — Personalized scholarship &amp; grant matching for Daejeon university students.
+Unisco — 대전 지역 대학생을 위한 맞춤형 장학금·지원금 매칭 서비스.
 
-See [PROJECT_BRIEF.md](./PROJECT_BRIEF.md) for background, scope, and rationale.
+배경, 스코프, 왜 이렇게 결정했는지는 [PROJECT_BRIEF.md](./PROJECT_BRIEF.md) 참고.
 
-## Stack
+## 스택
 
-- **Backend**: FastAPI (Python 3.13) + SQLModel
-- **Frontend**: Next.js (App Router) + React + TypeScript + Tailwind CSS
-- **Database**: PostgreSQL (Supabase — hosted, includes a spreadsheet-like Studio UI for non-technical data entry)
+- **백엔드**: FastAPI (Python 3.13) + SQLModel
+- **프론트엔드**: Next.js (App Router) + React + TypeScript + Tailwind CSS
+- **데이터베이스**: PostgreSQL (Supabase — 호스팅형, 비개발자용 데이터 입력을 위한 스프레드시트 같은 Studio UI 포함)
 
-## Project layout
+## 프로젝트 구조
+
+세 부분으로 나뉩니다. 각 폴더에 코드 설명과 셋업 방법이 담긴 README가 따로 있고, 이 파일은 전체 방향만 잡아줍니다.
 
 ```
 UniSco/
-├── backend/            # FastAPI app
-│   ├── app/
-│   │   ├── api/        # route modules
-│   │   ├── core/       # config/settings
-│   │   ├── db/         # DB session/engine
-│   │   ├── models/     # SQLModel table models (empty — feature work starts here)
-│   │   └── main.py     # app entrypoint
-│   ├── venv/           # local virtualenv (gitignored)
-│   ├── requirements.txt
-│   └── .env.example
-└── frontend/            # Next.js app (standard create-next-app layout)
-    └── .env.example
+├── backend/    # FastAPI 앱 — 매칭 로직, DB 통신. backend/README.md 참고
+├── frontend/   # Next.js 앱 — 스펙 입력 폼 + 결과 UI. frontend/README.md 참고
+└── supabase/   # 호스팅형 Postgres DB + Studio (친구용 데이터 입력 화면). supabase/README.md 참고
 ```
 
-## Local setup
+- [backend/README.md](./backend/README.md) — FastAPI 코드 구조, 로컬 셋업, 린트
+- [frontend/README.md](./frontend/README.md) — Next.js/React 코드 구조, 로컬 셋업
+- [supabase/README.md](./supabase/README.md) — 호스팅 DB가 뭔지, 친구가 Studio로 데이터 입력하는 방법
 
-### Backend
+## 빠른 시작
 
 ```bash
-cd backend
-python3.13 -m venv venv        # already created; recreate if missing
-source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env           # fill in real DATABASE_URL once Supabase project exists
-uvicorn app.main:app --reload  # http://localhost:8000
+# 백엔드
+cd backend && source venv/bin/activate && uvicorn app.main:app --reload   # http://localhost:8000
+
+# 프론트엔드 (별도 터미널)
+cd frontend && npm run dev                                                # http://localhost:3000
 ```
 
-Check it's alive: `curl http://localhost:8000/health` → `{"status": "ok"}`
+최초 셋업(venv 생성, `pip install`, `.env` 파일 등)은 각 폴더 README에 있습니다.
 
-Lint: `ruff check .` (run from `backend/`, with venv active)
+## 다음 단계 (기능 구현은 여기부터)
 
-### Frontend
+아래는 아직 구현 안 됨 — 이번 세션은 뼈대만 잡았습니다.
 
-```bash
-cd frontend
-npm install                    # already run once during scaffolding
-cp .env.example .env.local
-npm run dev                    # http://localhost:3000
-```
-
-## Next steps (feature work starts here)
-
-Nothing below this line is implemented yet — this session only set up the skeleton.
-
-1. **Provision Supabase project** — create it, get the Postgres connection string into `backend/.env`, and give the friend doing data collection access to Supabase Studio.
-2. **Define the data model** (`backend/app/models/`): `Scholarship`, eligibility rule fields (school year, major, income bracket, region, military status, etc.), and how a user "spec" maps to eligibility. This is the schema the friend's manually-collected data needs to fit.
-3. **Seed initial scholarship data** — manual/semi-manual entry via Supabase Studio per the brief's "not full automated scraping yet" scope.
-4. **Matching endpoint** — `POST /match` (or similar) in `backend/app/api/`: takes a user spec, filters scholarships by eligibility rules, returns matches. Rule-based only for v1, no ML.
-5. **Frontend spec-input form + results list** — the one-time input → personalized list flow described as the MVP's core differentiator.
-6. **Migrations** — pick a migration tool once the schema stabilizes (Alembic works with SQLModel).
+1. ~~**Supabase 프로젝트 생성**~~ — 진행 중, `supabase/README.md` 참고.
+2. **데이터 모델 정의** (`backend/app/models/`): `Scholarship`, 자격조건 필드(학년, 전공, 소득분위, 지역, 병역상태 등), 유저 "스펙"이 자격조건에 어떻게 매핑되는지. 친구가 수동 수집한 데이터가 맞춰야 할 스키마임.
+3. **초기 장학금 데이터 입력** — 브리프의 "자동 스크래핑은 아직 아님" 스코프에 맞춰 Supabase Studio로 수동/반자동 입력.
+4. **매칭 엔드포인트** — `backend/app/api/`에 `POST /match` (또는 비슷한 이름): 유저 스펙을 받아서 자격조건으로 장학금을 필터링하고 매칭 결과 반환. v1은 규칙 기반만, ML 없음.
+5. **프론트엔드 스펙 입력 폼 + 결과 리스트** — MVP의 핵심 차별점으로 명시된 "한 번 입력 → 맞춤형 리스트" 플로우.
+6. **마이그레이션** — 스키마가 안정되면 마이그레이션 툴 선정 (SQLModel과 궁합 좋은 Alembic).
