@@ -1,0 +1,13 @@
+# Python (backend)
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+*.pyc
+
+# env files (keep .env.example)
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
