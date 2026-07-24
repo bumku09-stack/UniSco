@@ -7,10 +7,12 @@
 --
 -- (비개발자 친구분은 이 파일 안 보셔도 됩니다 — supabase/README.md 상단 안내만 보시면 됩니다.)
 
--- 자격조건 값들을 정해진 옵션으로만 제한하는 타입들
-CREATE TYPE gender AS ENUM ('MALE', 'FEMALE');
-CREATE TYPE militarystatus AS ENUM ('COMPLETED', 'EXEMPTED', 'NOT_SERVED');
-CREATE TYPE foreignereligibility AS ENUM ('KOREAN_ONLY', 'FOREIGNER_ONLY');
+-- 자격조건 값들을 정해진 옵션으로만 제한하는 타입들.
+-- 값은 소문자(예: 'male', 'foreigner_only')로 저장됨 — SQLAlchemy 기본값(대문자, enum
+-- 멤버 이름)을 values_callable로 오버라이드해서 API JSON/문서와 casing을 통일함.
+CREATE TYPE gender AS ENUM ('male', 'female');
+CREATE TYPE militarystatus AS ENUM ('completed', 'exempted', 'not_served');
+CREATE TYPE foreignereligibility AS ENUM ('korean_only', 'foreigner_only');
 
 CREATE TABLE scholarship (
     id SERIAL NOT NULL,
@@ -28,6 +30,14 @@ CREATE TABLE scholarship (
     min_gpa FLOAT,
     requires_disability BOOLEAN,
     foreigner_eligibility foreignereligibility,
+    -- 자유 텍스트 자격조건 — enum/range로 깔끔하게 안 떨어지는 항목들
+    grade_level VARCHAR,
+    major VARCHAR,
+    affiliated_institution VARCHAR,
+    min_credits VARCHAR,
+    admission_score_condition VARCHAR,
+    headcount VARCHAR,
+    application_period VARCHAR,
     PRIMARY KEY (id)
 );
 
