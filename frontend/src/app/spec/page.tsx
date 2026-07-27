@@ -32,6 +32,16 @@ type UserSpec = {
   is_foreigner: boolean;
 };
 
+// 숫자 입력 필드는 폼에서 문자열로 들고 있다가 제출할 때만 숫자로 변환함.
+// (타이핑 도중 바로 Number()로 바꿔서 value에 되먹이면 "4." 같은 중간 입력이
+// 매번 리셋되면서 방금 친 글자가 씹히는 문제가 있었음 — 그래서 07, 04.5처럼
+// 앞에 0을 하나 더 쳐야 입력되는 현상이 발생했음)
+type SpecForm = Omit<UserSpec, "age" | "gpa" | "income_bracket"> & {
+  age: string;
+  gpa: string;
+  income_bracket: string;
+};
+
 // 대학마다 학점 만점 기준이 달라서, 학교 선택하면 자동으로 표시해줌 (따로 "몇 점 만점?" 안 물어봄)
 const UNIVERSITIES: { name: string; gpaScale: number }[] = [
   { name: "충남대학교", gpaScale: 4.5 },
@@ -41,14 +51,14 @@ const UNIVERSITIES: { name: string; gpaScale: number }[] = [
 
 const STORAGE_KEY = "unisco_spec";
 
-const initialSpec: UserSpec = {
+const initialSpec: SpecForm = {
   university: UNIVERSITIES[0].name,
-  gpa: 4.0,
-  age: 20,
+  gpa: "4.0",
+  age: "20",
   gender: "male",
   region: "",
   military_status: "not_served",
-  income_bracket: 1,
+  income_bracket: "1",
   has_disability: false,
   is_foreigner: false,
 };
@@ -111,7 +121,7 @@ function ScholarshipCard({ s }: { s: Scholarship }) {
 
 export default function SpecWizard() {
   const [step, setStep] = useState<1 | 2>(1);
-  const [spec, setSpec] = useState<UserSpec>(initialSpec);
+  const [spec, setSpec] = useState<SpecForm>(initialSpec);
   const [results, setResults] = useState<Scholarship[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -121,7 +131,14 @@ export default function SpecWizard() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
-        setSpec(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        setSpec({
+          ...initialSpec,
+          ...parsed,
+          age: String(parsed.age ?? initialSpec.age),
+          gpa: String(parsed.gpa ?? initialSpec.gpa),
+          income_bracket: String(parsed.income_bracket ?? initialSpec.income_bracket),
+        });
       } catch {
         // 저장된 값이 깨졌으면 그냥 기본값 씀
       }
@@ -134,12 +151,18 @@ export default function SpecWizard() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    const payload: UserSpec = {
+      ...spec,
+      age: Number(spec.age),
+      gpa: Number(spec.gpa),
+      income_bracket: Number(spec.income_bracket),
+    };
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(spec));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/match`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(spec),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error(`status ${res.status}`);
       setResults(await res.json());
@@ -191,7 +214,7 @@ export default function SpecWizard() {
                 min={0}
                 max={gpaScale}
                 value={spec.gpa}
-                onChange={(e) => setSpec({ ...spec, gpa: Number(e.target.value) })}
+                onChange={(e) => setSpec({ ...spec, gpa: e.target.value })}
                 className={inputClass}
               />
             </Field>
@@ -213,7 +236,7 @@ export default function SpecWizard() {
                 required
                 min={0}
                 value={spec.age}
-                onChange={(e) => setSpec({ ...spec, age: Number(e.target.value) })}
+                onChange={(e) => setSpec({ ...spec, age: e.target.value })}
                 className={inputClass}
               />
             </Field>
@@ -261,7 +284,7 @@ export default function SpecWizard() {
                 min={1}
                 max={10}
                 value={spec.income_bracket}
-                onChange={(e) => setSpec({ ...spec, income_bracket: Number(e.target.value) })}
+                onChange={(e) => setSpec({ ...spec, income_bracket: e.target.value })}
                 className={inputClass}
               />
             </Field>
