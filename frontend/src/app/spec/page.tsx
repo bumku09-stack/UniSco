@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { regionShortName, SIDO_LIST } from "@/lib/regions";
 
 type Scholarship = {
   id: number;
@@ -36,10 +37,12 @@ type UserSpec = {
 // (타이핑 도중 바로 Number()로 바꿔서 value에 되먹이면 "4." 같은 중간 입력이
 // 매번 리셋되면서 방금 친 글자가 씹히는 문제가 있었음 — 그래서 07, 04.5처럼
 // 앞에 0을 하나 더 쳐야 입력되는 현상이 발생했음)
-type SpecForm = Omit<UserSpec, "age" | "gpa" | "income_bracket"> & {
+type SpecForm = Omit<UserSpec, "age" | "gpa" | "income_bracket" | "region"> & {
   age: string;
   gpa: string;
   income_bracket: string;
+  sido: string;
+  district: string;
 };
 
 // 대학마다 학점 만점 기준이 달라서, 학교 선택하면 자동으로 표시해줌 (따로 "몇 점 만점?" 안 물어봄)
@@ -51,12 +54,15 @@ const UNIVERSITIES: { name: string; gpaScale: number }[] = [
 
 const STORAGE_KEY = "unisco_spec";
 
+const DEFAULT_SIDO = SIDO_LIST.find((s) => s.name === "대전광역시")!;
+
 const initialSpec: SpecForm = {
   university: UNIVERSITIES[0].name,
   gpa: "4.0",
   age: "20",
   gender: "male",
-  region: "",
+  sido: DEFAULT_SIDO.name,
+  district: DEFAULT_SIDO.districts[0] ?? "",
   military_status: "not_served",
   income_bracket: "1",
   has_disability: false,
@@ -138,6 +144,8 @@ export default function SpecWizard() {
           age: String(parsed.age ?? initialSpec.age),
           gpa: String(parsed.gpa ?? initialSpec.gpa),
           income_bracket: String(parsed.income_bracket ?? initialSpec.income_bracket),
+          sido: parsed.sido ?? initialSpec.sido,
+          district: parsed.district ?? initialSpec.district,
         });
       } catch {
         // 저장된 값이 깨졌으면 그냥 기본값 씀
@@ -146,19 +154,25 @@ export default function SpecWizard() {
   }, []);
 
   const gpaScale = UNIVERSITIES.find((u) => u.name === spec.university)?.gpaScale ?? 4.5;
+  const currentDistricts = SIDO_LIST.find((s) => s.name === spec.sido)?.districts ?? [];
 
   async function handleFinalSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
     const payload: UserSpec = {
-      ...spec,
-      age: Number(spec.age),
+      university: spec.university,
       gpa: Number(spec.gpa),
+      age: Number(spec.age),
+      gender: spec.gender,
+      region: regionShortName(spec.sido, spec.district),
+      military_status: spec.military_status,
       income_bracket: Number(spec.income_bracket),
+      has_disability: spec.has_disability,
+      is_foreigner: spec.is_foreigner,
     };
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(spec));
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/match`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -252,16 +266,38 @@ export default function SpecWizard() {
               </select>
             </Field>
 
-            <Field label="지역">
-              <input
-                type="text"
-                required
-                placeholder="예: 대전"
-                value={spec.region}
-                onChange={(e) => setSpec({ ...spec, region: e.target.value })}
+            <Field label="광역자치단체">
+              <select
+                value={spec.sido}
+                onChange={(e) => {
+                  const nextSido = SIDO_LIST.find((s) => s.name === e.target.value)!;
+                  setSpec({ ...spec, sido: nextSido.name, district: nextSido.districts[0] ?? "" });
+                }}
                 className={inputClass}
-              />
+              >
+                {SIDO_LIST.map((s) => (
+                  <option key={s.name} value={s.name}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
             </Field>
+
+            {currentDistricts.length > 0 && (
+              <Field label="기초자치단체">
+                <select
+                  value={spec.district}
+                  onChange={(e) => setSpec({ ...spec, district: e.target.value })}
+                  className={inputClass}
+                >
+                  {currentDistricts.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
 
             <Field label="병역">
               <select
