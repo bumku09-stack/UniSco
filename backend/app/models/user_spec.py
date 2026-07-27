@@ -4,17 +4,19 @@ from app.models.enums import Gender, MilitaryStatus
 
 
 class UserSpec(SQLModel):
-    """Matching request payload shape — not a DB table.
+    """Matching request payload shape — not a DB table (for now).
 
-    v1 is one-time input (see PROJECT_BRIEF.md), so specs aren't persisted;
-    this just defines what the frontend sends to the matching endpoint.
+    Frontend currently persists this client-side (localStorage) since there's
+    no real login yet — see frontend/src/app/login. Once auth exists this
+    should move to a real per-user table instead.
     """
 
+    university: str  # 소속 대학 (예: 충남대학교, KAIST) — GPA 만점 기준을 정하는 데도 씀
+    gpa: float
     age: int
     gender: Gender
     region: str
     military_status: MilitaryStatus
     income_bracket: int
-    gpa: float
     has_disability: bool
     is_foreigner: bool
