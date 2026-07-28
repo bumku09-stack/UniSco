@@ -37,6 +37,24 @@ def _is_eligible(scholarship: Scholarship, spec: UserSpec) -> bool:
         return False
     if scholarship.foreigner_eligibility == ForeignerEligibility.KOREAN_ONLY and spec.is_foreigner:
         return False
+    if scholarship.eligible_university is not None and scholarship.eligible_university != spec.university:
+        return False
+    if scholarship.eligible_college is not None and scholarship.eligible_college != spec.college:
+        return False
+    if (
+        scholarship.required_enrollment_status is not None
+        and scholarship.required_enrollment_status != spec.enrollment_status
+    ):
+        return False
+    if scholarship.min_grade is not None and (spec.grade is None or spec.grade < scholarship.min_grade):
+        return False
+    if scholarship.max_grade is not None and (spec.grade is None or spec.grade > scholarship.max_grade):
+        return False
+    if (
+        scholarship.required_degree_level is not None
+        and scholarship.required_degree_level != spec.degree_level
+    ):
+        return False
     return True
 
 

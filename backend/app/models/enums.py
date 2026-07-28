@@ -15,3 +15,15 @@ class MilitaryStatus(str, Enum):
 class ForeignerEligibility(str, Enum):
     KOREAN_ONLY = "korean_only"
     FOREIGNER_ONLY = "foreigner_only"
+
+
+class EnrollmentStatus(str, Enum):
+    UNDERGRAD_ENROLLED = "undergrad_enrolled"  # 학부재학
+    UNDERGRAD_LEAVE = "undergrad_leave"  # 학부휴학
+    POST_UNDERGRAD = "post_undergrad"  # 학부이후과정 (대학원 등)
+
+
+class DegreeLevel(str, Enum):
+    MASTERS = "masters"  # 석사
+    DOCTORAL = "doctoral"  # 박사
+    INTEGRATED_MS_PHD = "integrated_ms_phd"  # 석박사통합

@@ -29,15 +29,22 @@
 | `min_gpa` | 최소 학점 (4.5 만점 기준 숫자) | 학점 조건 없으면 비워둠 |
 | `requires_disability` | 장애인만 받는 장학금이면 `true`, 아니면 비워둠 | 비워둠 |
 | `foreigner_eligibility` | 외국인만 되면 `foreigner_only`, 내국인만 되면 `korean_only` | 둘 다 되면 비워둠 |
-| `grade_level` | 학년 조건 (예: 신입생, 재학생) | 텍스트로 자유롭게, 없으면 비워둠 |
-| `major` | 전공 조건 | 텍스트로 자유롭게, 없으면 비워둠 |
-| `affiliated_institution` | 특정 대학/기관 소속 한정 여부 | 텍스트로 자유롭게, 없으면 비워둠 |
+| `grade_level` (참고용) | 학년 조건 원문 (예: "학부 3~8학기차") | 텍스트로 자유롭게, 없으면 비워둠 |
+| `major` (참고용) | 전공 조건 원문 | 텍스트로 자유롭게, 없으면 비워둠 |
+| `affiliated_institution` (참고용) | 소속 대학/학과 조건 원문 | 텍스트로 자유롭게, 없으면 비워둠 |
 | `min_credits` | 이수학점 조건 | 텍스트로 자유롭게, 없으면 비워둠 |
 | `admission_score_condition` | 입시(수능/내신) 성적 조건 | 텍스트로 자유롭게, 없으면 비워둠 |
 | `headcount` | 선발 인원 | 텍스트로 자유롭게, 없으면 비워둠 |
 | `application_period` | 신청 기간 | 텍스트로 자유롭게, 없으면 비워둠 |
+| `eligible_university` ⭐매칭에 실제로 쓰임 | 대상 대학 — **짧은 태그로** (예: `충남대학교`, `KAIST`) | 대학 무관하면 비워둠 |
+| `eligible_college` ⭐매칭에 실제로 쓰임 | 대상 단과대 (예: `공과대학`) — 대학 이름 정확히 일치해야 매칭되니 `eligible_university`도 같이 채워야 의미 있음 | 단과대 무관하면 비워둠 |
+| `required_enrollment_status` ⭐매칭에 실제로 쓰임 | 재학 상태 — `undergrad_enrolled`(학부재학) / `undergrad_leave`(학부휴학) / `post_undergrad`(대학원 등) | 무관하면 비워둠 |
+| `min_grade` / `max_grade` ⭐매칭에 실제로 쓰임 | 학부 학년 범위 (숫자, 예: 2학년 이상이면 min_grade=2) — `required_enrollment_status`가 학부 관련일 때만 의미 있음 | 학년 제한 없으면 비워둠 |
+| `required_degree_level` ⭐매칭에 실제로 쓰임 | 대학원 과정 구분 — `masters`(석사) / `doctoral`(박사) / `integrated_ms_phd`(석박사통합). `required_enrollment_status`가 `post_undergrad`일 때만 의미 있음 | 무관하면 비워둠 |
 
 **핵심 규칙 하나만 기억하시면 됩니다: 조건이 없으면 그냥 그 칸을 비워두세요.** "제한 없음"을 뜻하는 별도 입력값 없이, 그냥 빈 칸으로 두면 시스템이 "모든 사람 해당"으로 처리합니다.
+
+**⭐표시된 컬럼이 실제 매칭 필터링에 쓰이는 것들입니다.** `grade_level`/`major`/`affiliated_institution`(참고용 표시)은 지금 화면엔 값이 들어있어도 매칭 로직이 아직 안 읽습니다 — 나중에 정밀 매칭이 더 확장되면 그때 다시 쓰일 수 있어서 지우진 않았지만, 지금 당장 결과에 영향 주고 싶으면 ⭐표시된 새 컬럼들을 채워주셔야 합니다.
 
 **`eligible_region`만 예외로 주의하세요**: 여기는 나중에 "사용자 지역 == 이 값"으로 정확히 비교하는 자동 매칭에 쓰일 예정이라, `대전 거주자가 타지역 대학 다니는 경우 대상` 같은 긴 설명 문장을 넣으면 그 장학금이 매칭에서 영원히 빠질 수 있습니다. 짧은 지역 태그만 넣고, 나머지 세부 조건은 `description`에 적어주세요.
 

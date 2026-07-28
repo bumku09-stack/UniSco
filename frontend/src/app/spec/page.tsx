@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { regionShortName, SIDO_LIST } from "@/lib/regions";
+import { UNIVERSITIES } from "@/lib/universities";
 
 type Scholarship = {
   id: number;
@@ -21,8 +22,12 @@ type Scholarship = {
   foreigner_eligibility: "korean_only" | "foreigner_only" | null;
 };
 
+type EnrollmentStatus = "undergrad_enrolled" | "undergrad_leave" | "post_undergrad";
+type DegreeLevel = "masters" | "doctoral" | "integrated_ms_phd";
+
 type UserSpec = {
   university: string;
+  college: string;
   gpa: number;
   age: number;
   gender: "male" | "female";
@@ -31,33 +36,32 @@ type UserSpec = {
   income_bracket: number;
   has_disability: boolean;
   is_foreigner: boolean;
+  enrollment_status: EnrollmentStatus;
+  grade: number | null;
+  degree_level: DegreeLevel | null;
 };
 
 // 숫자 입력 필드는 폼에서 문자열로 들고 있다가 제출할 때만 숫자로 변환함.
 // (타이핑 도중 바로 Number()로 바꿔서 value에 되먹이면 "4." 같은 중간 입력이
 // 매번 리셋되면서 방금 친 글자가 씹히는 문제가 있었음 — 그래서 07, 04.5처럼
 // 앞에 0을 하나 더 쳐야 입력되는 현상이 발생했음)
-type SpecForm = Omit<UserSpec, "age" | "gpa" | "income_bracket" | "region"> & {
+type SpecForm = Omit<UserSpec, "age" | "gpa" | "income_bracket" | "region" | "grade"> & {
   age: string;
   gpa: string;
   income_bracket: string;
   sido: string;
   district: string;
+  grade: string;
 };
-
-// 대학마다 학점 만점 기준이 달라서, 학교 선택하면 자동으로 표시해줌 (따로 "몇 점 만점?" 안 물어봄)
-const UNIVERSITIES: { name: string; gpaScale: number }[] = [
-  { name: "충남대학교", gpaScale: 4.5 },
-  { name: "KAIST", gpaScale: 4.3 },
-  { name: "기타", gpaScale: 4.5 },
-];
 
 const STORAGE_KEY = "unisco_spec";
 
 const DEFAULT_SIDO = SIDO_LIST.find((s) => s.name === "대전광역시")!;
+const DEFAULT_UNIVERSITY = UNIVERSITIES[0];
 
 const initialSpec: SpecForm = {
-  university: UNIVERSITIES[0].name,
+  university: DEFAULT_UNIVERSITY.name,
+  college: DEFAULT_UNIVERSITY.colleges[0] ?? "",
   gpa: "4.0",
   age: "20",
   gender: "male",
@@ -67,6 +71,9 @@ const initialSpec: SpecForm = {
   income_bracket: "1",
   has_disability: false,
   is_foreigner: false,
+  enrollment_status: "undergrad_enrolled",
+  grade: "1",
+  degree_level: null,
 };
 
 function formatAmount(amount: number | null) {
@@ -146,6 +153,10 @@ export default function SpecWizard() {
           income_bracket: String(parsed.income_bracket ?? initialSpec.income_bracket),
           sido: parsed.sido ?? initialSpec.sido,
           district: parsed.district ?? initialSpec.district,
+          college: parsed.college ?? initialSpec.college,
+          enrollment_status: parsed.enrollment_status ?? initialSpec.enrollment_status,
+          grade: String(parsed.grade ?? initialSpec.grade),
+          degree_level: parsed.degree_level ?? initialSpec.degree_level,
         });
       } catch {
         // 저장된 값이 깨졌으면 그냥 기본값 씀
@@ -153,7 +164,9 @@ export default function SpecWizard() {
     }
   }, []);
 
-  const gpaScale = UNIVERSITIES.find((u) => u.name === spec.university)?.gpaScale ?? 4.5;
+  const currentUniversity = UNIVERSITIES.find((u) => u.name === spec.university) ?? UNIVERSITIES[0];
+  const gpaScale = currentUniversity.gpaScale;
+  const currentColleges = currentUniversity.colleges;
   const currentDistricts = SIDO_LIST.find((s) => s.name === spec.sido)?.districts ?? [];
 
   async function handleFinalSubmit(e: React.FormEvent) {
@@ -162,6 +175,7 @@ export default function SpecWizard() {
     setError(null);
     const payload: UserSpec = {
       university: spec.university,
+      college: spec.college,
       gpa: Number(spec.gpa),
       age: Number(spec.age),
       gender: spec.gender,
@@ -170,6 +184,9 @@ export default function SpecWizard() {
       income_bracket: Number(spec.income_bracket),
       has_disability: spec.has_disability,
       is_foreigner: spec.is_foreigner,
+      enrollment_status: spec.enrollment_status,
+      grade: spec.enrollment_status === "post_undergrad" ? null : Number(spec.grade),
+      degree_level: spec.enrollment_status === "post_undergrad" ? spec.degree_level : null,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(spec));
@@ -209,7 +226,10 @@ export default function SpecWizard() {
             <Field label="소속 대학">
               <select
                 value={spec.university}
-                onChange={(e) => setSpec({ ...spec, university: e.target.value })}
+                onChange={(e) => {
+                  const next = UNIVERSITIES.find((u) => u.name === e.target.value)!;
+                  setSpec({ ...spec, university: next.name, college: next.colleges[0] ?? "" });
+                }}
                 className={inputClass}
               >
                 {UNIVERSITIES.map((u) => (
@@ -219,6 +239,63 @@ export default function SpecWizard() {
                 ))}
               </select>
             </Field>
+
+            {currentColleges.length > 0 && (
+              <Field label="단과대">
+                <select
+                  value={spec.college}
+                  onChange={(e) => setSpec({ ...spec, college: e.target.value })}
+                  className={inputClass}
+                >
+                  {currentColleges.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
+
+            <Field label="재학 상태">
+              <select
+                value={spec.enrollment_status}
+                onChange={(e) =>
+                  setSpec({ ...spec, enrollment_status: e.target.value as EnrollmentStatus })
+                }
+                className={inputClass}
+              >
+                <option value="undergrad_enrolled">학부 재학</option>
+                <option value="undergrad_leave">학부 휴학</option>
+                <option value="post_undergrad">학부 이후 과정 (대학원 등)</option>
+              </select>
+            </Field>
+
+            {spec.enrollment_status === "post_undergrad" ? (
+              <Field label="과정 구분">
+                <select
+                  value={spec.degree_level ?? "masters"}
+                  onChange={(e) => setSpec({ ...spec, degree_level: e.target.value as DegreeLevel })}
+                  className={inputClass}
+                >
+                  <option value="masters">석사</option>
+                  <option value="doctoral">박사</option>
+                  <option value="integrated_ms_phd">석박사통합</option>
+                </select>
+              </Field>
+            ) : (
+              <Field label="학년">
+                <select
+                  value={spec.grade}
+                  onChange={(e) => setSpec({ ...spec, grade: e.target.value })}
+                  className={inputClass}
+                >
+                  <option value="1">1학년</option>
+                  <option value="2">2학년</option>
+                  <option value="3">3학년</option>
+                  <option value="4">4학년</option>
+                </select>
+              </Field>
+            )}
 
             <Field label={`학점 (${gpaScale} 만점 기준)`}>
               <input

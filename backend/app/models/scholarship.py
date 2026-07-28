@@ -1,7 +1,7 @@
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field, SQLModel
 
-from app.models.enums import ForeignerEligibility, Gender, MilitaryStatus
+from app.models.enums import DegreeLevel, EnrollmentStatus, ForeignerEligibility, Gender, MilitaryStatus
 
 
 def _enum_column(enum_cls):
@@ -39,10 +39,22 @@ class Scholarship(SQLModel, table=True):
     # Free-text eligibility detail that doesn't fit a clean enum/range — added
     # after reviewing real scraped data, which needed these as separate columns
     # rather than crammed into `description`.
-    grade_level: str | None = None  # 학년 조건 (예: "신입생", "재학생")
-    major: str | None = None  # 전공 조건
-    affiliated_institution: str | None = None  # 소속 대학/기관 한정
+    grade_level: str | None = None  # (레거시, 구조화 전 원문) 학년 조건 텍스트
+    major: str | None = None  # 전공 조건 — 아직 매칭에 안 씀, 학과 단위 정밀매칭은 다음 단계
+    affiliated_institution: str | None = None  # (레거시, 구조화 전 원문) 소속 대학/학과 텍스트
     min_credits: str | None = None  # 이수학점 조건 (형식이 제각각이라 텍스트)
     admission_score_condition: str | None = None  # 내신/입학성적 조건
     headcount: str | None = None  # 선발 인원
     application_period: str | None = None  # 신청 기간
+
+    # 구조화된 자격조건 (정밀 매칭용). None=제한 없음, 기존 규칙과 동일.
+    eligible_university: str | None = None  # 짧은 태그 (예: "충남대학교", "KAIST")
+    eligible_college: str | None = None  # 단과대 (예: "공과대학") — 소속 대학이 정해진 경우만 의미 있음
+    required_enrollment_status: EnrollmentStatus | None = Field(
+        default=None, sa_type=_enum_column(EnrollmentStatus)
+    )
+    min_grade: int | None = None  # 학부 학년 하한 (재학상태가 학부 관련일 때만 의미)
+    max_grade: int | None = None  # 학부 학년 상한
+    required_degree_level: DegreeLevel | None = Field(
+        default=None, sa_type=_enum_column(DegreeLevel)
+    )  # 재학상태가 학부이후과정일 때만 의미

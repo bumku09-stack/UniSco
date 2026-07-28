@@ -13,6 +13,8 @@
 CREATE TYPE gender AS ENUM ('male', 'female');
 CREATE TYPE militarystatus AS ENUM ('completed', 'exempted', 'not_served');
 CREATE TYPE foreignereligibility AS ENUM ('korean_only', 'foreigner_only');
+CREATE TYPE enrollmentstatus AS ENUM ('undergrad_enrolled', 'undergrad_leave', 'post_undergrad');
+CREATE TYPE degreelevel AS ENUM ('masters', 'doctoral', 'integrated_ms_phd');
 
 CREATE TABLE scholarship (
     id SERIAL NOT NULL,
@@ -30,7 +32,7 @@ CREATE TABLE scholarship (
     min_gpa FLOAT,
     requires_disability BOOLEAN,
     foreigner_eligibility foreignereligibility,
-    -- 자유 텍스트 자격조건 — enum/range로 깔끔하게 안 떨어지는 항목들
+    -- (레거시) 구조화 전 원문 텍스트 — 매칭에는 안 쓰고 참고용/미래 정밀매칭 재료로 남겨둠
     grade_level VARCHAR,
     major VARCHAR,
     affiliated_institution VARCHAR,
@@ -38,6 +40,13 @@ CREATE TABLE scholarship (
     admission_score_condition VARCHAR,
     headcount VARCHAR,
     application_period VARCHAR,
+    -- 구조화된 정밀 매칭용 필드 (2026-07-28 추가)
+    eligible_university VARCHAR,
+    eligible_college VARCHAR,
+    required_enrollment_status enrollmentstatus,
+    min_grade INTEGER,
+    max_grade INTEGER,
+    required_degree_level degreelevel,
     PRIMARY KEY (id)
 );
 
