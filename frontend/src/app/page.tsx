@@ -29,9 +29,9 @@ export default function LoginPage() {
         </div>
 
         <h1 className="text-2xl font-bold leading-snug text-gray-900">
-          안녕하세요!
+          장학금, 이제는 놓치지 말자
           <br />
-          이메일로 로그인해주세요
+          UniSco
         </h1>
         <p className="mt-2 text-sm text-gray-500">
           대전 지역 대학생을 위한 맞춤형 장학금 매칭 서비스
@@ -64,7 +64,7 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-6 text-center text-xs text-gray-400">
-          아직 계정이 없으신가요? 지금은 아무 이메일로나 로그인할 수 있어요.
+          아직 계정이 없으신가요?
         </p>
       </div>
     </div>
