@@ -20,6 +20,8 @@ type Scholarship = {
   min_gpa: number | null;
   requires_disability: boolean | null;
   foreigner_eligibility: "korean_only" | "foreigner_only" | null;
+  category_l1: "school_internal" | "school_external" | "support_fund" | null;
+  category_l2: string | null;
 };
 
 type EnrollmentStatus = "undergrad_enrolled" | "undergrad_leave" | "post_undergrad";
@@ -104,6 +106,22 @@ function eligibilitySummary(s: Scholarship): string {
   return parts.length > 0 ? parts.join(" · ") : "제한 없음";
 }
 
+const CATEGORY_L2_LABEL: Record<string, string> = {
+  academic_merit: "성적",
+  welfare_living: "복지생활지원",
+  special_target: "특수대상",
+  activity_merit: "활동공로",
+  research: "연구",
+  international_exchange: "국제교류",
+  department_alumni: "학과동문회",
+  national_scholarship: "국가장학금",
+  local_gov: "지자체",
+  private_foundation: "민간재단",
+  association: "협회학회",
+  youth_living_support: "청년생활지원",
+  activity_participation_support: "활동참여지원",
+};
+
 const inputClass =
   "w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none";
 
@@ -119,6 +137,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function ScholarshipCard({ s }: { s: Scholarship }) {
   return (
     <li className="rounded-xl border border-zinc-200 p-4">
+      {s.category_l2 && (
+        <span className="mb-1.5 inline-block rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-500">
+          {CATEGORY_L2_LABEL[s.category_l2] ?? s.category_l2}
+        </span>
+      )}
       <div className="flex items-start justify-between gap-2">
         <h2 className="font-semibold text-zinc-900">{s.name}</h2>
         {formatAmount(s.amount) && (

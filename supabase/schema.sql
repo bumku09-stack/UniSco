@@ -15,6 +15,13 @@ CREATE TYPE militarystatus AS ENUM ('completed', 'exempted', 'not_served');
 CREATE TYPE foreignereligibility AS ENUM ('korean_only', 'foreigner_only');
 CREATE TYPE enrollmentstatus AS ENUM ('undergrad_enrolled', 'undergrad_leave', 'post_undergrad');
 CREATE TYPE degreelevel AS ENUM ('masters', 'doctoral', 'integrated_ms_phd');
+CREATE TYPE categoryl1 AS ENUM ('school_internal', 'school_external', 'support_fund');
+CREATE TYPE categoryl2 AS ENUM (
+    'academic_merit', 'welfare_living', 'special_target', 'activity_merit', 'research',
+    'international_exchange', 'department_alumni',
+    'national_scholarship', 'local_gov', 'private_foundation', 'association',
+    'youth_living_support', 'activity_participation_support'
+);
 
 CREATE TABLE scholarship (
     id SERIAL NOT NULL,
@@ -47,6 +54,9 @@ CREATE TABLE scholarship (
     min_grade INTEGER,
     max_grade INTEGER,
     required_degree_level degreelevel,
+    -- 분류 체계 (자격조건 아님, 목록 표시/그룹핑용) (2026-07-28 추가)
+    category_l1 categoryl1,
+    category_l2 categoryl2,
     PRIMARY KEY (id)
 );
 

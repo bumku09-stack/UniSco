@@ -1,7 +1,15 @@
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field, SQLModel
 
-from app.models.enums import DegreeLevel, EnrollmentStatus, ForeignerEligibility, Gender, MilitaryStatus
+from app.models.enums import (
+    CategoryL1,
+    CategoryL2,
+    DegreeLevel,
+    EnrollmentStatus,
+    ForeignerEligibility,
+    Gender,
+    MilitaryStatus,
+)
 
 
 def _enum_column(enum_cls):
@@ -58,3 +66,8 @@ class Scholarship(SQLModel, table=True):
     required_degree_level: DegreeLevel | None = Field(
         default=None, sa_type=_enum_column(DegreeLevel)
     )  # 재학상태가 학부이후과정일 때만 의미
+
+    # 분류 체계 (자격조건 아님 — 매칭 필터링에 안 쓰고, 목록 표시/그룹핑용).
+    # category_l2가 어느 category_l1에 속하는지는 app.models.enums.CATEGORY_L2_BY_L1 참고.
+    category_l1: CategoryL1 | None = Field(default=None, sa_type=_enum_column(CategoryL1))
+    category_l2: CategoryL2 | None = Field(default=None, sa_type=_enum_column(CategoryL2))

@@ -41,8 +41,20 @@
 | `required_enrollment_status` ⭐매칭에 실제로 쓰임 | 재학 상태 — `undergrad_enrolled`(학부재학) / `undergrad_leave`(학부휴학) / `post_undergrad`(대학원 등) | 무관하면 비워둠 |
 | `min_grade` / `max_grade` ⭐매칭에 실제로 쓰임 | 학부 학년 범위 (숫자, 예: 2학년 이상이면 min_grade=2) — `required_enrollment_status`가 학부 관련일 때만 의미 있음 | 학년 제한 없으면 비워둠 |
 | `required_degree_level` ⭐매칭에 실제로 쓰임 | 대학원 과정 구분 — `masters`(석사) / `doctoral`(박사) / `integrated_ms_phd`(석박사통합). `required_enrollment_status`가 `post_undergrad`일 때만 의미 있음 | 무관하면 비워둠 |
+| `category_l1` | 대분류 — `school_internal`(교내장학금) / `school_external`(교외장학금) / `support_fund`(지원금) | 분류 안 정했으면 비워둠 |
+| `category_l2` | 중분류 — 아래 표에서 `category_l1`에 맞는 값 골라서 입력 | 분류 안 정했으면 비워둠 |
+
+**`category_l1`별로 고를 수 있는 `category_l2` 값:**
+
+| category_l1 | 고를 수 있는 category_l2 값 |
+|---|---|
+| `school_internal` (교내장학금) | `academic_merit`(성적) / `welfare_living`(복지생활지원) / `special_target`(특수대상) / `activity_merit`(활동공로) / `research`(연구) / `international_exchange`(국제교류) / `department_alumni`(학과동문회자체) |
+| `school_external` (교외장학금) | `national_scholarship`(국가장학금) / `local_gov`(지자체) / `private_foundation`(민간재단기업) / `association`(협회학회) |
+| `support_fund` (지원금) | `youth_living_support`(청년생활지원) / `activity_participation_support`(활동참여지원) |
 
 **핵심 규칙 하나만 기억하시면 됩니다: 조건이 없으면 그냥 그 칸을 비워두세요.** "제한 없음"을 뜻하는 별도 입력값 없이, 그냥 빈 칸으로 두면 시스템이 "모든 사람 해당"으로 처리합니다.
+
+**`category_l1`/`category_l2`는 다른 컬럼이랑 성격이 달라요** — "이 장학금 누가 받을 수 있는지"(자격조건)가 아니라 "이 장학금이 어떤 종류인지"(분류)라서, 매칭 필터링에는 안 쓰이고 목록 화면에 표시/그룹핑하는 용도입니다. 애매한 경우(예: 연구메이트 지원사업처럼 연구지도가 아니라 튜터링 활동비 성격이면 `activity_participation_support`) 판단 기준은 계속 상의해서 정하면 됩니다.
 
 **⭐표시된 컬럼이 실제 매칭 필터링에 쓰이는 것들입니다.** `grade_level`/`major`/`affiliated_institution`(참고용 표시)은 지금 화면엔 값이 들어있어도 매칭 로직이 아직 안 읽습니다 — 나중에 정밀 매칭이 더 확장되면 그때 다시 쓰일 수 있어서 지우진 않았지만, 지금 당장 결과에 영향 주고 싶으면 ⭐표시된 새 컬럼들을 채워주셔야 합니다.
 
