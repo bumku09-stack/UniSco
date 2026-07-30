@@ -37,13 +37,13 @@ cd frontend && npm run dev                                                # http
 
 최초 셋업(venv 생성, `pip install`, `.env` 파일 등)은 각 폴더 README에 있습니다.
 
-## 다음 단계 (기능 구현은 여기부터)
+## 진행 상황 (2026-07-30 기준)
 
-아래는 아직 구현 안 됨 — 이번 세션은 뼈대만 잡았습니다.
-
-1. ~~**Supabase 프로젝트 생성**~~ — 진행 중, `supabase/README.md` 참고.
-2. **데이터 모델 정의** (`backend/app/models/`): `Scholarship`, 자격조건 필드(학년, 전공, 소득분위, 지역, 병역상태 등), 유저 "스펙"이 자격조건에 어떻게 매핑되는지. 친구가 수동 수집한 데이터가 맞춰야 할 스키마임.
-3. **초기 장학금 데이터 입력** — 브리프의 "자동 스크래핑은 아직 아님" 스코프에 맞춰 Supabase Studio로 수동/반자동 입력.
-4. **매칭 엔드포인트** — `backend/app/api/`에 `POST /match` (또는 비슷한 이름): 유저 스펙을 받아서 자격조건으로 장학금을 필터링하고 매칭 결과 반환. v1은 규칙 기반만, ML 없음.
-5. **프론트엔드 스펙 입력 폼 + 결과 리스트** — MVP의 핵심 차별점으로 명시된 "한 번 입력 → 맞춤형 리스트" 플로우.
-6. **마이그레이션** — 스키마가 안정되면 마이그레이션 툴 선정 (SQLModel과 궁합 좋은 Alembic).
+1. ~~**Supabase 프로젝트 생성**~~ — 완료. `supabase/README.md` 참고.
+2. ~~**데이터 모델 정의**~~ — 완료. `Scholarship`(자격조건 필드 + `category_l1`/`category_l2` 분류), `UserSpec`, 관련 enum 전부 `backend/app/models/`에 있음.
+3. **장학금 데이터 입력** — 진행 중. 친구가 Supabase Studio로 수동 입력 중(현재 133건). 최근 추가된 정밀 매칭 필드(`eligible_university`, `eligible_college`, `category_l1`/`l2` 등)는 새 항목부터 채워지는 중이고, 기존 항목 백필은 안 함.
+4. ~~**매칭 엔드포인트**~~ — 완료. `POST /match`, `GET /scholarships` (`backend/app/api/`). 규칙 기반, ML 없음.
+5. ~~**프론트엔드 스펙 입력 폼 + 결과 리스트**~~ — 완료. 로그인 → 2단계 스펙 위저드 → 매칭 결과(15개씩 페이지네이션). Toss 스타일 UI로 구현됨. `frontend/README.md` 참고.
+6. **마이그레이션** — 아직 안 함. 스키마가 계속 바뀌는 중이라 지금은 `SQLModel.metadata.create_all()` + 수동 `ALTER TABLE`로 운영, 안정되면 Alembic 등 도입 검토.
+7. **실제 로그인 연동** — 아직 UI만 있음. 인증 방식(Supabase Auth 등)은 동업자와 논의 중.
+8. **장학금 상세 페이지** — 아직 없음. 지금은 목록 카드에 요약 정보만 표시.
