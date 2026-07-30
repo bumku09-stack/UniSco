@@ -1,14 +1,20 @@
 # frontend/
 
-Next.js (App Router) + React + TypeScript + Tailwind CSS. `create-next-app`으로 스캐폴딩함, 아직은 대부분 기본 템플릿 그대로 — 스펙 입력 폼과 결과 리스트가 여기 만들어질 예정.
+Next.js (App Router) + React + TypeScript + Tailwind CSS. `create-next-app`으로 스캐폴딩 후 로그인 화면 + 2단계 스펙 입력 위저드 + 매칭 결과 화면까지 구현됨. 디자인은 Toss 스타일(블루 포인트 컬러, 라운드 카드, 필 토글)로 되어 있음.
 
 ## 코드 구조
 
 ```
-src/app/
-├── layout.tsx      # 루트 레이아웃 — 모든 페이지를 감싸는 껍데기, 지금은 폰트 설정 + <html>/<body>만
-├── page.tsx        # "/" 라우트 — 지금은 create-next-app 기본 플레이스홀더 페이지
-└── globals.css      # Tailwind 진입점 + 전역 스타일
+src/
+├── app/
+│   ├── layout.tsx      # 루트 레이아웃 — 모든 페이지를 감싸는 껍데기, 폰트 설정 + <html>/<body>
+│   ├── page.tsx         # "/" 라우트 — 로그인 화면 (실제 인증 연동 전, 제출하면 /spec으로 이동)
+│   ├── globals.css      # Tailwind 진입점 + 전역 스타일
+│   └── spec/
+│       └── page.tsx     # "/spec" 라우트 — 2단계 스펙 입력 위저드 + 매칭 결과 리스트(15개씩 페이지네이션)
+└── lib/
+    ├── regions.ts        # 광역/기초자치단체 목록(SIDO_LIST) + 지역 표기 축약 헬퍼
+    └── universities.ts   # 대학별 단과대 목록 + 학점 만점 기준(gpaScale)
 ```
 
 ### Next.js App Router 동작 방식 (처음이라면)
@@ -30,4 +36,9 @@ npm run dev                    # http://localhost:3000
 
 ## 실제 UI는 어디에
 
-아직 안 만듦. 브리프 기준 핵심 플로우는: 한 번 입력하는 스펙 폼(학년, 전공, 소득분위, 지역 등) → 백엔드 매칭 엔드포인트로 `POST` → 맞춤형 장학금 리스트 렌더링. 루트 [README.md](../README.md) "다음 단계" 참고.
+`app/page.tsx`(로그인) → `app/spec/page.tsx`(스펙 위저드). 핵심 플로우: 1단계(대학/단과대/재학상태/학년·과정/학점) → 2단계(나이/성별/지역/병역/소득분위/장애·외국인 여부) 입력 후 `POST /match` → 매칭된 장학금을 카드 리스트로, 15개 넘으면 하단 숫자 페이지네이션으로 표시. 스펙 값은 로그인이 아직 없어서 `localStorage`에 저장해뒀다가 다음 방문 때 불러옴(실제 인증 붙으면 서버 저장으로 교체 예정).
+
+## 남은 것 (2026-07-30 기준)
+
+- 실제 로그인 연동 안 됨 — 인증 방식(Supabase Auth 등)은 동업자와 논의 중, 지금은 UI만 있고 제출하면 그냥 `/spec`으로 넘어감.
+- 장학금 상세 페이지 없음 — 카드 클릭해서 들어가는 상세 화면은 아직 미구현.
