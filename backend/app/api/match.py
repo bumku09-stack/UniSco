@@ -6,6 +6,21 @@ from app.models import ForeignerEligibility, Scholarship, UserSpec
 
 router = APIRouter()
 
+# min_gpa is always stored on a 4.5 scale (see supabase/README.md). Schools
+# grade on different scales (KAIST is 4.3) — must mirror
+# frontend/src/lib/universities.ts's gpaScale so a user's self-reported GPA
+# compares correctly against that normalized 4.5-scale threshold.
+UNIVERSITY_GPA_SCALE = {
+    "충남대학교": 4.5,
+    "KAIST": 4.3,
+}
+DEFAULT_GPA_SCALE = 4.5
+
+
+def _normalized_gpa(spec: UserSpec) -> float:
+    scale = UNIVERSITY_GPA_SCALE.get(spec.university, DEFAULT_GPA_SCALE)
+    return spec.gpa * (4.5 / scale)
+
 
 def _is_eligible(scholarship: Scholarship, spec: UserSpec) -> bool:
     """A scholarship field left as None means no restriction for that
@@ -29,7 +44,7 @@ def _is_eligible(scholarship: Scholarship, spec: UserSpec) -> bool:
         and spec.income_bracket > scholarship.max_income_bracket
     ):
         return False
-    if scholarship.min_gpa is not None and spec.gpa < scholarship.min_gpa:
+    if scholarship.min_gpa is not None and _normalized_gpa(spec) < scholarship.min_gpa:
         return False
     if scholarship.requires_disability and not spec.has_disability:
         return False
