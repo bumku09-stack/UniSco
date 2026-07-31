@@ -57,6 +57,7 @@ def signup(body: SignupRequest, session: Session = Depends(get_session)):
     try:
         send_verification_code(body.email, code)
     except Exception as e:
+        print(f"[auth/signup] send_verification_code failed for {body.email}: {e!r}", flush=True)
         raise HTTPException(
             status_code=502, detail="인증 메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요."
         ) from e
@@ -136,6 +137,9 @@ def resend_code(body: ResendCodeRequest, session: Session = Depends(get_session)
     try:
         send_verification_code(user.email, code)
     except Exception as e:
+        print(
+            f"[auth/resend-code] send_verification_code failed for {user.email}: {e!r}", flush=True
+        )
         raise HTTPException(
             status_code=502, detail="인증 메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요."
         ) from e
