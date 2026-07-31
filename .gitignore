@@ -11,3 +11,6 @@ backend/**/__pycache__/
 
 # OS
 .DS_Store
+
+# personal local notes (not shared)
+CLAUDE.local.md

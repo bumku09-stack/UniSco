@@ -41,7 +41,7 @@
 
 1. **"학부생·대학원생 둘 다 대상"을 표현 못 함** — 실제로 이런 장학금이 7건 있었음(KAIST 인성장학금, 한국원자력학회장학금, 두산중공업장학금, 학생자치단체 간부장학금 3종, 감민호장학금). 지금은 그냥 비워둠(제한 없음)으로 처리했는데, 이게 결과적으로는 맞지만(둘 다 통과되니) — "휴학생은 제외하고 재학 중인 학부/대학원생만"처럼 더 세밀한 조건은 표현이 안 됨.
 2. **대학원생의 "휴학" 상태를 표현 못 함** — `undergrad_leave`만 있고 대학원 버전이 없음. "학생 출산·육아지원금"(KAIST, 휴학 중인 사람 대상)은 학부생 기준(`undergrad_leave`)으로 근사 처리함 — 대학원생이 이 사유로 휴학 중이면 지금 시스템에서 놓치게 됨.
-3. **법학전문대학원(로스�쿨) 계열이 분류 체계에 안 맞음** — `eligible_college` 목록(`frontend/src/lib/universities.ts`)에 로스쿨 항목 자체가 없고, `required_degree_level`(masters/doctoral/integrated_ms_phd)도 JD형 전문대학원엔 안 맞음. CNU 로스쿨 장학금 4건 + MD-Ph.D 통합과정 1건, 총 5건이 이 문제로 아직 미분류 상태로 남아있음 — 호성이 백엔드에 학과/과정 추가 예정.
+3. **법학전문대학원(로스쿨) 계열이 분류 체계에 안 맞음** — ✅ **부분 해결 (2026-07-31)**. `frontend/src/lib/universities.ts`의 충남대 단과대 목록에 `법학전문대학원`/`의학전문대학원`을 추가하고, 로스쿨 장학금 4건(id 15·16·43·44)은 `eligible_university=충남대학교`/`eligible_college=법학전문대학원`/`required_enrollment_status=post_undergrad`로, MD-Ph.D 통합과정 1건(id 92)은 같은 방식+`eligible_college=의학전문대학원`으로 분류함. `required_degree_level`은 JD형 전문대학원엔 맞는 값이 없어서 비워둠(제한 없음) — 어차피 `eligible_college`로 이미 좁혀지니 결과적으로는 문제없음. 다만 MD-Ph.D의 `required_degree_level=integrated_ms_phd`는 정확한 값이 없어서 가장 가까운 값으로 근사 처리한 것 — 정식으로 JD/MD-PhD 전용 값을 enum에 추가할지는 호성과 논의 필요.
 
 ---
 
