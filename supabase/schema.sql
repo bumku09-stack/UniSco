@@ -13,7 +13,10 @@
 CREATE TYPE gender AS ENUM ('male', 'female');
 CREATE TYPE militarystatus AS ENUM ('completed', 'exempted', 'not_served');
 CREATE TYPE foreignereligibility AS ENUM ('korean_only', 'foreigner_only');
-CREATE TYPE enrollmentstatus AS ENUM ('undergrad_enrolled', 'undergrad_leave', 'post_undergrad');
+-- undergrad_transfer(편입)는 2026-07-31 ALTER TYPE으로 추가됨. 매칭 시 undergrad_enrolled
+-- 요구조건은 undergrad_transfer도 만족시키는 것으로 취급함(둘 다 "현재 재학중") —
+-- backend/app/api/match.py의 _enrollment_status_matches() 참고.
+CREATE TYPE enrollmentstatus AS ENUM ('undergrad_enrolled', 'undergrad_transfer', 'undergrad_leave', 'post_undergrad');
 CREATE TYPE degreelevel AS ENUM ('masters', 'doctoral', 'integrated_ms_phd');
 CREATE TYPE categoryl1 AS ENUM ('school_internal', 'school_external', 'support_fund');
 CREATE TYPE categoryl2 AS ENUM (

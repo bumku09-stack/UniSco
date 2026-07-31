@@ -244,11 +244,15 @@ export default function SpecWizard() {
 
             <Field label="재학 상태">
               <PillToggle
-                value={spec.enrollment_status}
-                onChange={(v) => setSpec({ ...spec, enrollment_status: v as EnrollmentStatus })}
+                value={spec.enrollment_status === "post_undergrad" ? "post_undergrad" : "undergrad"}
+                onChange={(v) =>
+                  setSpec({
+                    ...spec,
+                    enrollment_status: v === "post_undergrad" ? "post_undergrad" : "undergrad_enrolled",
+                  })
+                }
                 options={[
-                  { value: "undergrad_enrolled", label: "학부 재학" },
-                  { value: "undergrad_leave", label: "학부 휴학" },
+                  { value: "undergrad", label: "학부" },
                   { value: "post_undergrad", label: "대학원 등" },
                 ]}
               />
@@ -266,17 +270,43 @@ export default function SpecWizard() {
                 ]}
               />
             ) : (
-              <SelectField
-                label="학년"
-                value={spec.grade}
-                onChange={(v) => setSpec({ ...spec, grade: v })}
-                options={[
-                  { value: "1", label: "1학년" },
-                  { value: "2", label: "2학년" },
-                  { value: "3", label: "3학년" },
-                  { value: "4", label: "4학년" },
-                ]}
-              />
+              <>
+                <Field label="학부 재학 구분">
+                  <PillToggle
+                    value={spec.enrollment_status}
+                    onChange={(v) => {
+                      const nextStatus = v as EnrollmentStatus;
+                      // 편입생은 1학년으로 들어오는 경우가 거의 없어서, 편입 선택 중
+                      // 학년이 1학년으로 남아있으면 2학년으로 올려줌
+                      const nextGrade =
+                        nextStatus === "undergrad_transfer" && spec.grade === "1" ? "2" : spec.grade;
+                      setSpec({ ...spec, enrollment_status: nextStatus, grade: nextGrade });
+                    }}
+                    options={[
+                      { value: "undergrad_enrolled", label: "재학" },
+                      { value: "undergrad_leave", label: "휴학" },
+                      { value: "undergrad_transfer", label: "편입" },
+                    ]}
+                  />
+                </Field>
+
+                <div>
+                  <SelectField
+                    label="학년"
+                    value={spec.grade}
+                    onChange={(v) => setSpec({ ...spec, grade: v })}
+                    options={(spec.enrollment_status === "undergrad_transfer"
+                      ? ["2", "3", "4"]
+                      : ["1", "2", "3", "4"]
+                    ).map((g) => ({ value: g, label: `${g}학년` }))}
+                  />
+                  {spec.enrollment_status === "undergrad_enrolled" && spec.grade === "1" && (
+                    <p className="mt-1.5 text-xs font-semibold text-blue-500">
+                      ✓ 신입생으로 인식돼요 — 신입생 전용 장학금도 함께 찾아드려요
+                    </p>
+                  )}
+                </div>
+              </>
             )}
 
             <Field label={`학점 (${gpaScale} 만점 기준)`}>

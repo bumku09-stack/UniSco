@@ -19,6 +19,7 @@ class ForeignerEligibility(str, Enum):
 
 class EnrollmentStatus(str, Enum):
     UNDERGRAD_ENROLLED = "undergrad_enrolled"  # 학부재학
+    UNDERGRAD_TRANSFER = "undergrad_transfer"  # 학부편입 (재학 중이라는 점은 undergrad_enrolled와 동일 — 매칭 시 취급은 match.py 참고)
     UNDERGRAD_LEAVE = "undergrad_leave"  # 학부휴학
     POST_UNDERGRAD = "post_undergrad"  # 학부이후과정 (대학원 등)
 

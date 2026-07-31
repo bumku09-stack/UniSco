@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
 
 from app.db.session import get_session
-from app.models import ForeignerEligibility, Scholarship, UserSpec
+from app.models import EnrollmentStatus, ForeignerEligibility, Scholarship, UserSpec
 
 router = APIRouter()
 
@@ -20,6 +20,20 @@ DEFAULT_GPA_SCALE = 4.5
 def _normalized_gpa(spec: UserSpec) -> float:
     scale = UNIVERSITY_GPA_SCALE.get(spec.university, DEFAULT_GPA_SCALE)
     return spec.gpa * (4.5 / scale)
+
+
+def _enrollment_status_matches(required: EnrollmentStatus | None, spec_status: EnrollmentStatus) -> bool:
+    """Existing scholarships were tagged undergrad_enrolled before
+    undergrad_transfer existed as a value, meaning "재학생" scholarships mean
+    "currently actively enrolled" rather than "not a transfer admit" — so a
+    transfer student satisfies an undergrad_enrolled requirement too.
+    Freshman-only scholarships stay correctly excluded via min_grade/max_grade
+    (transfer students never carry grade=1) rather than through this check."""
+    if required is None:
+        return True
+    if required == EnrollmentStatus.UNDERGRAD_ENROLLED:
+        return spec_status in (EnrollmentStatus.UNDERGRAD_ENROLLED, EnrollmentStatus.UNDERGRAD_TRANSFER)
+    return required == spec_status
 
 
 def _is_eligible(scholarship: Scholarship, spec: UserSpec) -> bool:
@@ -56,10 +70,7 @@ def _is_eligible(scholarship: Scholarship, spec: UserSpec) -> bool:
         return False
     if scholarship.eligible_college is not None and scholarship.eligible_college != spec.college:
         return False
-    if (
-        scholarship.required_enrollment_status is not None
-        and scholarship.required_enrollment_status != spec.enrollment_status
-    ):
+    if not _enrollment_status_matches(scholarship.required_enrollment_status, spec.enrollment_status):
         return False
     if scholarship.min_grade is not None and (spec.grade is None or spec.grade < scholarship.min_grade):
         return False

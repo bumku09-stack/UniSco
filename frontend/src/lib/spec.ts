@@ -1,6 +1,10 @@
 import { regionShortName } from "@/lib/regions";
 
-export type EnrollmentStatus = "undergrad_enrolled" | "undergrad_leave" | "post_undergrad";
+export type EnrollmentStatus =
+  | "undergrad_enrolled"
+  | "undergrad_transfer"
+  | "undergrad_leave"
+  | "post_undergrad";
 export type DegreeLevel = "masters" | "doctoral" | "integrated_ms_phd";
 
 export type UserSpec = {

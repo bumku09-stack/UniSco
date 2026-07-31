@@ -29,3 +29,15 @@
 - 알려진 한계(호성에게 전달 필요): `required_enrollment_status`가 "학부·대학원 둘 다 가능"이나 "대학원생 휴학"을 표현 못 함 — 향후 이런 케이스가 늘어나면 enum 확장이나 다중 선택 구조 고려 필요.
 
 ---
+
+### 2026-07-31 편입 구분 추가 + 신입생 전용 장학금 학년 필터 백필
+
+- 문제: 스펙 입력 위저드에서 재학상태를 "학부/대학원 등" → (학부인 경우) "재학/휴학/편입" → 학년 순으로 세분화하기로 했는데, `EnrollmentStatus`에 편입(transfer) 개념이 아예 없었음. 또한 "신입생" 전용 장학금 22건이 `min_grade`/`max_grade`가 비어있어서 학년 무관하게 전부 매칭되고 있었음(4학년도 신입생 전용 장학금에 매칭되는 상태) — 편입생을 신입생 전용 장학금에서 자동으로 걸러내려 해도 애초에 학년 필터 자체가 없어서 의미가 없었음.
+- 결정:
+  - `EnrollmentStatus`에 `UNDERGRAD_TRANSFER = "undergrad_transfer"` 추가 (Postgres `enrollmentstatus` enum에 `ALTER TYPE ... ADD VALUE`로 반영, 기존 133건 값은 안 건드림 — 추가만 하는 안전한 변경).
+  - 매칭 로직(`backend/app/api/match.py`)에서 `required_enrollment_status = undergrad_enrolled`인 장학금은 `undergrad_transfer`도 통과시키도록 처리 — 기존 100여 건의 "재학생" 장학금이 편입생을 부당하게 걸러내지 않게 하기 위함.
+  - "신입생" 이름이 붙은 장학금 중 `required_enrollment_status = undergrad_enrolled`이고 학년 제한이 비어있던 22건(대학원 신입생 7건은 애초에 학년 개념이 없어서 제외)에 `min_grade=1, max_grade=1` 백필.
+- 이유: 편입생은 국내 대학 특성상 1학년으로 편입하는 경우가 사실상 없어서, "신입생 전용 = min_grade=1·max_grade=1"로 표현하면 별도 컬럼 없이도 편입생이 자연스럽게 걸러짐 — `required_enrollment_status`를 통한 배제보다 이 방식이 기존 데이터(어느 것도 편입 여부를 안 담고 있었음)와 더 안전하게 호환됨.
+- 영향받는 테이블/쿼리: `enrollmentstatus` Postgres enum 타입(값 추가), `scholarship` 테이블 데이터(id 7,8,9,10,11,12,13,14,17,18,19,23,24,25,26,27,28,29,30,33,34,35의 `min_grade`/`max_grade` UPDATE), `backend/app/models/enums.py`, `backend/app/api/match.py`, `frontend/src/lib/spec.ts`, `frontend/src/app/spec/page.tsx`.
+
+---
