@@ -14,11 +14,14 @@ app/
 ├── api/
 │   ├── health.py        # GET /health, {"status": "ok"} 반환
 │   ├── scholarships.py  # GET /scholarships — 전체 장학금 목록 반환
-│   └── match.py          # POST /match — 유저 스펙 받아서 자격조건으로 필터링한 장학금 목록 반환
+│   ├── match.py          # POST /match — 유저 스펙 받아서 자격조건으로 필터링한 장학금 목록 반환
+│   └── auth.py            # 회원가입/이메일인증/로그인/토큰재발급 (POST /auth/*)
 └── models/
     ├── enums.py         # Gender, MilitaryStatus, EnrollmentStatus, CategoryL1/L2 등 자격조건·분류 enum
     ├── scholarship.py    # Scholarship 테이블 정의 (자격조건 필드 + category_l1/l2 분류 필드)
-    └── user_spec.py      # UserSpec — /match 요청 바디 (DB 테이블 아님)
+    ├── user_spec.py      # UserSpec — /match 요청 바디 (DB 테이블 아님)
+    ├── user.py           # User, EmailVerification 테이블 정의
+    └── auth.py            # SignupRequest 등 /auth 요청·응답 바디 (DB 테이블 아님)
 ```
 
 ### 어떻게 맞물려 돌아가는지
@@ -49,6 +52,23 @@ FastAPI가 자동 생성해주는 API 문서: http://localhost:8000/docs
 
 `category_l1`/`category_l2`(장학금 분류)는 매칭 필터링에는 안 쓰임 — "누가 받을 수 있는지"가 아니라 "어떤 종류인지"라서 프론트 목록 화면 표시/그룹핑 전용. 자세한 값 목록은 [supabase/README.md](../supabase/README.md) 참고.
 
+## 회원가입/로그인은 어디에
+
+`api/auth.py`, `core/security.py`(비밀번호 해싱 + JWT), `core/email.py`(인증 코드 이메일 발송) — 전부 2026-07-31에 추가됨.
+
+- **비밀번호**: `bcrypt` 패키지로 직접 해싱함. 원래 `passlib[bcrypt]`로 시작했는데 passlib이 2020년 이후 유지보수가 끊겨서 최신 `bcrypt` 5.x랑 호환이 안 되는 문제(`AttributeError: module 'bcrypt' has no attribute '__about__'`)가 있어 — passlib 없이 `bcrypt.hashpw`/`bcrypt.checkpw`를 직접 씀.
+- **JWT**: `pyjwt`. access token(`ACCESS_TOKEN_EXPIRE_MINUTES`, 기본 30분)은 매 요청에 실어 보내는 용도, refresh token(`REFRESH_TOKEN_EXPIRE_DAYS`, 기본 30일)은 `POST /auth/refresh`로 새 토큰 발급받을 때만 씀. 둘 다 페이로드에 `type`(`access`/`refresh`)을 넣어서 access token으로 refresh를 시도하는 걸 막음. 리프레시 토큰 회전/블랙리스트(탈취 시 무효화)는 아직 없음 — 필요해지면 추가.
+- **이메일 인증 코드**: 6자리 숫자, 5분 유효, 계정당 시도 5회 실패하면 그 코드는 잠기고 재발송 필요(`POST /auth/resend-code`). `identifier`(username 또는 email) 아무거나로 조회 가능.
+- **로그인 실패 메시지 통일**: 아이디가 없거나 비밀번호가 틀리거나 항상 "아이디 또는 비밀번호가 일치하지 않습니다"만 반환 — 아이디 존재 여부가 새지 않게. 단, "이메일 인증 안 됨"은 이미 로그인 자체는 맞게 한 사용자에게 알려줘야 하는 정보라 별도 403으로 분리함.
+
+### 이메일 발송: Resend를 쓰는 이유
+
+1. **Railway가 Hobby/Free 플랜에서 아웃바운드 SMTP(465/587 포트)를 막아둠** — Gmail SMTP 같은 전통적인 방식은 Railway에 배포하면 그냥 안 됨. Resend는 SMTP가 아니라 HTTPS API로 메일을 보내기 때문에 이 제한 자체가 적용 안 됨.
+2. 무료 티어가 월 3,000통/일 100통(도메인 1개) — 지금 규모(대전 지역 대학생 대상 MVP)엔 충분함.
+3. Python SDK 있고 API가 단순함(`core/email.py`의 `send_verification_code` 참고).
+
+`RESEND_API_KEY`는 [resend.com](https://resend.com) 가입 후 발급 — 처음엔 그들이 주는 `onboarding@resend.dev` 발신 주소로 테스트 가능하고(수신자가 가입한 계정 이메일일 때만 동작), 실제 서비스로 쓰려면 본인 도메인을 Resend에 등록/인증(DNS에 DKIM 레코드 추가)해야 그 도메인 주소로 아무 수신자에게나 보낼 수 있음.
+
 ## 배포 (Railway)
 
 Railway 대시보드에서 이 저장소를 연결하고, 서비스 설정의 **Root Directory**를 `backend`로 지정하면 됨. `Procfile`(`web: uvicorn app.main:app --host 0.0.0.0 --port $PORT`)과 `.python-version`(`3.13`)을 이미 넣어놨기 때문에 Railway가 Nixpacks로 자동 인식함 — 빌드/시작 명령을 따로 안 적어줘도 됨.
@@ -58,10 +78,15 @@ Railway 프로젝트 환경변수(Variables 탭)에 등록해야 하는 값:
 - `DATABASE_URL` — 로컬 `.env`에 있는 Supabase 커넥션 문자열과 동일 (Session pooler 버전)
 - `CORS_ORIGINS` — 배포된 프론트 URL을 JSON 배열로. 예: `["https://unisco.vercel.app"]`
 - `ENVIRONMENT` — `production`
+- `SECRET_KEY` — `openssl rand -hex 32`로 생성한 랜덤 문자열 (JWT 서명용, 로컬 개발용 기본값을 그대로 배포에 쓰면 안 됨)
+- `RESEND_API_KEY`, `EMAIL_FROM` — 회원가입 인증 메일 발송용 (`.env.example` 참고)
 
 배포되면 Railway가 `https://<프로젝트명>.up.railway.app` 같은 URL을 발급함 — 이걸 프론트의 `NEXT_PUBLIC_API_URL`로 등록하면 됨.
 
-## 남은 것 (2026-07-30 기준)
+## 남은 것 (2026-07-31 기준)
 
 - 기존에 입력된 장학금 데이터 중 `eligible_university`/`eligible_college`/`category_l1`/`category_l2` 등 새로 추가된 정밀 매칭·분류 필드가 비어있는 항목이 있음 — Supabase Studio에서 계속 채워지는 중.
 - 스키마가 계속 바뀌고 있어서 마이그레이션 툴(Alembic 등)은 아직 도입 안 함 — 지금은 `SQLModel.metadata.create_all()` + 수동 `ALTER TABLE`로 운영.
+- 회원가입/로그인 API(`/auth/*`)는 백엔드까지만 구현됨 — 프론트(로그인/회원가입 화면)는 아직 이 API를 안 씀. `frontend/src/app/page.tsx`(로그인 UI)는 여전히 목업 상태.
+- 리프레시 토큰 회전/탈취 대응(블랙리스트 등) 없음 — access token이 30분마다 만료되는 것으로만 방어 중. 트래픽 늘면 재검토.
+- Railway `RESEND_API_KEY`를 아직 실제 값으로 안 채워넣었으면 회원가입 시 이메일 발송이 502로 실패함 — 배포 전에 `resend.com`에서 키 발급하고 Variables에 등록 필요.

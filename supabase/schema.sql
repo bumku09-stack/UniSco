@@ -67,3 +67,30 @@ CREATE TABLE scholarship (
 -- Studio(친구분 데이터 입력)와 backend/의 직접 Postgres 연결에는 영향 없음.
 -- 정책(policy)을 따로 안 만든 건 의도한 것 — PostgREST 경로 자체를 완전히 막는 게 목적.
 ALTER TABLE scholarship ENABLE ROW LEVEL SECURITY;
+
+-- 회원가입/로그인 (2026-07-31 추가). "user"는 Postgres 예약어라 큰따옴표 필요.
+CREATE TABLE "user" (
+    id SERIAL NOT NULL,
+    username VARCHAR NOT NULL,
+    email VARCHAR NOT NULL,
+    hashed_password VARCHAR NOT NULL,
+    is_verified BOOLEAN NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+    PRIMARY KEY (id)
+);
+CREATE UNIQUE INDEX ix_user_username ON "user" (username);
+CREATE UNIQUE INDEX ix_user_email ON "user" (email);
+ALTER TABLE "user" ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE emailverification (
+    id SERIAL NOT NULL,
+    user_id INTEGER NOT NULL REFERENCES "user" (id),
+    code VARCHAR NOT NULL,
+    expires_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+    is_used BOOLEAN NOT NULL,
+    attempts INTEGER NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+    PRIMARY KEY (id)
+);
+CREATE INDEX ix_emailverification_user_id ON emailverification (user_id);
+ALTER TABLE emailverification ENABLE ROW LEVEL SECURITY;

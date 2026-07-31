@@ -3,4 +3,8 @@ uvicorn[standard]
 sqlmodel
 psycopg2-binary
 pydantic-settings
+pydantic[email]
+bcrypt
+pyjwt
+resend
 ruff
