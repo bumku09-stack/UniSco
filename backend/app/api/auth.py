@@ -42,25 +42,24 @@ def _find_user_by_identifier(session: Session, identifier: str) -> User | None:
     ).first()
 
 
-def _issue_verification_code(session: Session, user: User) -> str:
-    code = _generate_code()
-    session.add(
-        EmailVerification(
-            user_id=user.id,
-            code=code,
-            expires_at=datetime.now(UTC) + CODE_TTL,
-        )
-    )
-    session.commit()
-    return code
-
-
 @router.post("/signup", response_model=SignupResponse)
 def signup(body: SignupRequest, session: Session = Depends(get_session)):
     if session.exec(select(User).where(User.username == body.username)).first():
         raise HTTPException(status_code=409, detail="이미 사용 중인 아이디입니다.")
     if session.exec(select(User).where(User.email == body.email)).first():
         raise HTTPException(status_code=409, detail="이미 사용 중인 이메일입니다.")
+
+    # 메일 발송을 먼저 시도하고, 성공한 경우에만 계정을 만듦 — 순서를 반대로 하면
+    # 발송 실패 시 인증 안 된 계정만 DB에 남아서 같은 아이디/이메일로 재가입도
+    # 안 되고(409) 로그인도 안 되고(인증 미완료) 재발송도 또 같은 이유로 실패하는
+    # 막다른 상태가 됨.
+    code = _generate_code()
+    try:
+        send_verification_code(body.email, code)
+    except Exception as e:
+        raise HTTPException(
+            status_code=502, detail="인증 메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요."
+        ) from e
 
     user = User(
         username=body.username, email=body.email, hashed_password=hash_password(body.password)
@@ -69,14 +68,10 @@ def signup(body: SignupRequest, session: Session = Depends(get_session)):
     session.commit()
     session.refresh(user)
 
-    code = _issue_verification_code(session, user)
-    try:
-        send_verification_code(user.email, code)
-    except Exception as e:
-        # 계정은 이미 생성됐으니 /auth/resend-code로 재시도 가능 — 여기선 실패만 알림
-        raise HTTPException(
-            status_code=502, detail="인증 메일 발송에 실패했습니다. 잠시 후 재발송해주세요."
-        ) from e
+    session.add(
+        EmailVerification(user_id=user.id, code=code, expires_at=datetime.now(UTC) + CODE_TTL)
+    )
+    session.commit()
 
     return SignupResponse()
 
@@ -135,6 +130,16 @@ def resend_code(body: ResendCodeRequest, session: Session = Depends(get_session)
     if user.is_verified:
         raise HTTPException(status_code=400, detail="이미 인증된 계정입니다.")
 
+    # 여기서도 발송을 먼저 시도함 — 실패했는데 기존 유효 코드까지 먼저 지워버리면
+    # 재시도할 방법이 없어짐 (signup과 같은 이유).
+    code = _generate_code()
+    try:
+        send_verification_code(user.email, code)
+    except Exception as e:
+        raise HTTPException(
+            status_code=502, detail="인증 메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요."
+        ) from e
+
     # 기존에 안 쓴 코드가 남아있으면 무효화 — verify-code가 항상 "최신 코드"만
     # 보게 해서 예전 코드로 통과되는 일이 없게 함
     old_codes = session.exec(
@@ -145,15 +150,10 @@ def resend_code(body: ResendCodeRequest, session: Session = Depends(get_session)
     for old in old_codes:
         old.is_used = True
         session.add(old)
+    session.add(
+        EmailVerification(user_id=user.id, code=code, expires_at=datetime.now(UTC) + CODE_TTL)
+    )
     session.commit()
-
-    code = _issue_verification_code(session, user)
-    try:
-        send_verification_code(user.email, code)
-    except Exception as e:
-        raise HTTPException(
-            status_code=502, detail="인증 메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요."
-        ) from e
 
     return SignupResponse()
 

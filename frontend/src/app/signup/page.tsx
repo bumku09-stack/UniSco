@@ -104,7 +104,7 @@ export default function SignupPage() {
           <>
             <h1 className="text-2xl font-bold leading-snug text-gray-900">회원가입</h1>
             <p className="mt-2 text-sm text-gray-500">
-              아이디·비밀번호·이메일만 있으면 바로 시작할 수 있어요
+              이메일만 있으면 바로 시작할 수 있어요
             </p>
 
             <form onSubmit={handleSignup} className="mt-10 flex flex-col gap-3">
