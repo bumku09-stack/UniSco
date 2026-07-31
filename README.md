@@ -4,6 +4,14 @@ Unisco — 대전 지역 대학생을 위한 맞춤형 장학금·지원금 매�
 
 배경, 스코프, 왜 이렇게 결정했는지는 [PROJECT_BRIEF.md](./PROJECT_BRIEF.md) 참고.
 
+## 배포 주소 (2026-07-31 기준)
+
+- **서비스(프론트)**: https://unisco-pi.vercel.app — Vercel, `main` 브랜치 푸시할 때마다 자동 재배포
+- **API(백엔드)**: https://unisco-production.up.railway.app — Railway, `main` 브랜치 푸시할 때마다 자동 재배포
+- **DB**: Supabase 프로젝트 `unisco` (Studio 접근은 `supabase/README.md` 참고)
+
+배포 설정(환경변수, Root Directory 등)은 Railway/Vercel 대시보드에만 있고 git엔 안 잡힘 — 새로 참여하는 사람은 각 서비스 대시보드에서 직접 확인해야 함.
+
 ## 스택
 
 - **백엔드**: FastAPI (Python 3.13) + SQLModel
