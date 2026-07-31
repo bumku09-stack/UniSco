@@ -1,4 +1,3 @@
-from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field, SQLModel
 
 from app.models.enums import (
@@ -9,14 +8,8 @@ from app.models.enums import (
     ForeignerEligibility,
     Gender,
     MilitaryStatus,
+    enum_column,
 )
-
-
-def _enum_column(enum_cls):
-    """Store the enum's .value (lowercase) in Postgres instead of SQLAlchemy's
-    default .name (uppercase) — keeps raw-SQL inserts consistent with the API's
-    JSON casing and with supabase/README.md's column reference."""
-    return SAEnum(enum_cls, values_callable=lambda e: [member.value for member in e])
 
 
 class Scholarship(SQLModel, table=True):
@@ -32,16 +25,16 @@ class Scholarship(SQLModel, table=True):
     # that criterion — a scholarship open to everyone has every field below unset.
     min_age: int | None = None
     max_age: int | None = None
-    required_gender: Gender | None = Field(default=None, sa_type=_enum_column(Gender))
+    required_gender: Gender | None = Field(default=None, sa_type=enum_column(Gender))
     eligible_region: str | None = None
     required_military_status: MilitaryStatus | None = Field(
-        default=None, sa_type=_enum_column(MilitaryStatus)
+        default=None, sa_type=enum_column(MilitaryStatus)
     )
     max_income_bracket: int | None = None  # 소득분위 N 이하
     min_gpa: float | None = None  # 4.5 만점 기준
     requires_disability: bool | None = None  # None=무관, True=장애인 한정
     foreigner_eligibility: ForeignerEligibility | None = Field(
-        default=None, sa_type=_enum_column(ForeignerEligibility)
+        default=None, sa_type=enum_column(ForeignerEligibility)
     )  # None=내국인/외국인 무관
 
     # Free-text eligibility detail that doesn't fit a clean enum/range — added
@@ -59,15 +52,15 @@ class Scholarship(SQLModel, table=True):
     eligible_university: str | None = None  # 짧은 태그 (예: "충남대학교", "KAIST")
     eligible_college: str | None = None  # 단과대 (예: "공과대학") — 소속 대학이 정해진 경우만 의미 있음
     required_enrollment_status: EnrollmentStatus | None = Field(
-        default=None, sa_type=_enum_column(EnrollmentStatus)
+        default=None, sa_type=enum_column(EnrollmentStatus)
     )
     min_grade: int | None = None  # 학부 학년 하한 (재학상태가 학부 관련일 때만 의미)
     max_grade: int | None = None  # 학부 학년 상한
     required_degree_level: DegreeLevel | None = Field(
-        default=None, sa_type=_enum_column(DegreeLevel)
+        default=None, sa_type=enum_column(DegreeLevel)
     )  # 재학상태가 학부이후과정일 때만 의미
 
     # 분류 체계 (자격조건 아님 — 매칭 필터링에 안 쓰고, 목록 표시/그룹핑용).
     # category_l2가 어느 category_l1에 속하는지는 app.models.enums.CATEGORY_L2_BY_L1 참고.
-    category_l1: CategoryL1 | None = Field(default=None, sa_type=_enum_column(CategoryL1))
-    category_l2: CategoryL2 | None = Field(default=None, sa_type=_enum_column(CategoryL2))
+    category_l1: CategoryL1 | None = Field(default=None, sa_type=enum_column(CategoryL1))
+    category_l2: CategoryL2 | None = Field(default=None, sa_type=enum_column(CategoryL2))

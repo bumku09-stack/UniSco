@@ -25,3 +25,7 @@ class UserSpec(SQLModel):
     enrollment_status: EnrollmentStatus
     grade: int | None = None  # enrollment_status가 학부재학/학부휴학일 때만 사용
     degree_level: DegreeLevel | None = None  # enrollment_status가 학부이후과정일 때만 사용
+
+
+class SpecStatusResponse(SQLModel):
+    spec_completed: bool

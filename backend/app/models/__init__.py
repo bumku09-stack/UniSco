@@ -17,9 +17,10 @@ from app.models.enums import (
     Gender,
     MilitaryStatus,
 )
+from app.models.saved_spec import SavedSpec
 from app.models.scholarship import Scholarship
 from app.models.user import EmailVerification, User
-from app.models.user_spec import UserSpec
+from app.models.user_spec import SpecStatusResponse, UserSpec
 
 __all__ = [
     "CATEGORY_L2_BY_L1",
@@ -34,9 +35,11 @@ __all__ = [
     "MilitaryStatus",
     "RefreshRequest",
     "ResendCodeRequest",
+    "SavedSpec",
     "Scholarship",
     "SignupRequest",
     "SignupResponse",
+    "SpecStatusResponse",
     "TokenResponse",
     "User",
     "UserSpec",

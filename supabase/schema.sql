@@ -15,7 +15,7 @@ CREATE TYPE militarystatus AS ENUM ('completed', 'exempted', 'not_served');
 CREATE TYPE foreignereligibility AS ENUM ('korean_only', 'foreigner_only');
 -- undergrad_transfer(편입)는 2026-07-31 ALTER TYPE으로 추가됨. 매칭 시 undergrad_enrolled
 -- 요구조건은 undergrad_transfer도 만족시키는 것으로 취급함(둘 다 "현재 재학중") —
--- backend/app/api/match.py의 _enrollment_status_matches() 참고.
+-- backend/app/core/matching.py의 enrollment_status_matches() 참고.
 CREATE TYPE enrollmentstatus AS ENUM ('undergrad_enrolled', 'undergrad_transfer', 'undergrad_leave', 'post_undergrad');
 CREATE TYPE degreelevel AS ENUM ('masters', 'doctoral', 'integrated_ms_phd');
 CREATE TYPE categoryl1 AS ENUM ('school_internal', 'school_external', 'support_fund');
@@ -94,3 +94,27 @@ CREATE TABLE emailverification (
 );
 CREATE INDEX ix_emailverification_user_id ON emailverification (user_id);
 ALTER TABLE emailverification ENABLE ROW LEVEL SECURITY;
+
+-- 유저별 저장된 스펙 (2026-07-31 추가). UserSpec(요청 바디로만 쓰이는 비-테이블
+-- 스키마, backend/app/models/user_spec.py)의 저장형 짝 — 필드 구성이 동일함.
+-- user_id가 UNIQUE라서 유저당 최대 한 행만 존재(1:1) — 있으면 "스펙 설정 완료".
+CREATE TABLE savedspec (
+    id SERIAL NOT NULL,
+    user_id INTEGER NOT NULL REFERENCES "user" (id),
+    university VARCHAR NOT NULL,
+    college VARCHAR NOT NULL,
+    gpa FLOAT NOT NULL,
+    age INTEGER NOT NULL,
+    gender gender NOT NULL,
+    region VARCHAR NOT NULL,
+    military_status militarystatus NOT NULL,
+    income_bracket INTEGER NOT NULL,
+    has_disability BOOLEAN NOT NULL,
+    is_foreigner BOOLEAN NOT NULL,
+    enrollment_status enrollmentstatus NOT NULL,
+    grade INTEGER,
+    degree_level degreelevel,
+    PRIMARY KEY (id)
+);
+CREATE UNIQUE INDEX ix_savedspec_user_id ON savedspec (user_id);
+ALTER TABLE savedspec ENABLE ROW LEVEL SECURITY;

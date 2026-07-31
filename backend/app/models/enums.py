@@ -1,5 +1,14 @@
 from enum import Enum
 
+from sqlalchemy import Enum as SAEnum
+
+
+def enum_column(enum_cls):
+    """Store the enum's .value (lowercase) in Postgres instead of SQLAlchemy's
+    default .name (uppercase) — keeps raw-SQL inserts consistent with the API's
+    JSON casing and with supabase/README.md's column reference."""
+    return SAEnum(enum_cls, values_callable=lambda e: [member.value for member in e])
+
 
 class Gender(str, Enum):
     MALE = "male"
@@ -19,7 +28,7 @@ class ForeignerEligibility(str, Enum):
 
 class EnrollmentStatus(str, Enum):
     UNDERGRAD_ENROLLED = "undergrad_enrolled"  # 학부재학
-    UNDERGRAD_TRANSFER = "undergrad_transfer"  # 학부편입 (재학 중이라는 점은 undergrad_enrolled와 동일 — 매칭 시 취급은 match.py 참고)
+    UNDERGRAD_TRANSFER = "undergrad_transfer"  # 학부편입 — 매칭 시 취급은 core/matching.py 참고
     UNDERGRAD_LEAVE = "undergrad_leave"  # 학부휴학
     POST_UNDERGRAD = "post_undergrad"  # 학부이후과정 (대학원 등)
 
