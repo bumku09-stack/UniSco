@@ -211,7 +211,7 @@ export default function ScholarshipDetailPage({
               href={scholarship.application_url}
               target="_blank"
               rel="noreferrer noopener"
-              className="block w-full rounded-2xl bg-orange-500 py-4 text-center text-[15px] font-bold text-white transition hover:bg-orange-600 active:scale-[0.99]"
+              className="block w-full rounded-2xl bg-blue-500 py-4 text-center text-[15px] font-bold text-white transition hover:bg-blue-600 active:scale-[0.99]"
             >
               신청하러 가기
             </a>
