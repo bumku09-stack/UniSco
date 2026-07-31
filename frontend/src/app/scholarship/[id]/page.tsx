@@ -73,7 +73,7 @@ export default function ScholarshipDetailPage({
   return (
     <div className="flex min-h-screen flex-col bg-white">
       <div className="mx-auto w-full max-w-md flex-1 px-6 pb-32 pt-6">
-        <Link href="/matches" className="text-sm font-semibold text-gray-400">
+        <Link href="/home" className="text-sm font-semibold text-gray-400">
           ← 목록으로
         </Link>
 

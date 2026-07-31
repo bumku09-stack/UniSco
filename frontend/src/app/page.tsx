@@ -1,21 +1,47 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { setTokens } from "@/lib/auth";
 
 const inputClass =
   "w-full rounded-2xl bg-gray-100 px-4 py-4 text-[15px] text-gray-900 placeholder:text-gray-400 outline-none transition focus:bg-blue-50 focus:ring-2 focus:ring-blue-500";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // TODO: 실제 로그인 연동 전. 인증 방식(Supabase Auth / 소셜로그인 등) 정해지면 여기 붙임.
-  // 지금은 UI만 있고, 제출하면 그냥 다음 단계(스펙 입력)로 넘어감.
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    router.push("/spec");
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.detail ?? "로그인에 실패했습니다.");
+        return;
+      }
+      setTokens(data.access_token, data.refresh_token);
+
+      const statusRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/me/spec-status`, {
+        headers: { Authorization: `Bearer ${data.access_token}` },
+      });
+      const status = await statusRes.json();
+      router.push(status.spec_completed ? "/home" : "/spec");
+    } catch {
+      setError("로그인에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -39,11 +65,11 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="mt-10 flex flex-col gap-3">
           <input
-            type="email"
+            type="text"
             required
-            placeholder="이메일"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            placeholder="아이디"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
             className={inputClass}
           />
           <input
@@ -55,16 +81,24 @@ export default function LoginPage() {
             className={inputClass}
           />
 
+          {error && (
+            <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-500">{error}</p>
+          )}
+
           <button
             type="submit"
-            className="mt-4 w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white transition hover:bg-blue-600 active:scale-[0.99]"
+            disabled={loading}
+            className="mt-4 w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white transition hover:bg-blue-600 active:scale-[0.99] disabled:opacity-50"
           >
-            로그인
+            {loading ? "로그인 중..." : "로그인"}
           </button>
         </form>
 
         <p className="mt-6 text-center text-xs text-gray-400">
-          아직 계정이 없으신가요?
+          아직 계정이 없으신가요?{" "}
+          <Link href="/signup" className="font-semibold text-blue-500">
+            회원가입
+          </Link>
         </p>
       </div>
     </div>

@@ -142,3 +142,11 @@ export function regionShortName(sidoName: string, district: string): string {
   }
   return SIDO_LIST.find((s) => s.name === sidoName)?.shortName ?? sidoName;
 }
+
+/** regionShortName의 역방향 — 저장된 스펙을 다시 폼에 불러올 때(마이페이지) 씀.
+ * shortName만으로는 구/군까지는 복원 불가능(애초에 매칭에 안 쓰여서 저장도 안 함) —
+ * 시/도만 맞춰주고 구/군은 그 시/도의 첫 번째 값으로 기본 설정됨. */
+export function sidoNameFromRegion(region: string): string {
+  if (region === "광주" || region === "전남") return "전남광주통합특별시";
+  return SIDO_LIST.find((s) => s.shortName === region)?.name ?? SIDO_LIST[0].name;
+}

@@ -111,6 +111,6 @@ Railway 프로젝트 환경변수(Variables 탭)에 등록해야 하는 값:
 
 - 기존에 입력된 장학금 데이터 중 `eligible_university`/`eligible_college`/`category_l1`/`category_l2` 등 새로 추가된 정밀 매칭·분류 필드가 비어있는 항목이 있음 — Supabase Studio에서 계속 채워지는 중.
 - 스키마가 계속 바뀌고 있어서 마이그레이션 툴(Alembic 등)은 아직 도입 안 함 — 지금은 `SQLModel.metadata.create_all()` + 수동 `ALTER TABLE`로 운영.
-- 회원가입/로그인/스펙저장 API(`/auth/*`, `/users/me/spec*`, `/scholarships/recommendations`)는 백엔드까지만 구현됨 — 프론트가 아직 이 API들을 하나도 안 씀. `frontend/src/app/page.tsx`(로그인 UI)는 여전히 목업이고, 스펙 위저드(`/spec`)는 여전히 `POST /match`를 직접 호출하는 방식(로그인 없이 매번 입력) 그대로임. "로그인 → 스펙 있으면 홈, 없으면 스펙 설정 → 마이페이지에서 스펙 수정" 플로우를 프론트에 실제로 연결하는 건 다음 작업.
+- 회원가입/로그인/스펙저장 API(`/auth/*`, `/users/me/spec*`, `/scholarships/recommendations`)는 프론트까지 연결 완료(2026-07-31) — `/` → `/signup` → `/spec`(최초 1회) → `/home` → `/mypage` 플로우 전체 구현됨. 자세한 건 `frontend/README.md` 참고. `POST /match`(로그인 없이 즉석 매칭)는 그대로 남아있지만 지금 프론트는 안 씀 — 나중에 "로그인 없이 미리 둘러보기" 같은 용도로 재활용하거나, 안 쓰면 정리 대상.
 - 리프레시 토큰 회전/탈취 대응(블랙리스트 등) 없음 — access token이 30분마다 만료되는 것으로만 방어 중. 트래픽 늘면 재검토.
 - Railway `RESEND_API_KEY`를 아직 실제 값으로 안 채워넣었으면 회원가입 시 이메일 발송이 502로 실패함 — 배포 전에 `resend.com`에서 키 발급하고 Variables에 등록 필요.

@@ -1,4 +1,4 @@
-import { regionShortName } from "@/lib/regions";
+import { regionShortName, sidoNameFromRegion, SIDO_LIST } from "@/lib/regions";
 
 export type EnrollmentStatus =
   | "undergrad_enrolled"
@@ -36,10 +36,6 @@ export type SpecForm = Omit<UserSpec, "age" | "gpa" | "income_bracket" | "region
   grade: string;
 };
 
-// 로그인이 아직 없어서, 스펙 입력 폼(/spec)과 매칭 결과(/matches)가 브라우저
-// localStorage로 값을 주고받음 (실제 로그인 붙으면 서버 저장으로 교체 예정).
-export const SPEC_STORAGE_KEY = "unisco_spec";
-
 export function specFormToUserSpec(spec: SpecForm): UserSpec {
   return {
     university: spec.university,
@@ -55,5 +51,29 @@ export function specFormToUserSpec(spec: SpecForm): UserSpec {
     enrollment_status: spec.enrollment_status,
     grade: spec.enrollment_status === "post_undergrad" ? null : Number(spec.grade),
     degree_level: spec.enrollment_status === "post_undergrad" ? spec.degree_level : null,
+  };
+}
+
+// 마이페이지에서 서버에 저장된 스펙(UserSpec)을 불러와 수정 폼(SpecForm)에 채울 때 씀 —
+// specFormToUserSpec의 반대 방향. region은 구/군 정보 없이 짧은 시/도 단위로만 저장돼
+// 있어서, sido는 복원되지만 district는 그 시/도의 첫 번째 값으로 기본 설정됨.
+export function userSpecToSpecForm(spec: UserSpec): SpecForm {
+  const sido = sidoNameFromRegion(spec.region);
+  const district = SIDO_LIST.find((s) => s.name === sido)?.districts[0] ?? "";
+  return {
+    university: spec.university,
+    college: spec.college,
+    gpa: String(spec.gpa),
+    age: String(spec.age),
+    gender: spec.gender,
+    sido,
+    district,
+    military_status: spec.military_status,
+    income_bracket: String(spec.income_bracket),
+    has_disability: spec.has_disability,
+    is_foreigner: spec.is_foreigner,
+    enrollment_status: spec.enrollment_status,
+    grade: spec.grade != null ? String(spec.grade) : "1",
+    degree_level: spec.degree_level,
   };
 }

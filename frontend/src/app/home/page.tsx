@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { SPEC_STORAGE_KEY, SpecForm, specFormToUserSpec } from "@/lib/spec";
+import { authFetch, clearTokens, isLoggedIn } from "@/lib/auth";
 import {
   CATEGORY_L1_LABEL,
   CATEGORY_L2_BY_L1,
@@ -79,7 +79,7 @@ function ScholarshipCard({ s }: { s: Scholarship }) {
   );
 }
 
-export default function MatchesPage() {
+export default function HomePage() {
   const router = useRouter();
   const [results, setResults] = useState<Scholarship[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -90,33 +90,39 @@ export default function MatchesPage() {
   const [categoryL2, setCategoryL2] = useState<string | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem(SPEC_STORAGE_KEY);
-    if (!saved) {
-      router.replace("/spec");
+    if (!isLoggedIn()) {
+      router.replace("/");
       return;
     }
 
-    let spec: SpecForm;
-    try {
-      spec = JSON.parse(saved);
-    } catch {
-      router.replace("/spec");
-      return;
-    }
+    (async () => {
+      const statusRes = await authFetch("/users/me/spec-status");
+      if (!statusRes.ok) {
+        setError("정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
+        setLoading(false);
+        return;
+      }
+      const status = await statusRes.json();
+      if (!status.spec_completed) {
+        router.replace("/spec");
+        return;
+      }
 
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/match`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(specFormToUserSpec(spec)),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error(`status ${res.status}`);
-        return res.json();
-      })
-      .then((data: Scholarship[]) => setResults(data))
-      .catch(() => setError("매칭에 실패했습니다. 백엔드 서버가 켜져 있는지 확인해주세요."))
-      .finally(() => setLoading(false));
+      const recRes = await authFetch("/scholarships/recommendations");
+      if (!recRes.ok) {
+        setError("매칭에 실패했습니다. 백엔드 서버가 켜져 있는지 확인해주세요.");
+        setLoading(false);
+        return;
+      }
+      setResults(await recRes.json());
+      setLoading(false);
+    })();
   }, [router]);
+
+  function handleLogout() {
+    clearTokens();
+    router.push("/");
+  }
 
   const categoryFiltered = (results ?? []).filter((s) => {
     if (categoryL1 === "all") return true;
@@ -130,16 +136,26 @@ export default function MatchesPage() {
   return (
     <div className="min-h-screen bg-white pb-16">
       <div className="mx-auto w-full max-w-md px-6 py-6">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500 text-sm font-bold text-white">
-            U
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500 text-sm font-bold text-white">
+              U
+            </div>
+            <span className="text-base font-bold text-gray-900">UniSco</span>
           </div>
-          <span className="text-base font-bold text-gray-900">UniSco</span>
+          <div className="flex items-center gap-3">
+            <Link href="/mypage" className="text-sm font-semibold text-blue-500">
+              마이페이지
+            </Link>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="text-sm font-semibold text-gray-400"
+            >
+              로그아웃
+            </button>
+          </div>
         </div>
-
-        <Link href="/spec" className="mb-4 mt-6 inline-block text-sm font-semibold text-gray-400">
-          ← 조건 다시 입력
-        </Link>
 
         {loading && <p className="mt-8 text-center text-sm text-gray-400">매칭 중...</p>}
 
@@ -151,7 +167,7 @@ export default function MatchesPage() {
 
         {!loading && !error && results !== null && (
           <div>
-            <h2 className="text-lg font-bold text-gray-900">매칭 결과</h2>
+            <h2 className="mt-6 text-lg font-bold text-gray-900">내 맞춤 장학금</h2>
             <p className="mt-1 text-xs text-gray-400">
               조건을 자세하게 입력할수록 더 적합도 높은 장학금을 추천해드려요
             </p>

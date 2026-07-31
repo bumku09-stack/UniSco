@@ -2,8 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Field, inputClass, PillToggle, SelectField, ToggleChip, TopBar } from "@/components/form-ui";
+import { authFetch, isLoggedIn } from "@/lib/auth";
 import { SIDO_LIST } from "@/lib/regions";
-import { SPEC_STORAGE_KEY, SpecForm, EnrollmentStatus, DegreeLevel, UserSpec } from "@/lib/spec";
+import { DegreeLevel, EnrollmentStatus, specFormToUserSpec, SpecForm, UserSpec } from "@/lib/spec";
 import { UNIVERSITIES } from "@/lib/universities";
 
 const DEFAULT_SIDO = SIDO_LIST.find((s) => s.name === "대전광역시")!;
@@ -26,119 +28,6 @@ const initialSpec: SpecForm = {
   degree_level: null,
 };
 
-const inputClass =
-  "w-full rounded-2xl bg-gray-100 px-4 py-3.5 text-[15px] text-gray-900 outline-none transition focus:bg-blue-50 focus:ring-2 focus:ring-blue-500";
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="flex flex-col gap-2">
-      <span className="text-sm font-semibold text-gray-700">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function SelectField({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-}) {
-  return (
-    <Field label={label}>
-      <div className="relative">
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className={`${inputClass} appearance-none pr-10`}
-        >
-          {options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-        <svg
-          className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-          viewBox="0 0 20 20"
-          fill="none"
-        >
-          <path
-            d="M5 7.5L10 12.5L15 7.5"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </div>
-    </Field>
-  );
-}
-
-function PillToggle({
-  value,
-  onChange,
-  options,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-}) {
-  return (
-    <div className="flex gap-2">
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          onClick={() => onChange(opt.value)}
-          className={`flex-1 rounded-2xl border py-3.5 text-sm font-semibold transition ${
-            value === opt.value
-              ? "border-blue-500 bg-blue-50 text-blue-600"
-              : "border-gray-200 bg-white text-gray-500"
-          }`}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function ToggleChip({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      className={`flex items-center justify-between rounded-2xl border px-4 py-3.5 text-sm font-semibold transition ${
-        checked ? "border-blue-500 bg-blue-50 text-blue-600" : "border-gray-200 bg-white text-gray-600"
-      }`}
-    >
-      <span>{label}</span>
-      <span
-        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] transition ${
-          checked ? "border-blue-500 bg-blue-500 text-white" : "border-gray-300 text-transparent"
-        }`}
-      >
-        ✓
-      </span>
-    </button>
-  );
-}
-
 function ProgressBar({ step }: { step: 1 | 2 }) {
   return (
     <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
@@ -154,52 +43,45 @@ export default function SpecWizard() {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
   const [spec, setSpec] = useState<SpecForm>(initialSpec);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // 로그인이 아직 없어서, 브라우저에 저장해뒀다가 다음 방문 때 불러옴 (실제 로그인 붙으면 서버 저장으로 교체 예정)
   useEffect(() => {
-    const saved = localStorage.getItem(SPEC_STORAGE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setSpec({
-          ...initialSpec,
-          ...parsed,
-          age: String(parsed.age ?? initialSpec.age),
-          gpa: String(parsed.gpa ?? initialSpec.gpa),
-          income_bracket: String(parsed.income_bracket ?? initialSpec.income_bracket),
-          sido: parsed.sido ?? initialSpec.sido,
-          district: parsed.district ?? initialSpec.district,
-          college: parsed.college ?? initialSpec.college,
-          enrollment_status: parsed.enrollment_status ?? initialSpec.enrollment_status,
-          grade: String(parsed.grade ?? initialSpec.grade),
-          degree_level: parsed.degree_level ?? initialSpec.degree_level,
-        });
-      } catch {
-        // 저장된 값이 깨졌으면 그냥 기본값 씀
-      }
-    }
-  }, []);
+    if (!isLoggedIn()) router.replace("/");
+  }, [router]);
 
   const currentUniversity = UNIVERSITIES.find((u) => u.name === spec.university) ?? UNIVERSITIES[0];
   const gpaScale = currentUniversity.gpaScale;
   const currentColleges = currentUniversity.colleges;
   const currentDistricts = SIDO_LIST.find((s) => s.name === spec.sido)?.districts ?? [];
 
-  function handleFinalSubmit(e: React.FormEvent) {
+  async function handleFinalSubmit(e: React.FormEvent) {
     e.preventDefault();
-    localStorage.setItem(SPEC_STORAGE_KEY, JSON.stringify(spec));
-    router.push("/matches");
+    setSubmitting(true);
+    setError(null);
+    try {
+      const body: UserSpec = specFormToUserSpec(spec);
+      const res = await authFetch("/users/me/spec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.detail ?? `status ${res.status}`);
+      }
+      router.push("/home");
+    } catch {
+      setError("스펙 저장에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
     <div className="min-h-screen bg-white pb-16">
       <div className="mx-auto w-full max-w-md px-6 py-6">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500 text-sm font-bold text-white">
-            U
-          </div>
-          <span className="text-base font-bold text-gray-900">UniSco</span>
-        </div>
+        <TopBar />
 
         <h1 className="mt-6 text-xl font-bold leading-snug text-gray-900">
           {step === 1 ? "어느 학교에 다니시나요?" : "몇 가지만 더 알려주세요"}
@@ -413,6 +295,10 @@ export default function SpecWizard() {
               />
             </div>
 
+            {error && (
+              <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-500">{error}</p>
+            )}
+
             <div className="mt-2 flex gap-2">
               <button
                 type="button"
@@ -423,9 +309,10 @@ export default function SpecWizard() {
               </button>
               <button
                 type="submit"
-                className="w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white transition hover:bg-blue-600 active:scale-[0.99]"
+                disabled={submitting}
+                className="w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white transition hover:bg-blue-600 active:scale-[0.99] disabled:opacity-50"
               >
-                내 장학금 찾기
+                {submitting ? "저장 중..." : "내 장학금 찾기"}
               </button>
             </div>
           </form>
