@@ -48,6 +48,34 @@
 - **장애인 세부유형**: 단일 선택 — **2026-08-02 사용자 지정: Scholarships.com의 "Physical Disabilities" 카테고리(7개 전체)를 그대로 채택**(`scholarships_com_전체항목_한국어정리.pdf`, 사용자 컴퓨터 Downloads 폴더에 보관 중 — 새로 만든 목록 아니고 기존 조사 자료에서 가져옴): `physical_impairment`(신체적 장애)/`learning_disability`(학습장애)/`medical_disability`(의료적 장애·질환)/`mental_impairment`(정신적 장애)/`muscular_dystrophy`(근이영양증)/`developmental_impairment`(발달장애)/`disabled_parent`(장애가 있는 부모·자녀 대상). 기존 `has_disability` boolean은 그대로 두고 세부유형만 추가 컬럼으로. **주의**: 마지막 `disabled_parent`는 본인 장애가 아니라 "부모가 장애인인 학생" 대상이라 성격이 다른 항목인데, Scholarships.com 원본 카테고리에 포함돼 있어서 그대로 가져옴.
 - **특수상황**: 다중 선택 가능(사용자 확정, 2026-08-01) — `north_korean_defector`(북한이탈주민)/`multicultural_family`(다문화가정)/`child_care_facility`(아동양육시설 생활자·퇴소자)/`student_council_officer`(학생회장·임원)까지는 사용자가 직접 지정한 4개, 나머지 `single_parent_family`(한부모가정)/`grandparent_family`(조손가정)/`multi_child_family`(다자녀가정 3자녀 이상)/`national_merit`(국가보훈대상자) 4개는 크롤링 중 반복적으로 나온 실제 장학금 조건들(`scholarship_dedup_list.md` 참고: 보훈/다자녀/국가유공자 등)을 근거로 Claude가 판단해서 추가함 — 사용자에게 "잘 판단해서 만들어보라"는 위임을 받고 진행(최종 확정은 아니니 호성·사용자가 다시 검토해도 됨).
 - 세 항목 모두 `SavedSpec`(저장용 테이블)과, 매칭에 실제로 쓰려면 `Scholarship` 쪽에도 대응 컬럼이 있어야 함 — 지금은 프론트 UI만 있고 어느 쪽 테이블도 안 건드림.
+- 디자인 확인 완료(2026-08-02, 사용자 승인) — 이제 실제 구현은 호성 담당. 아래 "실제 구현 시 해야 할 일"과 "특수상황 매칭 로직" 참고.
+
+### 실제 구현 시 해야 할 일 (호성 담당)
+
+1. `backend/app/models/saved_spec.py`(`SavedSpec`)와 `backend/app/models/user_spec.py`(`UserSpec`, `/match` 요청 바디)에 새 필드 추가: 어학점수(시험종류+점수), 장애인 세부유형(단일 선택), 특수상황(다중 선택 리스트).
+2. `backend/app/models/scholarship.py`(`Scholarship`)에도 대응 컬럼 추가: 장학금이 요구하는 어학점수 조건(있다면), 장학금이 요구하는 장애인 세부유형(있다면), 장학금이 요구하는 특수상황(있다면, 위 목록 중 1개 — 지금까지 크롤링한 133~250번대 기존 장학금 중 새터민/다문화가정/보훈 등 조건이 `description`에 텍스트로만 있던 것들은 이 새 컬럼으로 재분류 필요).
+3. `backend/app/core/matching.py`의 `is_eligible()`에 세 필드 검사 로직 추가 — 특수상황은 아래 "특수상황 매칭 로직" 그대로, 어학점수·장애인 세부유형은 다른 필드들과 같은 표준 패턴(`scholarship.필드 is not None`이고 `spec.필드`가 없거나 안 맞으면 `return False`)으로 하면 됨.
+4. `frontend/src/lib/spec.ts`의 `UserSpec`/`SpecForm`에 이 필드들 추가하고, `specFormToUserSpec`/`userSpecToSpecForm`에서 변환하도록 연결, `/spec`·`/mypage`의 `handleFinalSubmit`/`handleSubmit`이 실제로 서버에 보내도록 수정(지금은 `optionalInfo` state가 로컬에만 있고 제출 안 됨).
+
+### 특수상황 매칭 로직 (2026-08-02, 사용자 확정 — 다른 필드들과 다른 예외 규칙)
+
+다른 필드(성별·나이·GPA 등)는 전부 "장학금에 조건이 있으면, 유저가 그 조건에 안 맞을 때 제외" 방식임. **특수상황은 이거랑 다르게, "유저가 특수상황을 아예 선택 안 했으면 애초에 걸러내지 않는다"는 예외 규칙**을 사용자가 명시적으로 요구함:
+
+- **유저가 특수상황을 하나도 선택 안 함** → 특수상황 조건이 걸려있는 장학금도 걸러내지 않고 그냥 다 보여줌 (마치 특수상황 필드 자체가 없는 것처럼 동작).
+- **유저가 특수상황을 1개 이상 선택함** → 그때부터 특수상황 조건이 걸려있는 장학금만 필터링 시작: 유저가 선택한 항목과 장학금이 요구하는 항목이 일치하면 보여주고, 안 맞으면 제외. **특수상황 조건이 아예 없는 일반 장학금은 이 필터링과 무관하게 계속 다 보임.**
+
+**이유(사용자 설명)**: 특수상황은 선택 항목(옵션)이라 안 누른 학생이 많을 텐데, "안 눌렀다"는 게 "나는 특수상황 대상자가 아니다"를 확정하는 게 아님 — 그냥 아직 대답 안 한 것뿐. 그런데 표준 방식대로 처리하면, 실제로는 다문화가정인 학생이 그 항목을 안 눌렀다는 이유만으로 다문화가정 전용 장학금이 안 보이게 될 수 있음 — 그건 잘못된 결과. 그래서 "선택 안 함 = 모르는 것 = 걸러내지 않음", "선택함 = 그 항목 기준으로만 좁힘"으로 설계함.
+
+의사코드(참고용, 그대로 코드로 옮기면 됨):
+```python
+def special_status_matches(scholarship_special_status: str | None, spec_special_status: list[str]) -> bool:
+    if scholarship_special_status is None:
+        return True  # 특수상황 조건 없는 일반 장학금 — 항상 통과
+    if not spec_special_status:
+        return True  # 유저가 특수상황 아예 안 눌렀음 — 그래도 걸러내지 않음
+    return scholarship_special_status in spec_special_status
+```
+`is_eligible()`에 다른 필드들과 같은 자리에 `if not special_status_matches(scholarship.required_special_status, spec.special_status): return False` 형태로 추가하면 됨.
 
 ### 3번 후속: 백필하면서 새로 발견된 한계 (2026-07-30)
 
