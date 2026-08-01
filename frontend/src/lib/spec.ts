@@ -67,12 +67,16 @@ export const LANGUAGE_TESTS: { value: string; label: string; max: number | null 
   { value: "기타", label: "기타", max: null },
 ];
 
+// Scholarships.com의 "15 · Physical Disabilities" 카테고리(7개 전체)를 그대로
+// 가져옴 — scholarships_com_전체항목_한국어정리.pdf 참고(사용자 컴퓨터에 보관 중).
 export const DISABILITY_TYPES = [
-  { value: "physical", label: "신체장애인" },
-  { value: "visual", label: "시각장애인" },
-  { value: "hearing", label: "청각장애인" },
-  { value: "intellectual", label: "지적장애인" },
-  { value: "other", label: "기타" },
+  { value: "physical_impairment", label: "신체적 장애" },
+  { value: "learning_disability", label: "학습장애" },
+  { value: "medical_disability", label: "의료적 장애(질환)" },
+  { value: "mental_impairment", label: "정신적 장애" },
+  { value: "muscular_dystrophy", label: "근이영양증" },
+  { value: "developmental_impairment", label: "발달장애" },
+  { value: "disabled_parent", label: "장애가 있는 부모(자녀 대상)" },
 ];
 
 export const SPECIAL_STATUS_OPTIONS = [
