@@ -14,6 +14,11 @@ def to_user_spec(saved: SavedSpec) -> UserSpec:
 UNIVERSITY_GPA_SCALE = {
     "충남대학교": 4.5,
     "KAIST": 4.3,
+    "한밭대학교": 4.5,
+    "배재대학교": 4.5,
+    "목원대학교": 4.5,
+    "우송대학교": 4.5,
+    "한남대학교": 4.5,
 }
 DEFAULT_GPA_SCALE = 4.5
 
