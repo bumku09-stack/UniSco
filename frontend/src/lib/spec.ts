@@ -54,6 +54,56 @@ export function specFormToUserSpec(spec: SpecForm): UserSpec {
   };
 }
 
+// 아래 세 항목(어학점수/장애인 세부유형/특수상황)은 아직 백엔드·DB에 저장할 칸이
+// 없어서 일단 화면(/spec, /mypage 둘 다)에서만 입력받고 제출 시 서버로는 안 보냄 —
+// 호성 확인 받고 스키마(SavedSpec/Scholarship 새 컬럼) 추가되면 그때 실제로 연결함
+// (supabase/matching_gaps.md 참고). /spec과 /mypage는 항상 같이 맞출 것
+// (frontend/README.md "/spec과 /mypage는 필드를 항상 같이 맞출 것" 참고).
+export const LANGUAGE_TESTS: { value: string; label: string; max: number | null }[] = [
+  { value: "TOEIC", label: "TOEIC", max: 990 },
+  { value: "TOEFL", label: "TOEFL(iBT)", max: 120 },
+  { value: "IELTS", label: "IELTS", max: 9 },
+  { value: "TOPIK", label: "TOPIK", max: 6 },
+  { value: "기타", label: "기타", max: null },
+];
+
+export const DISABILITY_TYPES = [
+  { value: "physical", label: "신체장애인" },
+  { value: "visual", label: "시각장애인" },
+  { value: "hearing", label: "청각장애인" },
+  { value: "intellectual", label: "지적장애인" },
+  { value: "other", label: "기타" },
+];
+
+export const SPECIAL_STATUS_OPTIONS = [
+  { value: "north_korean_defector", label: "북한이탈주민" },
+  { value: "multicultural_family", label: "다문화가정" },
+  { value: "child_care_facility", label: "아동양육시설 생활자·퇴소자" },
+  { value: "student_council_officer", label: "학생회장(임원)" },
+  { value: "single_parent_family", label: "한부모가정" },
+  { value: "grandparent_family", label: "조손가정" },
+  { value: "multi_child_family", label: "다자녀가정(3자녀 이상)" },
+  { value: "national_merit", label: "국가보훈대상자" },
+];
+
+export type OptionalInfo = {
+  languageTestEnabled: boolean;
+  languageTestType: string;
+  languageTestScore: string;
+  disabilityType: string;
+  specialStatusEnabled: boolean;
+  specialStatus: string[];
+};
+
+export const initialOptionalInfo: OptionalInfo = {
+  languageTestEnabled: false,
+  languageTestType: LANGUAGE_TESTS[0].value,
+  languageTestScore: "",
+  disabilityType: DISABILITY_TYPES[0].value,
+  specialStatusEnabled: false,
+  specialStatus: [],
+};
+
 // 마이페이지에서 서버에 저장된 스펙(UserSpec)을 불러와 수정 폼(SpecForm)에 채울 때 씀 —
 // specFormToUserSpec의 반대 방향. region은 구/군 정보 없이 짧은 시/도 단위로만 저장돼
 // 있어서, sido는 복원되지만 district는 그 시/도의 첫 번째 값으로 기본 설정됨.

@@ -3,14 +3,28 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Field, inputClass, PillToggle, SelectField, ToggleChip, TopBar } from "@/components/form-ui";
+import {
+  CollapsibleToggle,
+  Field,
+  inputClass,
+  MultiPillSelect,
+  PillToggle,
+  SelectField,
+  ToggleChip,
+  TopBar,
+} from "@/components/form-ui";
 import { authFetch, isLoggedIn } from "@/lib/auth";
 import { SIDO_LIST } from "@/lib/regions";
 import {
   DegreeLevel,
+  DISABILITY_TYPES,
   EnrollmentStatus,
+  initialOptionalInfo,
+  LANGUAGE_TESTS,
+  OptionalInfo,
   specFormToUserSpec,
   SpecForm,
+  SPECIAL_STATUS_OPTIONS,
   userSpecToSpecForm,
   UserSpec,
 } from "@/lib/spec";
@@ -19,6 +33,7 @@ import { UNIVERSITIES } from "@/lib/universities";
 export default function MyPage() {
   const router = useRouter();
   const [spec, setSpec] = useState<SpecForm | null>(null);
+  const [optionalInfo, setOptionalInfo] = useState<OptionalInfo>(initialOptionalInfo);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -259,18 +274,71 @@ export default function MyPage() {
             />
           </Field>
 
-          <div className="flex flex-col gap-2">
-            <ToggleChip
-              checked={spec.has_disability}
-              onChange={(v) => setSpec({ ...spec, has_disability: v })}
-              label="장애인"
+          <ToggleChip
+            checked={spec.is_foreigner}
+            onChange={(v) => setSpec({ ...spec, is_foreigner: v })}
+            label="외국인(유학생)"
+          />
+
+          <CollapsibleToggle
+            checked={optionalInfo.languageTestEnabled}
+            onChange={(v) => setOptionalInfo({ ...optionalInfo, languageTestEnabled: v })}
+            label="어학점수"
+          >
+            <SelectField
+              label="종류"
+              value={optionalInfo.languageTestType}
+              onChange={(v) => setOptionalInfo({ ...optionalInfo, languageTestType: v })}
+              options={LANGUAGE_TESTS.map((t) => ({ value: t.value, label: t.label }))}
             />
-            <ToggleChip
-              checked={spec.is_foreigner}
-              onChange={(v) => setSpec({ ...spec, is_foreigner: v })}
-              label="외국인(유학생)"
+            <Field
+              label={`점수${
+                LANGUAGE_TESTS.find((t) => t.value === optionalInfo.languageTestType)?.max != null
+                  ? ` (만점 ${LANGUAGE_TESTS.find((t) => t.value === optionalInfo.languageTestType)?.max})`
+                  : ""
+              }`}
+            >
+              <input
+                type="number"
+                min={0}
+                max={LANGUAGE_TESTS.find((t) => t.value === optionalInfo.languageTestType)?.max ?? undefined}
+                value={optionalInfo.languageTestScore}
+                onChange={(e) => setOptionalInfo({ ...optionalInfo, languageTestScore: e.target.value })}
+                className={inputClass}
+              />
+            </Field>
+          </CollapsibleToggle>
+
+          <CollapsibleToggle
+            checked={spec.has_disability}
+            onChange={(v) => setSpec({ ...spec, has_disability: v })}
+            label="장애인"
+          >
+            <SelectField
+              label="유형"
+              value={optionalInfo.disabilityType}
+              onChange={(v) => setOptionalInfo({ ...optionalInfo, disabilityType: v })}
+              options={DISABILITY_TYPES}
             />
-          </div>
+          </CollapsibleToggle>
+
+          <CollapsibleToggle
+            checked={optionalInfo.specialStatusEnabled}
+            onChange={(v) =>
+              setOptionalInfo({
+                ...optionalInfo,
+                specialStatusEnabled: v,
+                specialStatus: v ? optionalInfo.specialStatus : [],
+              })
+            }
+            label="특수상황"
+          >
+            <MultiPillSelect
+              values={optionalInfo.specialStatus}
+              onChange={(v) => setOptionalInfo({ ...optionalInfo, specialStatus: v })}
+              options={SPECIAL_STATUS_OPTIONS}
+            />
+          </CollapsibleToggle>
 
           {saved && !error && (
             <p className="rounded-2xl bg-blue-50 px-4 py-3 text-sm font-medium text-blue-600">
