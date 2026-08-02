@@ -13,7 +13,8 @@ class UserSpec(SQLModel):
 
     university: str  # 소속 대학 (예: 충남대학교, KAIST) — GPA 만점 기준을 정하는 데도 씀
     college: str  # 단과대 (예: 공과대학)
-    gpa: float
+    semester_gpa: float  # 직전 학기 평점평균 (해당 대학 만점 기준 원점수, 정규화는 matching.py에서)
+    cumulative_gpa: float  # 전체 재학기간 누적 평점평균(CGPA) — 마찬가지로 원점수
     age: int
     gender: Gender
     region: str

@@ -1,4 +1,11 @@
-from app.models import EnrollmentStatus, ForeignerEligibility, SavedSpec, Scholarship, UserSpec
+from app.models import (
+    EnrollmentStatus,
+    ForeignerEligibility,
+    GpaBasis,
+    SavedSpec,
+    Scholarship,
+    UserSpec,
+)
 
 
 def to_user_spec(saved: SavedSpec) -> UserSpec:
@@ -23,9 +30,29 @@ UNIVERSITY_GPA_SCALE = {
 DEFAULT_GPA_SCALE = 4.5
 
 
-def normalized_gpa(spec: UserSpec) -> float:
-    scale = UNIVERSITY_GPA_SCALE.get(spec.university, DEFAULT_GPA_SCALE)
-    return spec.gpa * (4.5 / scale)
+def normalized_gpa(gpa: float, university: str) -> float:
+    scale = UNIVERSITY_GPA_SCALE.get(university, DEFAULT_GPA_SCALE)
+    return gpa * (4.5 / scale)
+
+
+def gpa_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
+    """min_gpa_basis가 직전학기/전체누적 중 무엇을 요구하는지에 따라 그쪽 GPA만 비교함
+    (2026-08-02 추가 — matching_gaps.md 13번, 우송대 재검증 중 발견). 아직 basis를
+    분류 안 한(None) 장학금은 기존 크롤링 데이터 대부분이 여기 해당하는데, 직전학기·
+    전체누적 둘 중 하나라도 기준을 만족하면 통과시키는 관대한 기본값으로 처리함 —
+    실제로는 둘 중 하나 기준일 텐데 어느 쪽인지 몰라서 학생을 잘못 걸러내는 것보다
+    낫다는 판단(과다매칭이 과소매칭보다 덜 해로움)."""
+    if scholarship.min_gpa is None:
+        return True
+    threshold = scholarship.min_gpa
+    if scholarship.min_gpa_basis == GpaBasis.SEMESTER:
+        return normalized_gpa(spec.semester_gpa, spec.university) >= threshold
+    if scholarship.min_gpa_basis == GpaBasis.CUMULATIVE:
+        return normalized_gpa(spec.cumulative_gpa, spec.university) >= threshold
+    return (
+        normalized_gpa(spec.semester_gpa, spec.university) >= threshold
+        or normalized_gpa(spec.cumulative_gpa, spec.university) >= threshold
+    )
 
 
 def enrollment_status_matches(
@@ -69,7 +96,7 @@ def is_eligible(scholarship: Scholarship, spec: UserSpec) -> bool:
         and spec.income_bracket > scholarship.max_income_bracket
     ):
         return False
-    if scholarship.min_gpa is not None and normalized_gpa(spec) < scholarship.min_gpa:
+    if not gpa_matches(scholarship, spec):
         return False
     if scholarship.requires_disability and not spec.has_disability:
         return False

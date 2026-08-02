@@ -194,15 +194,28 @@ export default function MyPage() {
             </>
           )}
 
-          <Field label={`학점 (${gpaScale} 만점 기준)`}>
+          <Field label={`직전 학기 평점 (${gpaScale} 만점 기준)`}>
             <input
               type="number"
               required
               step={0.01}
               min={0}
               max={gpaScale}
-              value={spec.gpa}
-              onChange={(e) => setSpec({ ...spec, gpa: e.target.value })}
+              value={spec.semester_gpa}
+              onChange={(e) => setSpec({ ...spec, semester_gpa: e.target.value })}
+              className={inputClass}
+            />
+          </Field>
+
+          <Field label={`전체 재학기간 누적 평점 (${gpaScale} 만점 기준)`}>
+            <input
+              type="number"
+              required
+              step={0.01}
+              min={0}
+              max={gpaScale}
+              value={spec.cumulative_gpa}
+              onChange={(e) => setSpec({ ...spec, cumulative_gpa: e.target.value })}
               className={inputClass}
             />
           </Field>

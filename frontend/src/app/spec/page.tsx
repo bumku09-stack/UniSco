@@ -34,7 +34,8 @@ const DEFAULT_UNIVERSITY = UNIVERSITIES[0];
 const initialSpec: SpecForm = {
   university: DEFAULT_UNIVERSITY.name,
   college: DEFAULT_UNIVERSITY.colleges[0] ?? "",
-  gpa: "4.0",
+  semester_gpa: "4.0",
+  cumulative_gpa: "4.0",
   age: "20",
   gender: "male",
   sido: DEFAULT_SIDO.name,
@@ -214,15 +215,28 @@ export default function SpecWizard() {
               </>
             )}
 
-            <Field label={`학점 (${gpaScale} 만점 기준)`}>
+            <Field label={`직전 학기 평점 (${gpaScale} 만점 기준)`}>
               <input
                 type="number"
                 required
                 step={0.01}
                 min={0}
                 max={gpaScale}
-                value={spec.gpa}
-                onChange={(e) => setSpec({ ...spec, gpa: e.target.value })}
+                value={spec.semester_gpa}
+                onChange={(e) => setSpec({ ...spec, semester_gpa: e.target.value })}
+                className={inputClass}
+              />
+            </Field>
+
+            <Field label={`전체 재학기간 누적 평점 (${gpaScale} 만점 기준)`}>
+              <input
+                type="number"
+                required
+                step={0.01}
+                min={0}
+                max={gpaScale}
+                value={spec.cumulative_gpa}
+                onChange={(e) => setSpec({ ...spec, cumulative_gpa: e.target.value })}
                 className={inputClass}
               />
             </Field>

@@ -10,7 +10,8 @@ export type DegreeLevel = "masters" | "doctoral" | "integrated_ms_phd";
 export type UserSpec = {
   university: string;
   college: string;
-  gpa: number;
+  semester_gpa: number;
+  cumulative_gpa: number;
   age: number;
   gender: "male" | "female";
   region: string;
@@ -27,9 +28,13 @@ export type UserSpec = {
 // (타이핑 도중 바로 Number()로 바꿔서 value에 되먹이면 "4." 같은 중간 입력이
 // 매번 리셋되면서 방금 친 글자가 씹히는 문제가 있었음 — 그래서 07, 04.5처럼
 // 앞에 0을 하나 더 쳐야 입력되는 현상이 발생했음)
-export type SpecForm = Omit<UserSpec, "age" | "gpa" | "income_bracket" | "region" | "grade"> & {
+export type SpecForm = Omit<
+  UserSpec,
+  "age" | "semester_gpa" | "cumulative_gpa" | "income_bracket" | "region" | "grade"
+> & {
   age: string;
-  gpa: string;
+  semester_gpa: string;
+  cumulative_gpa: string;
   income_bracket: string;
   sido: string;
   district: string;
@@ -40,7 +45,8 @@ export function specFormToUserSpec(spec: SpecForm): UserSpec {
   return {
     university: spec.university,
     college: spec.college,
-    gpa: Number(spec.gpa),
+    semester_gpa: Number(spec.semester_gpa),
+    cumulative_gpa: Number(spec.cumulative_gpa),
     age: Number(spec.age),
     gender: spec.gender,
     region: regionShortName(spec.sido, spec.district),
@@ -117,7 +123,8 @@ export function userSpecToSpecForm(spec: UserSpec): SpecForm {
   return {
     university: spec.university,
     college: spec.college,
-    gpa: String(spec.gpa),
+    semester_gpa: String(spec.semester_gpa),
+    cumulative_gpa: String(spec.cumulative_gpa),
     age: String(spec.age),
     gender: spec.gender,
     sido,

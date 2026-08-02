@@ -13,6 +13,10 @@
 CREATE TYPE gender AS ENUM ('male', 'female');
 CREATE TYPE militarystatus AS ENUM ('completed', 'exempted', 'not_served');
 CREATE TYPE foreignereligibility AS ENUM ('korean_only', 'foreigner_only');
+-- gpabasis(2026-08-02 추가): min_gpa가 직전학기 성적 기준인지 전체 재학기간 누적(CGPA)
+-- 기준인지 구분. NULL이면 미지정 — matching.py에서 둘 중 하나만 만족해도 통과시키는
+-- 관대한 기본값으로 처리함(matching_gaps.md 13번 참고).
+CREATE TYPE gpabasis AS ENUM ('semester', 'cumulative');
 -- undergrad_transfer(편입)는 2026-07-31 ALTER TYPE으로 추가됨. 매칭 시 undergrad_enrolled
 -- 요구조건은 undergrad_transfer도 만족시키는 것으로 취급함(둘 다 "현재 재학중") —
 -- backend/app/core/matching.py의 enrollment_status_matches() 참고.
@@ -40,6 +44,7 @@ CREATE TABLE scholarship (
     required_military_status militarystatus,
     max_income_bracket INTEGER,
     min_gpa FLOAT,
+    min_gpa_basis gpabasis,  -- 2026-08-02 추가
     requires_disability BOOLEAN,
     foreigner_eligibility foreignereligibility,
     -- (레거시) 구조화 전 원문 텍스트 — 매칭에는 안 쓰고 참고용/미래 정밀매칭 재료로 남겨둠
@@ -103,7 +108,8 @@ CREATE TABLE savedspec (
     user_id INTEGER NOT NULL REFERENCES "user" (id),
     university VARCHAR NOT NULL,
     college VARCHAR NOT NULL,
-    gpa FLOAT NOT NULL,
+    semester_gpa FLOAT NOT NULL,  -- 2026-08-02: 기존 gpa 컬럼을 semester_gpa로 개명
+    cumulative_gpa FLOAT NOT NULL,  -- 2026-08-02 신규 추가
     age INTEGER NOT NULL,
     gender gender NOT NULL,
     region VARCHAR NOT NULL,

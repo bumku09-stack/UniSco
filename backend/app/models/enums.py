@@ -26,6 +26,17 @@ class ForeignerEligibility(str, Enum):
     FOREIGNER_ONLY = "foreigner_only"
 
 
+class GpaBasis(str, Enum):
+    """min_gpa가 직전학기 성적 기준인지 전체 재학기간 누적(CGPA) 기준인지 — 대학마다,
+    같은 대학 안에서도 장학금마다 둘 중 하나를 요구하는 경우가 섞여 있어서 분리함
+    (2026-08-02, 우송대 재검증 중 발견 — matching_gaps.md 13번 참고).
+    None(미지정)인 기존/신규 데이터는 matching.py에서 직전학기·전체누적 중 하나라도
+    만족하면 통과시키는 관대한 기본값으로 처리함."""
+
+    SEMESTER = "semester"  # 직전학기 성적 기준
+    CUMULATIVE = "cumulative"  # 전체 재학기간 누적(CGPA) 기준
+
+
 class EnrollmentStatus(str, Enum):
     UNDERGRAD_ENROLLED = "undergrad_enrolled"  # 학부재학
     UNDERGRAD_TRANSFER = "undergrad_transfer"  # 학부편입 — 매칭 시 취급은 core/matching.py 참고

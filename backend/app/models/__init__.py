@@ -15,6 +15,7 @@ from app.models.enums import (
     EnrollmentStatus,
     ForeignerEligibility,
     Gender,
+    GpaBasis,
     MilitaryStatus,
 )
 from app.models.saved_spec import SavedSpec
@@ -31,6 +32,7 @@ __all__ = [
     "EnrollmentStatus",
     "ForeignerEligibility",
     "Gender",
+    "GpaBasis",
     "LoginRequest",
     "MilitaryStatus",
     "RefreshRequest",

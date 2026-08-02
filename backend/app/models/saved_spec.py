@@ -14,7 +14,8 @@ class SavedSpec(SQLModel, table=True):
 
     university: str
     college: str
-    gpa: float
+    semester_gpa: float
+    cumulative_gpa: float
     age: int
     gender: Gender = Field(sa_type=enum_column(Gender))
     region: str

@@ -7,6 +7,7 @@ from app.models.enums import (
     EnrollmentStatus,
     ForeignerEligibility,
     Gender,
+    GpaBasis,
     MilitaryStatus,
     enum_column,
 )
@@ -32,6 +33,9 @@ class Scholarship(SQLModel, table=True):
     )
     max_income_bracket: int | None = None  # 소득분위 N 이하
     min_gpa: float | None = None  # 4.5 만점 기준
+    min_gpa_basis: GpaBasis | None = Field(
+        default=None, sa_type=enum_column(GpaBasis)
+    )  # 이 min_gpa가 직전학기/전체누적 중 어느 기준인지. None=미지정(둘 중 하나만 만족해도 통과)
     requires_disability: bool | None = None  # None=무관, True=장애인 한정
     foreigner_eligibility: ForeignerEligibility | None = Field(
         default=None, sa_type=enum_column(ForeignerEligibility)
