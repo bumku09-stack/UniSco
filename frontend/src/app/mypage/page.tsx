@@ -14,6 +14,7 @@ import {
   TopBar,
 } from "@/components/form-ui";
 import { authFetch, isLoggedIn } from "@/lib/auth";
+import { clearCachedRecommendations } from "@/lib/recommendations-cache";
 import { SIDO_LIST } from "@/lib/regions";
 import {
   DegreeLevel,
@@ -104,6 +105,9 @@ export default function MyPage() {
         const data = await res.json().catch(() => null);
         throw new Error(data?.detail ?? `status ${res.status}`);
       }
+      // 스펙이 실제로 바뀌었으니 /home의 캐시된 추천 결과는 이제 낡은 값 — 다음 방문 때
+      // 다시 계산하도록 지움(clearCachedRecommendations 참고).
+      clearCachedRecommendations();
       setSaved(true);
     } catch {
       setError("스펙 수정에 실패했습니다. 잠시 후 다시 시도해주세요.");

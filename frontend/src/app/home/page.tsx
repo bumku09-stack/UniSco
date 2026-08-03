@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { TopBar } from "@/components/form-ui";
 import { authFetch, clearTokens, isLoggedIn } from "@/lib/auth";
+import { getCachedRecommendations, setCachedRecommendations } from "@/lib/recommendations-cache";
 import {
   CATEGORY_L1_LABEL,
   CATEGORY_L2_BY_L1,
@@ -81,8 +83,9 @@ function ScholarshipCard({ s }: { s: Scholarship }) {
 
 export default function HomePage() {
   const router = useRouter();
-  const [results, setResults] = useState<Scholarship[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  // 캐시가 있으면 그걸로 바로 렌더링 시작(로딩 스피너 없이) — 없을 때만 로딩 상태로 시작함.
+  const [results, setResults] = useState<Scholarship[] | null>(() => getCachedRecommendations());
+  const [loading, setLoading] = useState(results === null);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState<SortBy>("relevance");
@@ -95,11 +98,17 @@ export default function HomePage() {
       return;
     }
 
+    // results를 deps에 안 넣은 건 의도적임 — 마운트 시점의 캐시 유무만 한 번 확인하면
+    // 되고, 이 안에서 나중에 setResults 하는 것 때문에 이펙트가 다시 도는 걸 막기 위함.
+    const hadCache = results !== null;
+
     (async () => {
       const statusRes = await authFetch("/users/me/spec-status");
       if (!statusRes.ok) {
-        setError("정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
-        setLoading(false);
+        if (!hadCache) {
+          setError("정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
+          setLoading(false);
+        }
         return;
       }
       const status = await statusRes.json();
@@ -110,13 +119,20 @@ export default function HomePage() {
 
       const recRes = await authFetch("/scholarships/recommendations");
       if (!recRes.ok) {
-        setError("매칭에 실패했습니다. 백엔드 서버가 켜져 있는지 확인해주세요.");
-        setLoading(false);
+        // 캐시된 이전 결과가 이미 화면에 떠 있으면 그거 그대로 두고 조용히 넘어감 —
+        // 캐시가 없을 때만(최초 진입) 에러를 실제로 보여줌.
+        if (!hadCache) {
+          setError("매칭에 실패했습니다. 백엔드 서버가 켜져 있는지 확인해주세요.");
+          setLoading(false);
+        }
         return;
       }
-      setResults(await recRes.json());
+      const data: Scholarship[] = await recRes.json();
+      setResults(data);
+      setCachedRecommendations(data);
       setLoading(false);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   function handleLogout() {
@@ -136,26 +152,22 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-white pb-16">
       <div className="mx-auto w-full max-w-md px-6 py-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500 text-sm font-bold text-white">
-              U
+        <TopBar
+          right={
+            <div className="flex items-center gap-3">
+              <Link href="/mypage" className="text-sm font-semibold text-blue-500">
+                마이페이지
+              </Link>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="text-sm font-semibold text-gray-400"
+              >
+                로그아웃
+              </button>
             </div>
-            <span className="text-base font-bold text-gray-900">UniSco</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link href="/mypage" className="text-sm font-semibold text-blue-500">
-              마이페이지
-            </Link>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="text-sm font-semibold text-gray-400"
-            >
-              로그아웃
-            </button>
-          </div>
-        </div>
+          }
+        />
 
         {loading && <p className="mt-8 text-center text-sm text-gray-400">매칭 중...</p>}
 

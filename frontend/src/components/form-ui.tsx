@@ -1,6 +1,8 @@
 // 스펙 입력 위저드(/spec)랑 마이페이지(/mypage) 둘 다 같은 필드 UI를 쓰기 때문에
 // 여기 하나로 모아둠 — 스타일(Toss 느낌: 라운드, 옅은 회색 배경, 파란 포인트) 통일 목적.
 
+import Link from "next/link";
+
 export const inputClass =
   "w-full rounded-2xl bg-gray-100 px-4 py-3.5 text-[15px] text-gray-900 outline-none transition focus:bg-blue-50 focus:ring-2 focus:ring-blue-500";
 
@@ -170,12 +172,12 @@ export function MultiPillSelect({
 export function TopBar({ right }: { right?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2">
+      <Link href="/home" className="flex items-center gap-2">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500 text-sm font-bold text-white">
           U
         </div>
         <span className="text-base font-bold text-gray-900">UniSco</span>
-      </div>
+      </Link>
       {right}
     </div>
   );

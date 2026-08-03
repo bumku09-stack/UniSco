@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
+import { TopBar } from "@/components/form-ui";
 import {
   CATEGORY_L2_LABEL,
   eligibilityList,
@@ -73,9 +74,13 @@ export default function ScholarshipDetailPage({
   return (
     <div className="flex min-h-screen flex-col bg-white">
       <div className="mx-auto w-full max-w-md flex-1 px-6 pb-32 pt-6">
-        <Link href="/home" className="text-sm font-semibold text-gray-400">
-          ← 목록으로
-        </Link>
+        <TopBar
+          right={
+            <Link href="/home" className="text-sm font-semibold text-gray-400">
+              ← 목록으로
+            </Link>
+          }
+        />
 
         {scholarship === undefined && (
           <p className="mt-8 text-center text-sm text-gray-400">불러오는 중...</p>
