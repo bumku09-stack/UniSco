@@ -10,6 +10,7 @@ export type DegreeLevel = "masters" | "doctoral" | "integrated_ms_phd";
 export type UserSpec = {
   university: string;
   college: string;
+  department: string | null; // 2026-08-03 추가 (matching_gaps.md 2번) — 단과대 밑 학과
   semester_gpa: number;
   cumulative_gpa: number;
   age: number;
@@ -22,15 +23,33 @@ export type UserSpec = {
   enrollment_status: EnrollmentStatus;
   grade: number | null;
   degree_level: DegreeLevel | null;
+  // 2026-08-02 추가 (matching_gaps.md 9·10·12번) — 전부 선택 입력, 아래 OptionalInfo 참고.
+  language_test_type: string | null;
+  language_test_score: number | null;
+  disability_type: string | null;
+  special_status: string[];
 };
 
 // 숫자 입력 필드는 폼에서 문자열로 들고 있다가 제출할 때만 숫자로 변환함.
 // (타이핑 도중 바로 Number()로 바꿔서 value에 되먹이면 "4." 같은 중간 입력이
 // 매번 리셋되면서 방금 친 글자가 씹히는 문제가 있었음 — 그래서 07, 04.5처럼
 // 앞에 0을 하나 더 쳐야 입력되는 현상이 발생했음)
+// language_test_type/language_test_score/disability_type/special_status는 SpecForm에
+// 안 넣음 — 이 넷은 OptionalInfo(아래) 쪽 상태로 따로 관리되고, 제출 시 specFormToUserSpec의
+// 두 번째 인자로 합쳐짐.
 export type SpecForm = Omit<
   UserSpec,
-  "age" | "semester_gpa" | "cumulative_gpa" | "income_bracket" | "region" | "grade"
+  | "age"
+  | "semester_gpa"
+  | "cumulative_gpa"
+  | "income_bracket"
+  | "region"
+  | "grade"
+  | "department"
+  | "language_test_type"
+  | "language_test_score"
+  | "disability_type"
+  | "special_status"
 > & {
   age: string;
   semester_gpa: string;
@@ -39,12 +58,14 @@ export type SpecForm = Omit<
   sido: string;
   district: string;
   grade: string;
+  department: string; // 빈 문자열 = 학과 선택 안 함(단과대에 학과 목록이 없거나 미선택)
 };
 
-export function specFormToUserSpec(spec: SpecForm): UserSpec {
+export function specFormToUserSpec(spec: SpecForm, optionalInfo: OptionalInfo): UserSpec {
   return {
     university: spec.university,
     college: spec.college,
+    department: spec.department || null,
     semester_gpa: Number(spec.semester_gpa),
     cumulative_gpa: Number(spec.cumulative_gpa),
     age: Number(spec.age),
@@ -57,14 +78,23 @@ export function specFormToUserSpec(spec: SpecForm): UserSpec {
     enrollment_status: spec.enrollment_status,
     grade: spec.enrollment_status === "post_undergrad" ? null : Number(spec.grade),
     degree_level: spec.enrollment_status === "post_undergrad" ? spec.degree_level : null,
+    language_test_type:
+      optionalInfo.languageTestEnabled && optionalInfo.languageTestScore !== ""
+        ? optionalInfo.languageTestType
+        : null,
+    language_test_score:
+      optionalInfo.languageTestEnabled && optionalInfo.languageTestScore !== ""
+        ? Number(optionalInfo.languageTestScore)
+        : null,
+    disability_type: spec.has_disability ? optionalInfo.disabilityType : null,
+    special_status: optionalInfo.specialStatusEnabled ? optionalInfo.specialStatus : [],
   };
 }
 
-// 아래 세 항목(어학점수/장애인 세부유형/특수상황)은 아직 백엔드·DB에 저장할 칸이
-// 없어서 일단 화면(/spec, /mypage 둘 다)에서만 입력받고 제출 시 서버로는 안 보냄 —
-// 호성 확인 받고 스키마(SavedSpec/Scholarship 새 컬럼) 추가되면 그때 실제로 연결함
-// (supabase/matching_gaps.md 참고). /spec과 /mypage는 항상 같이 맞출 것
-// (frontend/README.md "/spec과 /mypage는 필드를 항상 같이 맞출 것" 참고).
+// 아래 세 항목(어학점수/장애인 세부유형/특수상황) — 2026-08-03 백엔드 연결 완료
+// (SavedSpec/Scholarship 새 컬럼 추가, supabase/matching_gaps.md 참고). /spec과
+// /mypage는 항상 같이 맞출 것 (frontend/README.md "/spec과 /mypage는 필드를 항상
+// 같이 맞출 것" 참고).
 export const LANGUAGE_TESTS: { value: string; label: string; max: number | null }[] = [
   { value: "TOEIC", label: "TOEIC", max: 990 },
   { value: "TOEFL", label: "TOEFL(iBT)", max: 120 },
@@ -94,6 +124,13 @@ export const SPECIAL_STATUS_OPTIONS = [
   { value: "grandparent_family", label: "조손가정" },
   { value: "multi_child_family", label: "다자녀가정(3자녀 이상)" },
   { value: "national_merit", label: "국가보훈대상자" },
+  // 2026-08-03 추가 — 배재대 희망복지장학금·대전대 장학사정관장학금 같은 복합조건
+  // 장학금을 재분류하면서 새로 필요해진 항목들 (matching_gaps.md 참고)
+  { value: "basic_livelihood_recipient", label: "기초생활수급자" },
+  { value: "near_poor", label: "차상위계층" },
+  { value: "severe_illness_or_injury", label: "중증질병 및 상해" },
+  { value: "job_loss_or_disaster", label: "실직가정·재난 및 재해" },
+  { value: "financial_emergency", label: "긴급가계곤란" },
 ];
 
 export type OptionalInfo = {
@@ -123,6 +160,7 @@ export function userSpecToSpecForm(spec: UserSpec): SpecForm {
   return {
     university: spec.university,
     college: spec.college,
+    department: spec.department ?? "",
     semester_gpa: String(spec.semester_gpa),
     cumulative_gpa: String(spec.cumulative_gpa),
     age: String(spec.age),
@@ -136,5 +174,18 @@ export function userSpecToSpecForm(spec: UserSpec): SpecForm {
     enrollment_status: spec.enrollment_status,
     grade: spec.grade != null ? String(spec.grade) : "1",
     degree_level: spec.degree_level,
+  };
+}
+
+// userSpecToSpecForm과 짝 — 서버에서 불러온 UserSpec으로 OptionalInfo(어학점수/장애인
+// 세부유형/특수상황) 폼 상태를 복원할 때 씀 (마이페이지에서 기존 저장값을 보여주기 위함).
+export function userSpecToOptionalInfo(spec: UserSpec): OptionalInfo {
+  return {
+    languageTestEnabled: spec.language_test_type != null,
+    languageTestType: spec.language_test_type ?? LANGUAGE_TESTS[0].value,
+    languageTestScore: spec.language_test_score != null ? String(spec.language_test_score) : "",
+    disabilityType: spec.disability_type ?? DISABILITY_TYPES[0].value,
+    specialStatusEnabled: spec.special_status.length > 0,
+    specialStatus: spec.special_status,
   };
 }

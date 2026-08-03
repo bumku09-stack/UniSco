@@ -1,14 +1,20 @@
+import datetime
+
+from sqlalchemy import ARRAY, Column, String
 from sqlmodel import Field, SQLModel
 
 from app.models.enums import (
     CategoryL1,
     CategoryL2,
     DegreeLevel,
+    DisabilityType,
     EnrollmentStatus,
     ForeignerEligibility,
     Gender,
     GpaBasis,
+    LanguageTestType,
     MilitaryStatus,
+    SpecialStatus,
     enum_column,
 )
 
@@ -37,15 +43,39 @@ class Scholarship(SQLModel, table=True):
         default=None, sa_type=enum_column(GpaBasis)
     )  # 이 min_gpa가 직전학기/전체누적 중 어느 기준인지. None=미지정(둘 중 하나만 만족해도 통과)
     requires_disability: bool | None = None  # None=무관, True=장애인 한정
+    required_disability_type: DisabilityType | None = Field(
+        default=None, sa_type=enum_column(DisabilityType)
+    )  # requires_disability=True일 때만 의미. None=장애 유형 무관(장애인이면 다 해당)
     foreigner_eligibility: ForeignerEligibility | None = Field(
         default=None, sa_type=enum_column(ForeignerEligibility)
     )  # None=내국인/외국인 무관
+    language_test_type: LanguageTestType | None = Field(
+        default=None, sa_type=enum_column(LanguageTestType)
+    )  # 2026-08-02 추가(matching_gaps.md 10번). None=어학점수 조건 없음
+    language_test_min_score: float | None = None  # language_test_type이 있을 때만 의미
+    # 2026-08-02 추가(matching_gaps.md 9번), 2026-08-03 단일값→리스트로 변경(배재사랑장학금
+    # "장애학생 또는 다문화가정 학생" 같은 OR조건 표현 위함). 빈 리스트=특수상황 조건 없음.
+    # 매칭 로직은 다른 필드들과 다름(core/matching.py의 special_status_matches() 참고,
+    # 유저가 특수상황을 아예 선택 안 하면 이 조건이 있어도 걸러내지 않음). 이 장학금이
+    # requires_disability/required_disability_type도 같이 갖고 있으면 "장애 조건 OR 특수상황
+    # 조건"으로 취급함(core/matching.py의 is_eligible() 참고).
+    required_special_status: list[SpecialStatus] = Field(
+        default_factory=list, sa_column=Column(ARRAY(String), nullable=False, server_default="{}")
+    )
+    # 2026-08-03 추가 — 구조화된 마감일(matching_gaps.md 7번). 대부분의 기존 데이터는
+    # "매 학기 초 공지"류 상시/반복 프로그램이라 NULL로 남아있고(마감 자동판정 대상 아님),
+    # 실제 확정 마감일이 있는 공고만 이 값을 채워서 자동으로 걸러지게 함(match_scholarships()
+    # 참고). 신규 크롤링 시 확정 마감일을 알아내면 여기 채울 것 — 기존 366건 백필은 별도 작업.
+    application_deadline: datetime.date | None = None
 
     # Free-text eligibility detail that doesn't fit a clean enum/range — added
     # after reviewing real scraped data, which needed these as separate columns
     # rather than crammed into `description`.
     grade_level: str | None = None  # (레거시, 구조화 전 원문) 학년 조건 텍스트
-    major: str | None = None  # 전공 조건 — 아직 매칭에 안 씀, 학과 단위 정밀매칭은 다음 단계
+    # 2026-08-03: matching_gaps.md 2번 해결 — UserSpec.department와 매칭에 실제로 씀
+    # (core/matching.py의 major_matches() 참고). 콤마로 여러 학과가 나열된 기존 데이터
+    # (예: "융합디자인전공,회화전공,미술교육과")도 그대로 지원함 — 그 중 하나만 일치해도 통과.
+    major: str | None = None
     affiliated_institution: str | None = None  # (레거시, 구조화 전 원문) 소속 대학/학과 텍스트
     min_credits: str | None = None  # 이수학점 조건 (형식이 제각각이라 텍스트)
     admission_score_condition: str | None = None  # 내신/입학성적 조건

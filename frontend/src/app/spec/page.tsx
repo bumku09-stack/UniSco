@@ -33,7 +33,8 @@ const DEFAULT_UNIVERSITY = UNIVERSITIES[0];
 
 const initialSpec: SpecForm = {
   university: DEFAULT_UNIVERSITY.name,
-  college: DEFAULT_UNIVERSITY.colleges[0] ?? "",
+  college: DEFAULT_UNIVERSITY.colleges[0]?.name ?? "",
+  department: DEFAULT_UNIVERSITY.colleges[0]?.departments[0] ?? "",
   semester_gpa: "4.0",
   cumulative_gpa: "4.0",
   age: "20",
@@ -75,6 +76,8 @@ export default function SpecWizard() {
   const currentUniversity = UNIVERSITIES.find((u) => u.name === spec.university) ?? UNIVERSITIES[0];
   const gpaScale = currentUniversity.gpaScale;
   const currentColleges = currentUniversity.colleges;
+  const currentDepartments =
+    currentColleges.find((c) => c.name === spec.college)?.departments ?? [];
   const currentDistricts = SIDO_LIST.find((s) => s.name === spec.sido)?.districts ?? [];
 
   async function handleFinalSubmit(e: React.FormEvent) {
@@ -82,7 +85,7 @@ export default function SpecWizard() {
     setSubmitting(true);
     setError(null);
     try {
-      const body: UserSpec = specFormToUserSpec(spec);
+      const body: UserSpec = specFormToUserSpec(spec, optionalInfo);
       const res = await authFetch("/users/me/spec", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -134,7 +137,12 @@ export default function SpecWizard() {
               value={spec.university}
               onChange={(v) => {
                 const next = UNIVERSITIES.find((u) => u.name === v)!;
-                setSpec({ ...spec, university: next.name, college: next.colleges[0] ?? "" });
+                setSpec({
+                  ...spec,
+                  university: next.name,
+                  college: next.colleges[0]?.name ?? "",
+                  department: next.colleges[0]?.departments[0] ?? "",
+                });
               }}
               options={UNIVERSITIES.map((u) => ({ value: u.name, label: u.name }))}
             />
@@ -143,9 +151,31 @@ export default function SpecWizard() {
               <SelectField
                 label="단과대"
                 value={spec.college}
-                onChange={(v) => setSpec({ ...spec, college: v })}
-                options={currentColleges.map((c) => ({ value: c, label: c }))}
+                onChange={(v) => {
+                  const nextCollege = currentColleges.find((c) => c.name === v)!;
+                  setSpec({ ...spec, college: v, department: nextCollege.departments[0] ?? "" });
+                }}
+                options={currentColleges.map((c) => ({ value: c.name, label: c.name }))}
               />
+            )}
+
+            {currentDepartments.length > 0 ? (
+              <SelectField
+                label="학과"
+                value={spec.department}
+                onChange={(v) => setSpec({ ...spec, department: v })}
+                options={currentDepartments.map((d) => ({ value: d, label: d }))}
+              />
+            ) : (
+              <Field label="학과 (선택)">
+                <input
+                  type="text"
+                  value={spec.department}
+                  onChange={(e) => setSpec({ ...spec, department: e.target.value })}
+                  placeholder="예: 컴퓨터공학과"
+                  className={inputClass}
+                />
+              </Field>
             )}
 
             <Field label="재학 상태">

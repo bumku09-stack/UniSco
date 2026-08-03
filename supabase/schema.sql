@@ -13,10 +13,30 @@
 CREATE TYPE gender AS ENUM ('male', 'female');
 CREATE TYPE militarystatus AS ENUM ('completed', 'exempted', 'not_served');
 CREATE TYPE foreignereligibility AS ENUM ('korean_only', 'foreigner_only');
--- gpabasis(2026-08-02 추가): min_gpa가 직전학기 성적 기준인지 전체 재학기간 누적(CGPA)
--- 기준인지 구분. NULL이면 미지정 — matching.py에서 둘 중 하나만 만족해도 통과시키는
--- 관대한 기본값으로 처리함(matching_gaps.md 13번 참고).
-CREATE TYPE gpabasis AS ENUM ('semester', 'cumulative');
+-- gpabasis(2026-08-02 추가, 'both'는 2026-08-03 추가): min_gpa가 직전학기 성적 기준인지
+-- 전체 재학기간 누적(CGPA) 기준인지, 아니면 둘 다 동시에 만족해야 하는지 구분. NULL이면
+-- 미지정 — matching.py에서 둘 중 하나만 만족해도 통과시키는 관대한 기본값으로 처리함
+-- (matching_gaps.md 13번 참고).
+CREATE TYPE gpabasis AS ENUM ('semester', 'cumulative', 'both');
+-- languagetesttype/disabilitytype/specialstatus (2026-08-03 추가, matching_gaps.md 9·10·12번)
+CREATE TYPE languagetesttype AS ENUM ('TOEIC', 'TOEFL', 'IELTS', 'TOPIK', '기타');
+CREATE TYPE disabilitytype AS ENUM (
+    'physical_impairment', 'learning_disability', 'medical_disability', 'mental_impairment',
+    'muscular_dystrophy', 'developmental_impairment', 'disabled_parent'
+);
+-- specialstatus: Scholarship/SavedSpec 둘 다 다중 선택(TEXT[]로 저장, 아래 두 테이블 참고 —
+-- Scholarship 쪽은 2026-08-03에 단일값에서 리스트로 변경, 배재사랑장학금 "장애학생 또는
+-- 다문화가정" 같은 OR조건 표현 위함). 매칭 로직이 다른 필드들과 다름
+-- (backend/app/core/matching.py의 special_status_matches() 참고). 이 CREATE TYPE 자체는
+-- 실제 컬럼 타입으로는 안 쓰이고(둘 다 TEXT[]) Python 쪽 enum 값 참고용 문서화 목적.
+CREATE TYPE specialstatus AS ENUM (
+    'north_korean_defector', 'multicultural_family', 'child_care_facility',
+    'student_council_officer', 'single_parent_family', 'grandparent_family',
+    'multi_child_family', 'national_merit',
+    -- 2026-08-03 추가 — 희망복지장학금·장학사정관장학금 등 복합조건 장학금 재분류하며 필요해짐
+    'basic_livelihood_recipient', 'near_poor', 'severe_illness_or_injury',
+    'job_loss_or_disaster', 'financial_emergency'
+);
 -- undergrad_transfer(편입)는 2026-07-31 ALTER TYPE으로 추가됨. 매칭 시 undergrad_enrolled
 -- 요구조건은 undergrad_transfer도 만족시키는 것으로 취급함(둘 다 "현재 재학중") —
 -- backend/app/core/matching.py의 enrollment_status_matches() 참고.
@@ -46,9 +66,16 @@ CREATE TABLE scholarship (
     min_gpa FLOAT,
     min_gpa_basis gpabasis,  -- 2026-08-02 추가
     requires_disability BOOLEAN,
+    required_disability_type disabilitytype,  -- 2026-08-03 추가
     foreigner_eligibility foreignereligibility,
+    language_test_type languagetesttype,  -- 2026-08-03 추가
+    language_test_min_score FLOAT,  -- 2026-08-03 추가
+    required_special_status TEXT[] NOT NULL DEFAULT '{}',  -- 2026-08-03 추가, 같은날 단일->리스트 변경
+    application_deadline DATE,  -- 2026-08-03 추가(matching_gaps.md 7번). NULL=상시/마감정보 없음
     -- (레거시) 구조화 전 원문 텍스트 — 매칭에는 안 쓰고 참고용/미래 정밀매칭 재료로 남겨둠
     grade_level VARCHAR,
+    -- major: 2026-08-03부터 UserSpec.department와 실제 매칭에 씀(matching_gaps.md 2번) —
+    -- 더는 순수 레거시가 아님, 위 목록에서 뺌
     major VARCHAR,
     affiliated_institution VARCHAR,
     min_credits VARCHAR,
@@ -108,6 +135,7 @@ CREATE TABLE savedspec (
     user_id INTEGER NOT NULL REFERENCES "user" (id),
     university VARCHAR NOT NULL,
     college VARCHAR NOT NULL,
+    department VARCHAR,  -- 2026-08-03 추가(matching_gaps.md 2번), 선택 입력
     semester_gpa FLOAT NOT NULL,  -- 2026-08-02: 기존 gpa 컬럼을 semester_gpa로 개명
     cumulative_gpa FLOAT NOT NULL,  -- 2026-08-02 신규 추가
     age INTEGER NOT NULL,
@@ -120,6 +148,11 @@ CREATE TABLE savedspec (
     enrollment_status enrollmentstatus NOT NULL,
     grade INTEGER,
     degree_level degreelevel,
+    -- 2026-08-03 추가 (matching_gaps.md 9·10·12번, 전부 선택 입력)
+    language_test_type languagetesttype,
+    language_test_score FLOAT,
+    disability_type disabilitytype,
+    special_status TEXT[] NOT NULL DEFAULT '{}',  -- 다중 선택이라 ARRAY(Enum) 대신 TEXT[]로 저장
     PRIMARY KEY (id)
 );
 CREATE UNIQUE INDEX ix_savedspec_user_id ON savedspec (user_id);
