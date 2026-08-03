@@ -1,4 +1,5 @@
 import datetime
+import re
 
 from app.models import (
     EnrollmentStatus,
@@ -201,6 +202,7 @@ def is_eligible(scholarship: Scholarship, spec: UserSpec) -> bool:
         return False
     if (
         scholarship.max_income_bracket is not None
+        and spec.income_bracket is not None
         and spec.income_bracket > scholarship.max_income_bracket
     ):
         return False
@@ -315,3 +317,52 @@ def match_scholarships(scholarships: list[Scholarship], spec: UserSpec) -> list[
     eligible = [s for s in scholarships if is_eligible(s, spec)]
     eligible.sort(key=specificity_score, reverse=True)
     return eligible
+
+
+_TOKEN_RE = re.compile(r"[\w가-힣]+")
+
+
+def _tokenize(text: str | None) -> set[str]:
+    return set(_TOKEN_RE.findall(text.lower())) if text else set()
+
+
+def _wording_similarity(a: Scholarship, b: Scholarship) -> int:
+    """이름+설명을 단순 토큰화해서 겹치는 단어 수를 셈 — 정교한 추천이 아니라, 같은 중분류/
+    대분류가 하나도 없을 때 그나마 워딩이 비슷한 것부터 보여주기 위한 최후 fallback 정렬 기준."""
+    tokens_a = _tokenize(a.name) | _tokenize(a.description)
+    tokens_b = _tokenize(b.name) | _tokenize(b.description)
+    return len(tokens_a & tokens_b)
+
+
+def find_similar(
+    target: Scholarship,
+    eligible: list[Scholarship],
+    limit: int = 3,
+    exclude_id: int | None = None,
+) -> list[Scholarship]:
+    """상세페이지 "이런 장학금은 어때요?" 추천(2026-08-03 설계). 후보를 "내 조건에 맞는(이미
+    match_scholarships를 통과한) 장학금"으로만 한정한 뒤, 같은 중분류(category_l2) 우선 →
+    대분류(category_l1)로 확장 → 그래도 부족하면 나머지 전체에서 워딩(이름+설명 텍스트 겹침)이
+    비슷한 순으로 채움. exclude_id는 A→B로 넘어왔을 때 B의 추천 목록에 A가 다시 뜨는 핑퐁을
+    막기 위함(프론트가 ?from= 쿼리로 넘겨줌)."""
+    others = [s for s in eligible if s.id != target.id and s.id != exclude_id]
+
+    same_l2 = (
+        [s for s in others if s.category_l2 == target.category_l2]
+        if target.category_l2 is not None
+        else []
+    )
+    same_l2_ids = {s.id for s in same_l2}
+    same_l1 = (
+        [s for s in others if s.category_l1 == target.category_l1 and s.id not in same_l2_ids]
+        if target.category_l1 is not None
+        else []
+    )
+    picked_ids = same_l2_ids | {s.id for s in same_l1}
+    rest = sorted(
+        (s for s in others if s.id not in picked_ids),
+        key=lambda s: _wording_similarity(target, s),
+        reverse=True,
+    )
+
+    return (same_l2 + same_l1 + rest)[:limit]

@@ -16,7 +16,7 @@ app/
 │   └── session.py      # SQLAlchemy/SQLModel 엔진 + DB 접근용 get_session() 디펜던시
 ├── api/
 │   ├── health.py        # GET /health, {"status": "ok"} 반환
-│   ├── scholarships.py  # GET /scholarships (전체 목록), GET /scholarships/recommendations (로그인 유저 스펙 기준 추천)
+│   ├── scholarships.py  # GET /scholarships (전체 목록), GET /scholarships/{id} (단건), GET /scholarships/recommendations (로그인 유저 스펙 기준 추천), GET /scholarships/{id}/similar (상세페이지 추천, 2026-08-03 추가)
 │   ├── match.py          # POST /match — 요청 바디로 받은 스펙으로 즉석 매칭 (로그인 없이도 씀, 프론트 스펙 위저드가 아직 이걸 씀)
 │   ├── auth.py            # 회원가입/이메일인증/로그인/토큰재발급 (POST /auth/*)
 │   ├── users.py            # 로그인 유저 스펙 저장/조회/수정 (GET·POST·PUT /users/me/spec*)
@@ -58,6 +58,7 @@ FastAPI가 자동 생성해주는 API 문서: http://localhost:8000/docs
 
 - `POST /match` (`api/match.py`) — 요청 바디로 받은 `UserSpec`을 그 자리에서 매칭. 로그인 없이도 되고, 지금 프론트 스펙 위저드가 쓰는 방식.
 - `GET /scholarships/recommendations` (`api/scholarships.py`) — 로그인(JWT) 필요. 요청 바디 없이, DB에 저장된 그 유저의 `SavedSpec`을 불러와서 매칭. 2026-07-31 추가.
+- `GET /scholarships/{id}/similar` (`api/scholarships.py`) — 로그인(JWT) 필요. 상세페이지 "이런 장학금은 어때요?" 전용(2026-08-03 추가). 예전엔 프론트가 `/scholarships`로 전체 목록을 받아서 화면에서 분류만 보고 골랐는데(내 조건 필터가 아예 없어서 무관한 장학금도 추천됐음), 이제 서버에서 그 유저의 `SavedSpec`으로 먼저 걸러낸 "내 조건에 맞는 장학금" 안에서만 같은 중분류(`category_l2`) 우선 → 대분류(`category_l1`) 확장 → 그래도 부족하면 워딩(이름+설명 텍스트 겹침) 유사도 순으로 채워서 최대 `limit`(기본 3)개 반환(`core/matching.py`의 `find_similar`). `exclude_id` 쿼리 파라미터로 A→B로 넘어왔을 때 B의 추천에 A가 다시 뜨는 핑퐁을 막음.
 
 두 진입점 다 결과적으로 같은 `is_eligible`/`specificity_score`를 타므로 동작이 갈릴 일이 없음 — `POST /match`용으로 짠 로직을 다시 구현한 게 아니라 `core/matching.py`로 뽑아내서 그대로 재사용한 것.
 
@@ -114,3 +115,4 @@ Railway 프로젝트 환경변수(Variables 탭)에 등록해야 하는 값:
 - 회원가입/로그인/스펙저장 API(`/auth/*`, `/users/me/spec*`, `/scholarships/recommendations`)는 프론트까지 연결 완료(2026-07-31) — `/` → `/signup` → `/spec`(최초 1회) → `/home` → `/mypage` 플로우 전체 구현됨. 자세한 건 `frontend/README.md` 참고. `POST /match`(로그인 없이 즉석 매칭)는 그대로 남아있지만 지금 프론트는 안 씀 — 나중에 "로그인 없이 미리 둘러보기" 같은 용도로 재활용하거나, 안 쓰면 정리 대상.
 - 리프레시 토큰 회전/탈취 대응(블랙리스트 등) 없음 — access token이 30분마다 만료되는 것으로만 방어 중. 트래픽 늘면 재검토.
 - Railway `RESEND_API_KEY`를 아직 실제 값으로 안 채워넣었으면 회원가입 시 이메일 발송이 502로 실패함 — 배포 전에 `resend.com`에서 키 발급하고 Variables에 등록 필요.
+3

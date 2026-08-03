@@ -103,38 +103,6 @@ export const CATEGORY_L2_BY_L1: Record<CategoryL1, string[]> = {
   support_fund: ["youth_living_support", "activity_participation_support"],
 };
 
-// 같은 중분류 > 같은 대분류 > 나머지 순으로 우선순위를 매겨 "비슷한 장학금"을 뽑음.
-// 실제 추천 알고리즘이 아니라 지금 있는 분류 데이터만 활용한 단순 규칙 — 정교한 추천이 필요해지면 교체.
-// excludeId: 추천 목록을 타고 넘어온 직전 장학금 id — A→B로 이동했을 때 B의 추천에 A가 다시
-// 나오는 핑퐁을 막기 위함(상세페이지에서 ?from= 쿼리로 넘겨줌).
-export function findSimilar(
-  target: Scholarship,
-  all: Scholarship[],
-  limit = 3,
-  excludeId?: number
-): Scholarship[] {
-  const others = all.filter((s) => s.id !== target.id && s.id !== excludeId);
-  const sameL2 = target.category_l2
-    ? others.filter((s) => s.category_l2 === target.category_l2)
-    : [];
-  const sameL1 = target.category_l1
-    ? others.filter((s) => s.category_l1 === target.category_l1 && s.category_l2 !== target.category_l2)
-    : [];
-  const rest = others.filter(
-    (s) => s.category_l1 !== target.category_l1 || (!target.category_l1 && !s.category_l1)
-  );
-
-  const seen = new Set<number>();
-  const result: Scholarship[] = [];
-  for (const s of [...sameL2, ...sameL1, ...rest]) {
-    if (seen.has(s.id)) continue;
-    seen.add(s.id);
-    result.push(s);
-    if (result.length >= limit) break;
-  }
-  return result;
-}
-
 export type SortBy = "relevance" | "amount" | "deadline";
 
 export function sortScholarships(list: Scholarship[], sortBy: SortBy): Scholarship[] {

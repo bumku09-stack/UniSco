@@ -18,6 +18,8 @@ import {
   DegreeLevel,
   DISABILITY_TYPES,
   EnrollmentStatus,
+  gradeOptions,
+  INCOME_BRACKET_OPTIONS,
   initialOptionalInfo,
   LANGUAGE_TESTS,
   OptionalInfo,
@@ -42,7 +44,7 @@ const initialSpec: SpecForm = {
   sido: DEFAULT_SIDO.name,
   district: DEFAULT_SIDO.districts[0] ?? "",
   military_status: "not_served",
-  income_bracket: "1",
+  income_bracket: "unknown",
   has_disability: false,
   is_foreigner: false,
   enrollment_status: "undergrad_enrolled",
@@ -137,11 +139,13 @@ export default function SpecWizard() {
               value={spec.university}
               onChange={(v) => {
                 const next = UNIVERSITIES.find((u) => u.name === v)!;
+                const nextDepartment = next.colleges[0]?.departments[0] ?? "";
                 setSpec({
                   ...spec,
                   university: next.name,
                   college: next.colleges[0]?.name ?? "",
-                  department: next.colleges[0]?.departments[0] ?? "",
+                  department: nextDepartment,
+                  grade: gradeOptions(nextDepartment, spec.enrollment_status)[0]?.value ?? spec.grade,
                 });
               }}
               options={UNIVERSITIES.map((u) => ({ value: u.name, label: u.name }))}
@@ -153,7 +157,13 @@ export default function SpecWizard() {
                 value={spec.college}
                 onChange={(v) => {
                   const nextCollege = currentColleges.find((c) => c.name === v)!;
-                  setSpec({ ...spec, college: v, department: nextCollege.departments[0] ?? "" });
+                  const nextDepartment = nextCollege.departments[0] ?? "";
+                  setSpec({
+                    ...spec,
+                    college: v,
+                    department: nextDepartment,
+                    grade: gradeOptions(nextDepartment, spec.enrollment_status)[0]?.value ?? spec.grade,
+                  });
                 }}
                 options={currentColleges.map((c) => ({ value: c.name, label: c.name }))}
               />
@@ -163,7 +173,13 @@ export default function SpecWizard() {
               <SelectField
                 label="학과"
                 value={spec.department}
-                onChange={(v) => setSpec({ ...spec, department: v })}
+                onChange={(v) =>
+                  setSpec({
+                    ...spec,
+                    department: v,
+                    grade: gradeOptions(v, spec.enrollment_status)[0]?.value ?? spec.grade,
+                  })
+                }
                 options={currentDepartments.map((d) => ({ value: d, label: d }))}
               />
             ) : (
@@ -212,10 +228,12 @@ export default function SpecWizard() {
                     value={spec.enrollment_status}
                     onChange={(v) => {
                       const nextStatus = v as EnrollmentStatus;
-                      // 편입생은 1학년으로 들어오는 경우가 거의 없어서, 편입 선택 중
-                      // 학년이 1학년으로 남아있으면 2학년으로 올려줌
-                      const nextGrade =
-                        nextStatus === "undergrad_transfer" && spec.grade === "1" ? "2" : spec.grade;
+                      const nextOptions = gradeOptions(spec.department, nextStatus);
+                      // 지금 고른 학년이 새 재학구분에서도 유효하면 그대로 두고,
+                      // 아니면(예: 편입 선택 중 1학년으로 남아있으면) 첫 유효 옵션으로 올려줌
+                      const nextGrade = nextOptions.some((o) => o.value === spec.grade)
+                        ? spec.grade
+                        : nextOptions[0]?.value ?? spec.grade;
                       setSpec({ ...spec, enrollment_status: nextStatus, grade: nextGrade });
                     }}
                     options={[
@@ -231,10 +249,7 @@ export default function SpecWizard() {
                     label="학년"
                     value={spec.grade}
                     onChange={(v) => setSpec({ ...spec, grade: v })}
-                    options={(spec.enrollment_status === "undergrad_transfer"
-                      ? ["2", "3", "4"]
-                      : ["1", "2", "3", "4"]
-                    ).map((g) => ({ value: g, label: `${g}학년` }))}
+                    options={gradeOptions(spec.department, spec.enrollment_status)}
                   />
                   {spec.enrollment_status === "undergrad_enrolled" && spec.grade === "1" && (
                     <p className="mt-1.5 text-xs font-semibold text-blue-500">
@@ -343,17 +358,12 @@ export default function SpecWizard() {
               />
             </Field>
 
-            <Field label="소득분위 (1~10)">
-              <input
-                type="number"
-                required
-                min={1}
-                max={10}
-                value={spec.income_bracket}
-                onChange={(e) => setSpec({ ...spec, income_bracket: e.target.value })}
-                className={inputClass}
-              />
-            </Field>
+            <SelectField
+              label="소득분위"
+              value={spec.income_bracket}
+              onChange={(v) => setSpec({ ...spec, income_bracket: v })}
+              options={INCOME_BRACKET_OPTIONS}
+            />
 
             <ToggleChip
               checked={spec.is_foreigner}

@@ -17,7 +17,7 @@ export type UserSpec = {
   gender: "male" | "female";
   region: string;
   military_status: "completed" | "exempted" | "not_served";
-  income_bracket: number;
+  income_bracket: number | null; // null="모름" — 소득분위 조건이 있는 장학금도 안 거름
   has_disability: boolean;
   is_foreigner: boolean;
   enrollment_status: EnrollmentStatus;
@@ -29,6 +29,44 @@ export type UserSpec = {
   disability_type: string | null;
   special_status: string[];
 };
+
+// 의예과·수의예과·한의예과(2년제 예과) — 여기 1학년은 진짜 신입생.
+const PREP_DEPARTMENTS = new Set(["의예과", "수의예과", "한의예과"]);
+// 의학과·수의학과·한의학과(예과 2년을 마친 뒤 진입하는 4년제 본과) — 학교 관례상 "학년"이
+// 본과 진입 시점부터 1로 리셋되는데(본과 1학년=전체 재학 3년차), min_grade/max_grade는
+// "전체 재학연차" 기준으로 매칭하는 필드라 그대로 "1"을 보내면 신입생 전용 장학금에 실제로는
+// 신입생이 아닌 학생이 잘못 매칭됨(2026-08-03, 사용자가 본인이 수의학과라 직접 알려줘서 발견).
+// 그래서 이 학과들만 학년 선택값 자체를 전체 재학연차(3~6)로 보정해서 보냄 — 화면엔 학생들이
+// 익숙한 "본과 N학년" 표기를 유지하되, 실제 전송 값은 전체 연차로 어긋나지 않게 함.
+const MAIN_AFTER_PREP_DEPARTMENTS = new Set(["의학과", "수의학과", "한의학과"]);
+
+// 소득분위 드롭다운 공용 옵션 — "모름"은 UserSpec.income_bracket=null로 변환됨(아래
+// specFormToUserSpec 참고). 자기 소득분위를 모르는 사용자가 많아서 추가함(2026-08-03).
+export const INCOME_BRACKET_OPTIONS: { value: string; label: string }[] = [
+  { value: "unknown", label: "모름 — 관련 장학금 다 보여드려요" },
+  { value: "0", label: "0구간 (기초생활수급자)" },
+  ...Array.from({ length: 10 }, (_, i) => ({ value: String(i + 1), label: `${i + 1}구간` })),
+];
+
+// 스펙 입력/마이페이지 둘 다 학과에 따라 학년 선택지를 다르게 보여주기 위한 공용 헬퍼.
+// 편입생은 1학년으로 들어오는 경우가 거의 없어서 항상 첫 옵션(1학년)을 제외함.
+export function gradeOptions(
+  department: string,
+  enrollmentStatus: EnrollmentStatus
+): { value: string; label: string }[] {
+  let options: { value: string; label: string }[];
+  if (PREP_DEPARTMENTS.has(department)) {
+    options = [1, 2].map((g) => ({ value: String(g), label: `${g}학년` }));
+  } else if (MAIN_AFTER_PREP_DEPARTMENTS.has(department)) {
+    options = [3, 4, 5, 6].map((overall) => ({
+      value: String(overall),
+      label: `본과 ${overall - 2}학년(전체 ${overall}학년차)`,
+    }));
+  } else {
+    options = [1, 2, 3, 4].map((g) => ({ value: String(g), label: `${g}학년` }));
+  }
+  return enrollmentStatus === "undergrad_transfer" ? options.slice(1) : options;
+}
 
 // 숫자 입력 필드는 폼에서 문자열로 들고 있다가 제출할 때만 숫자로 변환함.
 // (타이핑 도중 바로 Number()로 바꿔서 value에 되먹이면 "4." 같은 중간 입력이
@@ -72,7 +110,7 @@ export function specFormToUserSpec(spec: SpecForm, optionalInfo: OptionalInfo): 
     gender: spec.gender,
     region: regionShortName(spec.sido, spec.district),
     military_status: spec.military_status,
-    income_bracket: Number(spec.income_bracket),
+    income_bracket: spec.income_bracket === "unknown" ? null : Number(spec.income_bracket),
     has_disability: spec.has_disability,
     is_foreigner: spec.is_foreigner,
     enrollment_status: spec.enrollment_status,
@@ -168,7 +206,7 @@ export function userSpecToSpecForm(spec: UserSpec): SpecForm {
     sido,
     district,
     military_status: spec.military_status,
-    income_bracket: String(spec.income_bracket),
+    income_bracket: spec.income_bracket != null ? String(spec.income_bracket) : "unknown",
     has_disability: spec.has_disability,
     is_foreigner: spec.is_foreigner,
     enrollment_status: spec.enrollment_status,

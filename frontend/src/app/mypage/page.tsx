@@ -21,6 +21,8 @@ import {
   DegreeLevel,
   DISABILITY_TYPES,
   EnrollmentStatus,
+  gradeOptions,
+  INCOME_BRACKET_OPTIONS,
   initialOptionalInfo,
   LANGUAGE_TESTS,
   OptionalInfo,
@@ -195,11 +197,13 @@ export default function MyPage() {
             value={spec.university}
             onChange={(v) => {
               const next = UNIVERSITIES.find((u) => u.name === v)!;
+              const nextDepartment = next.colleges[0]?.departments[0] ?? "";
               setSpec({
                 ...spec,
                 university: next.name,
                 college: next.colleges[0]?.name ?? "",
-                department: next.colleges[0]?.departments[0] ?? "",
+                department: nextDepartment,
+                grade: gradeOptions(nextDepartment, spec.enrollment_status)[0]?.value ?? spec.grade,
               });
             }}
             options={UNIVERSITIES.map((u) => ({ value: u.name, label: u.name }))}
@@ -211,7 +215,13 @@ export default function MyPage() {
               value={spec.college}
               onChange={(v) => {
                 const nextCollege = currentColleges.find((c) => c.name === v)!;
-                setSpec({ ...spec, college: v, department: nextCollege.departments[0] ?? "" });
+                const nextDepartment = nextCollege.departments[0] ?? "";
+                setSpec({
+                  ...spec,
+                  college: v,
+                  department: nextDepartment,
+                  grade: gradeOptions(nextDepartment, spec.enrollment_status)[0]?.value ?? spec.grade,
+                });
               }}
               options={currentColleges.map((c) => ({ value: c.name, label: c.name }))}
             />
@@ -221,7 +231,13 @@ export default function MyPage() {
             <SelectField
               label="학과"
               value={spec.department}
-              onChange={(v) => setSpec({ ...spec, department: v })}
+              onChange={(v) =>
+                setSpec({
+                  ...spec,
+                  department: v,
+                  grade: gradeOptions(v, spec.enrollment_status)[0]?.value ?? spec.grade,
+                })
+              }
               options={currentDepartments.map((d) => ({ value: d, label: d }))}
             />
           ) : (
@@ -270,8 +286,10 @@ export default function MyPage() {
                   value={spec.enrollment_status}
                   onChange={(v) => {
                     const nextStatus = v as EnrollmentStatus;
-                    const nextGrade =
-                      nextStatus === "undergrad_transfer" && spec.grade === "1" ? "2" : spec.grade;
+                    const nextOptions = gradeOptions(spec.department, nextStatus);
+                    const nextGrade = nextOptions.some((o) => o.value === spec.grade)
+                      ? spec.grade
+                      : nextOptions[0]?.value ?? spec.grade;
                     setSpec({ ...spec, enrollment_status: nextStatus, grade: nextGrade });
                   }}
                   options={[
@@ -286,10 +304,7 @@ export default function MyPage() {
                 label="학년"
                 value={spec.grade}
                 onChange={(v) => setSpec({ ...spec, grade: v })}
-                options={(spec.enrollment_status === "undergrad_transfer"
-                  ? ["2", "3", "4"]
-                  : ["1", "2", "3", "4"]
-                ).map((g) => ({ value: g, label: `${g}학년` }))}
+                options={gradeOptions(spec.department, spec.enrollment_status)}
               />
             </>
           )}
@@ -375,17 +390,12 @@ export default function MyPage() {
             />
           </Field>
 
-          <Field label="소득분위 (1~10)">
-            <input
-              type="number"
-              required
-              min={1}
-              max={10}
-              value={spec.income_bracket}
-              onChange={(e) => setSpec({ ...spec, income_bracket: e.target.value })}
-              className={inputClass}
-            />
-          </Field>
+          <SelectField
+            label="소득분위"
+            value={spec.income_bracket}
+            onChange={(v) => setSpec({ ...spec, income_bracket: v })}
+            options={INCOME_BRACKET_OPTIONS}
+          />
 
           <ToggleChip
             checked={spec.is_foreigner}
