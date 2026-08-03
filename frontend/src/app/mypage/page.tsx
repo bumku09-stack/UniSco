@@ -3,14 +3,29 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Field, inputClass, PillToggle, SelectField, ToggleChip, TopBar } from "@/components/form-ui";
+import {
+  CollapsibleToggle,
+  Field,
+  inputClass,
+  MultiPillSelect,
+  PillToggle,
+  SelectField,
+  ToggleChip,
+  TopBar,
+} from "@/components/form-ui";
 import { authFetch, isLoggedIn } from "@/lib/auth";
 import { SIDO_LIST } from "@/lib/regions";
 import {
   DegreeLevel,
+  DISABILITY_TYPES,
   EnrollmentStatus,
+  initialOptionalInfo,
+  LANGUAGE_TESTS,
+  OptionalInfo,
   specFormToUserSpec,
   SpecForm,
+  SPECIAL_STATUS_OPTIONS,
+  userSpecToOptionalInfo,
   userSpecToSpecForm,
   UserSpec,
 } from "@/lib/spec";
@@ -19,6 +34,7 @@ import { UNIVERSITIES } from "@/lib/universities";
 export default function MyPage() {
   const router = useRouter();
   const [spec, setSpec] = useState<SpecForm | null>(null);
+  const [optionalInfo, setOptionalInfo] = useState<OptionalInfo>(initialOptionalInfo);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +59,7 @@ export default function MyPage() {
       }
       const data: UserSpec = await res.json();
       setSpec(userSpecToSpecForm(data));
+      setOptionalInfo(userSpecToOptionalInfo(data));
       setLoading(false);
     })();
   }, [router]);
@@ -66,6 +83,8 @@ export default function MyPage() {
   const currentUniversity = UNIVERSITIES.find((u) => u.name === spec.university) ?? UNIVERSITIES[0];
   const gpaScale = currentUniversity.gpaScale;
   const currentColleges = currentUniversity.colleges;
+  const currentDepartments =
+    currentColleges.find((c) => c.name === spec.college)?.departments ?? [];
   const currentDistricts = SIDO_LIST.find((s) => s.name === spec.sido)?.districts ?? [];
 
   async function handleSubmit(e: React.FormEvent) {
@@ -75,7 +94,7 @@ export default function MyPage() {
     setError(null);
     setSaved(false);
     try {
-      const body: UserSpec = specFormToUserSpec(spec);
+      const body: UserSpec = specFormToUserSpec(spec, optionalInfo);
       const res = await authFetch("/users/me/spec", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -107,7 +126,12 @@ export default function MyPage() {
             value={spec.university}
             onChange={(v) => {
               const next = UNIVERSITIES.find((u) => u.name === v)!;
-              setSpec({ ...spec, university: next.name, college: next.colleges[0] ?? "" });
+              setSpec({
+                ...spec,
+                university: next.name,
+                college: next.colleges[0]?.name ?? "",
+                department: next.colleges[0]?.departments[0] ?? "",
+              });
             }}
             options={UNIVERSITIES.map((u) => ({ value: u.name, label: u.name }))}
           />
@@ -116,9 +140,31 @@ export default function MyPage() {
             <SelectField
               label="단과대"
               value={spec.college}
-              onChange={(v) => setSpec({ ...spec, college: v })}
-              options={currentColleges.map((c) => ({ value: c, label: c }))}
+              onChange={(v) => {
+                const nextCollege = currentColleges.find((c) => c.name === v)!;
+                setSpec({ ...spec, college: v, department: nextCollege.departments[0] ?? "" });
+              }}
+              options={currentColleges.map((c) => ({ value: c.name, label: c.name }))}
             />
+          )}
+
+          {currentDepartments.length > 0 ? (
+            <SelectField
+              label="학과"
+              value={spec.department}
+              onChange={(v) => setSpec({ ...spec, department: v })}
+              options={currentDepartments.map((d) => ({ value: d, label: d }))}
+            />
+          ) : (
+            <Field label="학과 (선택)">
+              <input
+                type="text"
+                value={spec.department}
+                onChange={(e) => setSpec({ ...spec, department: e.target.value })}
+                placeholder="예: 컴퓨터공학과"
+                className={inputClass}
+              />
+            </Field>
           )}
 
           <Field label="재학 상태">
@@ -179,15 +225,28 @@ export default function MyPage() {
             </>
           )}
 
-          <Field label={`학점 (${gpaScale} 만점 기준)`}>
+          <Field label={`직전 학기 평점 (${gpaScale} 만점 기준)`}>
             <input
               type="number"
               required
               step={0.01}
               min={0}
               max={gpaScale}
-              value={spec.gpa}
-              onChange={(e) => setSpec({ ...spec, gpa: e.target.value })}
+              value={spec.semester_gpa}
+              onChange={(e) => setSpec({ ...spec, semester_gpa: e.target.value })}
+              className={inputClass}
+            />
+          </Field>
+
+          <Field label={`전체 재학기간 누적 평점 (${gpaScale} 만점 기준)`}>
+            <input
+              type="number"
+              required
+              step={0.01}
+              min={0}
+              max={gpaScale}
+              value={spec.cumulative_gpa}
+              onChange={(e) => setSpec({ ...spec, cumulative_gpa: e.target.value })}
               className={inputClass}
             />
           </Field>
@@ -259,18 +318,71 @@ export default function MyPage() {
             />
           </Field>
 
-          <div className="flex flex-col gap-2">
-            <ToggleChip
-              checked={spec.has_disability}
-              onChange={(v) => setSpec({ ...spec, has_disability: v })}
-              label="장애인"
+          <ToggleChip
+            checked={spec.is_foreigner}
+            onChange={(v) => setSpec({ ...spec, is_foreigner: v })}
+            label="외국인(유학생)"
+          />
+
+          <CollapsibleToggle
+            checked={optionalInfo.languageTestEnabled}
+            onChange={(v) => setOptionalInfo({ ...optionalInfo, languageTestEnabled: v })}
+            label="어학점수"
+          >
+            <SelectField
+              label="종류"
+              value={optionalInfo.languageTestType}
+              onChange={(v) => setOptionalInfo({ ...optionalInfo, languageTestType: v })}
+              options={LANGUAGE_TESTS.map((t) => ({ value: t.value, label: t.label }))}
             />
-            <ToggleChip
-              checked={spec.is_foreigner}
-              onChange={(v) => setSpec({ ...spec, is_foreigner: v })}
-              label="외국인(유학생)"
+            <Field
+              label={`점수${
+                LANGUAGE_TESTS.find((t) => t.value === optionalInfo.languageTestType)?.max != null
+                  ? ` (만점 ${LANGUAGE_TESTS.find((t) => t.value === optionalInfo.languageTestType)?.max})`
+                  : ""
+              }`}
+            >
+              <input
+                type="number"
+                min={0}
+                max={LANGUAGE_TESTS.find((t) => t.value === optionalInfo.languageTestType)?.max ?? undefined}
+                value={optionalInfo.languageTestScore}
+                onChange={(e) => setOptionalInfo({ ...optionalInfo, languageTestScore: e.target.value })}
+                className={inputClass}
+              />
+            </Field>
+          </CollapsibleToggle>
+
+          <CollapsibleToggle
+            checked={spec.has_disability}
+            onChange={(v) => setSpec({ ...spec, has_disability: v })}
+            label="장애인"
+          >
+            <SelectField
+              label="유형"
+              value={optionalInfo.disabilityType}
+              onChange={(v) => setOptionalInfo({ ...optionalInfo, disabilityType: v })}
+              options={DISABILITY_TYPES}
             />
-          </div>
+          </CollapsibleToggle>
+
+          <CollapsibleToggle
+            checked={optionalInfo.specialStatusEnabled}
+            onChange={(v) =>
+              setOptionalInfo({
+                ...optionalInfo,
+                specialStatusEnabled: v,
+                specialStatus: v ? optionalInfo.specialStatus : [],
+              })
+            }
+            label="특수상황"
+          >
+            <MultiPillSelect
+              values={optionalInfo.specialStatus}
+              onChange={(v) => setOptionalInfo({ ...optionalInfo, specialStatus: v })}
+              options={SPECIAL_STATUS_OPTIONS}
+            />
+          </CollapsibleToggle>
 
           {saved && !error && (
             <p className="rounded-2xl bg-blue-50 px-4 py-3 text-sm font-medium text-blue-600">

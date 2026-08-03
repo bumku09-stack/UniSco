@@ -1,6 +1,16 @@
+from sqlalchemy import ARRAY, Column, String
 from sqlmodel import Field, SQLModel
 
-from app.models.enums import DegreeLevel, EnrollmentStatus, Gender, MilitaryStatus, enum_column
+from app.models.enums import (
+    DegreeLevel,
+    DisabilityType,
+    EnrollmentStatus,
+    Gender,
+    LanguageTestType,
+    MilitaryStatus,
+    SpecialStatus,
+    enum_column,
+)
 
 
 class SavedSpec(SQLModel, table=True):
@@ -14,7 +24,9 @@ class SavedSpec(SQLModel, table=True):
 
     university: str
     college: str
-    gpa: float
+    department: str | None = None  # 2026-08-03 추가, matching_gaps.md 2번
+    semester_gpa: float
+    cumulative_gpa: float
     age: int
     gender: Gender = Field(sa_type=enum_column(Gender))
     region: str
@@ -26,3 +38,16 @@ class SavedSpec(SQLModel, table=True):
     enrollment_status: EnrollmentStatus = Field(sa_type=enum_column(EnrollmentStatus))
     grade: int | None = None
     degree_level: DegreeLevel | None = Field(default=None, sa_type=enum_column(DegreeLevel))
+
+    # 2026-08-02 추가 (matching_gaps.md 9·10·12번).
+    language_test_type: LanguageTestType | None = Field(
+        default=None, sa_type=enum_column(LanguageTestType)
+    )
+    language_test_score: float | None = None
+    disability_type: DisabilityType | None = Field(default=None, sa_type=enum_column(DisabilityType))
+    # Postgres TEXT[]로 저장 — SpecialStatus는 다중 선택이라 단일 enum 컬럼으로 표현 안 됨.
+    # (ARRAY(Enum)은 SQLAlchemy/asyncpg 조합에서 다루기 까다로워서, 문자열 배열로 저장하고
+    # 값 자체는 SpecialStatus.value와 항상 일치하도록 애플리케이션 레벨에서만 검증함.)
+    special_status: list[SpecialStatus] = Field(
+        default_factory=list, sa_column=Column(ARRAY(String), nullable=False, server_default="{}")
+    )

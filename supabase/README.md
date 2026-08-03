@@ -27,6 +27,7 @@
 | `required_military_status` | 병역 조건 있으면 `completed`(군필) / `exempted`(면제) / `not_served`(미필) 중 하나 | 병역 무관하면 비워둠 |
 | `max_income_bracket` | "소득분위 N 이하"의 그 N 숫자 | 소득 조건 없으면 비워둠 |
 | `min_gpa` | 최소 학점 (4.5 만점 기준 숫자) | 학점 조건 없으면 비워둠 |
+| `min_gpa_basis` | 위 `min_gpa`가 **직전학기** 성적 기준이면 `semester`, **전체 재학기간 누적(CGPA)** 기준이면 `cumulative` (2026-08-02 추가 — 같은 대학 안에서도 장학금마다 둘 중 하나를 요구하는 경우가 섞여 있어서 나눔) | 어느 쪽인지 설명에 안 나와 있거나 모르겠으면 비워둠(비워두면 둘 중 하나만 맞아도 통과되는 안전한 기본값으로 처리됨) |
 | `requires_disability` | 장애인만 받는 장학금이면 `true`, 아니면 비워둠 | 비워둠 |
 | `foreigner_eligibility` | 외국인만 되면 `foreigner_only`, 내국인만 되면 `korean_only` | 둘 다 되면 비워둠 |
 | `grade_level` (참고용) | 학년 조건 원문 (예: "학부 3~8학기차") | 텍스트로 자유롭게, 없으면 비워둠 |

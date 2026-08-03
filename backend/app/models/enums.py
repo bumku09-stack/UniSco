@@ -26,6 +26,20 @@ class ForeignerEligibility(str, Enum):
     FOREIGNER_ONLY = "foreigner_only"
 
 
+class GpaBasis(str, Enum):
+    """min_gpa가 직전학기 성적 기준인지 전체 재학기간 누적(CGPA) 기준인지 — 대학마다,
+    같은 대학 안에서도 장학금마다 둘 중 하나를 요구하는 경우가 섞여 있어서 분리함
+    (2026-08-02, 우송대 재검증 중 발견 — matching_gaps.md 13번 참고).
+    None(미지정)인 기존/신규 데이터는 matching.py에서 직전학기·전체누적 중 하나라도
+    만족하면 통과시키는 관대한 기본값으로 처리함."""
+
+    SEMESTER = "semester"  # 직전학기 성적 기준
+    CUMULATIVE = "cumulative"  # 전체 재학기간 누적(CGPA) 기준
+    BOTH = "both"  # 직전학기·전체누적 둘 다 동시 충족 필요 (2026-08-02 을지대 크롤링 중 발견,
+    # matching_gaps.md 13번 후속 — 기존엔 "둘 중 하나" 케이스만 있었는데 "둘 다" 요구하는
+    # 장학금이 나와서 추가함)
+
+
 class EnrollmentStatus(str, Enum):
     UNDERGRAD_ENROLLED = "undergrad_enrolled"  # 학부재학
     UNDERGRAD_TRANSFER = "undergrad_transfer"  # 학부편입 — 매칭 시 취급은 core/matching.py 참고
@@ -37,6 +51,56 @@ class DegreeLevel(str, Enum):
     MASTERS = "masters"  # 석사
     DOCTORAL = "doctoral"  # 박사
     INTEGRATED_MS_PHD = "integrated_ms_phd"  # 석박사통합
+
+
+class LanguageTestType(str, Enum):
+    """어학점수 조건 (matching_gaps.md 10번, 2026-08-02 구현). frontend/src/lib/spec.ts의
+    LANGUAGE_TESTS와 값을 정확히 맞춰야 함 — 프론트가 이 문자열 그대로 보냄."""
+
+    TOEIC = "TOEIC"
+    TOEFL = "TOEFL"
+    IELTS = "IELTS"
+    TOPIK = "TOPIK"
+    OTHER = "기타"
+
+
+class DisabilityType(str, Enum):
+    """장애인 세부 유형 (matching_gaps.md 12번, 2026-08-02 구현) — Scholarships.com의
+    "Physical Disabilities" 카테고리 7종을 그대로 채택. frontend/src/lib/spec.ts의
+    DISABILITY_TYPES와 값을 정확히 맞춰야 함."""
+
+    PHYSICAL_IMPAIRMENT = "physical_impairment"  # 신체적 장애
+    LEARNING_DISABILITY = "learning_disability"  # 학습장애
+    MEDICAL_DISABILITY = "medical_disability"  # 의료적 장애(질환)
+    MENTAL_IMPAIRMENT = "mental_impairment"  # 정신적 장애
+    MUSCULAR_DYSTROPHY = "muscular_dystrophy"  # 근이영양증
+    DEVELOPMENTAL_IMPAIRMENT = "developmental_impairment"  # 발달장애
+    DISABLED_PARENT = "disabled_parent"  # 장애가 있는 부모(자녀 대상) — 본인 장애 아님, 주의
+
+
+class SpecialStatus(str, Enum):
+    """특수상황 신분 (matching_gaps.md 9번, 2026-08-02 구현). frontend/src/lib/spec.ts의
+    SPECIAL_STATUS_OPTIONS와 값을 정확히 맞춰야 함. 매칭 로직이 다른 필드들과 다름 —
+    core/matching.py의 special_status_matches() 참고(유저가 아예 선택 안 하면 걸러내지 않음).
+    `Scholarship.required_special_status`는 리스트(다중)임 — 배재사랑장학금처럼
+    "A 또는 B 대상"으로 여러 특수상황이 OR로 묶인 장학금을 표현하기 위함
+    (2026-08-03 추가, 아래 5개 값도 이때 함께 추가됨)."""
+
+    NORTH_KOREAN_DEFECTOR = "north_korean_defector"  # 북한이탈주민
+    MULTICULTURAL_FAMILY = "multicultural_family"  # 다문화가정
+    CHILD_CARE_FACILITY = "child_care_facility"  # 아동양육시설 생활자·퇴소자
+    STUDENT_COUNCIL_OFFICER = "student_council_officer"  # 학생회장(임원)
+    SINGLE_PARENT_FAMILY = "single_parent_family"  # 한부모가정
+    GRANDPARENT_FAMILY = "grandparent_family"  # 조손가정
+    MULTI_CHILD_FAMILY = "multi_child_family"  # 다자녀가정(3자녀 이상)
+    NATIONAL_MERIT = "national_merit"  # 국가보훈대상자
+    # 2026-08-03 추가 — 배재대 희망복지장학금·대전대 장학사정관장학금 같은 복합조건
+    # 장학금을 재분류하면서 새로 필요해진 값들
+    BASIC_LIVELIHOOD_RECIPIENT = "basic_livelihood_recipient"  # 기초생활수급자
+    NEAR_POOR = "near_poor"  # 차상위계층
+    SEVERE_ILLNESS_OR_INJURY = "severe_illness_or_injury"  # 중증질병 및 상해
+    JOB_LOSS_OR_DISASTER = "job_loss_or_disaster"  # 실직가정·재난 및 재해
+    FINANCIAL_EMERGENCY = "financial_emergency"  # 긴급가계곤란
 
 
 class CategoryL1(str, Enum):

@@ -114,6 +114,59 @@ export function ToggleChip({
   );
 }
 
+export function CollapsibleToggle({
+  checked,
+  onChange,
+  label,
+  children,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <ToggleChip checked={checked} onChange={onChange} label={label} />
+      {checked && children && (
+        <div className="flex flex-col gap-3 rounded-2xl bg-gray-50 p-4">{children}</div>
+      )}
+    </div>
+  );
+}
+
+export function MultiPillSelect({
+  values,
+  onChange,
+  options,
+}: {
+  values: string[];
+  onChange: (v: string[]) => void;
+  options: { value: string; label: string }[];
+}) {
+  function toggle(v: string) {
+    onChange(values.includes(v) ? values.filter((x) => x !== v) : [...values, v]);
+  }
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          onClick={() => toggle(opt.value)}
+          className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+            values.includes(opt.value)
+              ? "border-blue-500 bg-blue-50 text-blue-600"
+              : "border-gray-200 bg-white text-gray-500"
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function TopBar({ right }: { right?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between">
