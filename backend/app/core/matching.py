@@ -131,13 +131,26 @@ def special_status_matches_strict(
 
 def major_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
     """전공/학과 조건 (matching_gaps.md 2번, 2026-08-03 구현). 장학금 쪽 `major`는 크롤링
-    원문 그대로라 콤마·가운뎃점으로 여러 학과가 나열된 경우가 있음(예: "융합디자인전공,
-    회화전공,미술교육과") — 그 중 하나라도 유저 학과와 일치하면 통과."""
+    원문 그대로라 콤마로 여러 학과가 나열된 경우가 있음(예: "융합디자인전공,회화전공,
+    미술교육과") — 그 중 하나라도 유저 학과와 일치하면 통과.
+
+    가운뎃점(·)은 콤마와 똑같이 구분자로 쓰일 때도 있지만(예: 서술형 "국어·수학·탐구"),
+    "국어국문·창작학과"·"법·행정학부"처럼 학과/학부 이름 자체에 가운뎃점이 들어간 경우도
+    많아서(`frontend/src/lib/universities.ts` 참고) 무조건 쪼개면 그 학과 학생이 자기
+    이름과 정확히 일치하는 항목을 못 찾아 매칭에서 빠지는 문제가 있었음(2026-08-03 발견).
+    그래서 콤마로 나눈 한 조각을 통째로도 후보에 넣고, 그 조각을 가운뎃점으로 다시 쪼갠
+    부분들도 같이 후보에 넣어서 어느 쪽 해석이든 맞으면 통과시킴(과다매칭이 과소매칭보다
+    덜 해로움 — gpa_matches와 동일한 원칙)."""
     if not scholarship.major:
         return True
     if not spec.department:
         return False
-    candidates = [m.strip() for m in scholarship.major.replace("·", ",").split(",")]
+    candidates: set[str] = set()
+    for chunk in scholarship.major.split(","):
+        chunk = chunk.strip()
+        candidates.add(chunk)
+        if "·" in chunk:
+            candidates.update(part.strip() for part in chunk.split("·"))
     return spec.department in candidates
 
 
