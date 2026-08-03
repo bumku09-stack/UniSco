@@ -35,8 +35,6 @@ function StatBox({
   );
 }
 
-// 백엔드에 GET /scholarships/{id}가 아직 없어서(README상 목록 전체 반환만 있음),
-// 전체 목록을 받아 id로 찾음 — 상세페이지 전용 엔드포인트가 생기면 이 부분만 교체하면 됨.
 export default function ScholarshipDetailPage({
   params,
   searchParams,
@@ -49,14 +47,19 @@ export default function ScholarshipDetailPage({
   const [scholarship, setScholarship] = useState<Scholarship | null | undefined>(undefined);
   const [allScholarships, setAllScholarships] = useState<Scholarship[]>([]);
 
+  // 본문은 GET /scholarships/{id} 하나로 바로 받아서 빠르게 그림 — 예전엔 전체 목록(수백
+  // 건)을 받아서 그중 하나를 골라 쓰는 방식이라 상세페이지 열 때마다 느렸음. "이런 장학금은
+  // 어때요" 추천 섹션만 전체 목록이 필요해서, 본문 렌더링을 막지 않게 따로(병렬로) 받아옴.
   useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/scholarships/${id}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then(setScholarship)
+      .catch(() => setScholarship(null));
+
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/scholarships`)
       .then((res) => res.json())
-      .then((all: Scholarship[]) => {
-        setAllScholarships(all);
-        setScholarship(all.find((s) => String(s.id) === id) ?? null);
-      })
-      .catch(() => setScholarship(null));
+      .then(setAllScholarships)
+      .catch(() => setAllScholarships([]));
   }, [id]);
 
   // A→B로 추천을 타고 넘어온 경우, B의 추천 목록에 A가 다시 뜨는 걸 막음

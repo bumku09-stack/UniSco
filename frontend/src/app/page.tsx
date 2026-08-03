@@ -31,12 +31,9 @@ export default function LoginPage() {
         return;
       }
       setTokens(data.access_token, data.refresh_token);
-
-      const statusRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/me/spec-status`, {
-        headers: { Authorization: `Bearer ${data.access_token}` },
-      });
-      const status = await statusRes.json();
-      router.push(status.spec_completed ? "/home" : "/spec");
+      // 로그인 응답에 spec_completed가 같이 오기 때문에(백엔드에서 로그인 시점에 조회해서
+      // 실어보냄) /users/me/spec-status를 또 부를 필요 없음 — 요청 한 번 줄임.
+      router.push(data.spec_completed ? "/home" : "/spec");
     } catch {
       setError("로그인에 실패했습니다. 잠시 후 다시 시도해주세요.");
     } finally {

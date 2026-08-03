@@ -29,6 +29,9 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    # 로그인 직후 프론트가 /users/me/spec-status를 또 호출하지 않도록 여기 같이 실어보냄
+    # (로그인 응답 시점 기준 값 — refresh에서도 채우지만 보통 이미 로그인된 상태라 안 씀).
+    spec_completed: bool = False
 
 
 class RefreshRequest(BaseModel):

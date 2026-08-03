@@ -19,6 +19,7 @@ from app.models import (
     LoginRequest,
     RefreshRequest,
     ResendCodeRequest,
+    SavedSpec,
     SignupRequest,
     SignupResponse,
     TokenResponse,
@@ -174,9 +175,12 @@ def login(body: LoginRequest, session: Session = Depends(get_session)):
     if not user.is_verified:
         raise HTTPException(status_code=403, detail="이메일 인증이 완료되지 않았습니다.")
 
+    saved_spec = session.exec(select(SavedSpec).where(SavedSpec.user_id == user.id)).first()
+
     return TokenResponse(
         access_token=create_access_token(user.id),
         refresh_token=create_refresh_token(user.id),
+        spec_completed=saved_spec is not None,
     )
 
 

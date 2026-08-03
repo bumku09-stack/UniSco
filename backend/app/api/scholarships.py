@@ -27,3 +27,13 @@ def recommendations(
     spec = to_user_spec(saved)
     scholarships = session.exec(select(Scholarship)).all()
     return match_scholarships(scholarships, spec)
+
+
+# /scholarships/recommendations 뒤에 둬야 함 — 먼저 두면 "recommendations"이
+# {scholarship_id}(int)로 해석 시도되다가 실패해서 404/422가 남.
+@router.get("/scholarships/{scholarship_id}", response_model=Scholarship)
+def get_scholarship(scholarship_id: int, session: Session = Depends(get_session)):
+    scholarship = session.get(Scholarship, scholarship_id)
+    if scholarship is None:
+        raise HTTPException(status_code=404, detail="장학금을 찾을 수 없습니다.")
+    return scholarship
