@@ -2,6 +2,7 @@ import datetime
 import re
 
 from app.models import (
+    UNVERIFIABLE_CONDITIONS,
     EnrollmentStatus,
     ForeignerEligibility,
     GpaBasis,
@@ -70,10 +71,16 @@ def gpa_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
 
 
 def language_test_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
-    """어학점수 조건 (matching_gaps.md 10번). 시험 종류가 정확히 같아야 하고, 점수는
-    그 시험 기준으로 min 이상이어야 함 — 다른 필드들과 같은 표준 패턴(조건 있는데 유저가
-    입력 안 했거나 안 맞으면 제외)."""
+    """어학점수 조건 (matching_gaps.md 10번). 3페이지의 다른 "선택 입력" 항목들(소득분위·
+    특수상황)과 같은 원칙으로 통일함(2026-08-04) — 학생이 어학점수를 아예 안 넣었으면
+    "해당 없음"이 아니라 "아직 모름"으로 보고 걸러내지 않음(이전엔 스펙 3페이지가 선택
+    입력이라는 설계 의도와 반대로, 안 넣으면 그 조건 걸린 장학금이 전부 숨겨지는 버그가
+    있었음). 학생이 실제로 다른 시험 종류를 입력한 경우(예: 장학금은 TOEFL을 요구하는데
+    학생은 TOEIC 점수를 넣은 경우)는 여전히 진짜 불일치라 그대로 제외함 — "안 넣음"과
+    "다른 시험 넣음"을 구분하는 게 핵심."""
     if scholarship.language_test_type is None:
+        return True
+    if spec.language_test_type is None:
         return True
     if spec.language_test_type != scholarship.language_test_type:
         return False
@@ -208,25 +215,31 @@ def is_eligible(scholarship: Scholarship, spec: UserSpec) -> bool:
         return False
     if not gpa_matches(scholarship, spec):
         return False
+    # required_special_status에는 학생이 실제로 고를 수 있는 특수상황 값과, 학생이 절대
+    # 고를 수 없는 "확인 불가" 태그(UNVERIFIABLE_CONDITIONS — 2026-08-04 추가, 랭킹 전용)가
+    # 섞여 있을 수 있음. 자격 거름(노출 여부)은 항상 "확인 불가" 태그를 뺀 나머지로만 판단함 —
+    # 안 그러면 학생이 다른 특수상황을 골랐을 때 "확인 불가" 태그만 붙은 장학금이 실수로
+    # 숨겨져버림(노출 정책 회귀). "확인 불가" 태그는 core/matching.py의 랭킹 계산에서만 씀.
+    verifiable_special_status = [
+        s for s in scholarship.required_special_status if s not in UNVERIFIABLE_CONDITIONS
+    ]
     # 장애 조건과 특수상황 조건이 둘 다 걸려있는 장학금(예: 배재대 "배재사랑장학금" — 장애학생
     # 또는 다문화가정 학생 대상)은 각각 따로 AND로 걸면 틀림 — 실제로는 "둘 중 하나만 만족해도
     # 통과"하는 OR 조건이라, 이 경우만 예외적으로 OR로 처리함(2026-08-03, 사용자 확정).
     has_disability_condition = scholarship.requires_disability or (
         scholarship.required_disability_type is not None
     )
-    has_special_status_condition = bool(scholarship.required_special_status)
+    has_special_status_condition = bool(verifiable_special_status)
     if has_disability_condition and has_special_status_condition:
         if not (
             disability_matches(scholarship, spec)
-            or special_status_matches_strict(
-                scholarship.required_special_status, spec.special_status
-            )
+            or special_status_matches_strict(verifiable_special_status, spec.special_status)
         ):
             return False
     else:
         if not disability_matches(scholarship, spec):
             return False
-        if not special_status_matches(scholarship.required_special_status, spec.special_status):
+        if not special_status_matches(verifiable_special_status, spec.special_status):
             return False
     if not language_test_matches(scholarship, spec):
         return False
@@ -268,13 +281,15 @@ def is_eligible(scholarship: Scholarship, spec: UserSpec) -> bool:
     return True
 
 
-def specificity_score(scholarship: Scholarship) -> int:
-    """How many eligibility criteria this scholarship actually sets, among
-    the ones a passed-in UserSpec could be filtered on. Every scholarship
-    reaching this point already passed is_eligible, so a higher score means
-    it's narrowly targeted at this exact spec (e.g. a specific university +
-    college + income bracket) rather than open to almost everyone — ranked
-    first because it's the more specific, less competitive match."""
+def confirmed_match_count(scholarship: Scholarship, spec: UserSpec) -> int:
+    """이 학생 스펙으로 "진짜 확인된" 매칭 조건 개수 (2026-08-04, specificity_score를
+    대체함 — 기존 버전은 "장학금이 조건을 얼마나 많이 걸었나"만 셌지 "나랑 얼마나 잘
+    맞나"는 안 쟀음, 사용자 지적으로 재설계). 여기까지 오는 장학금은 이미 is_eligible을
+    통과했으므로, 장학금이 조건을 걸어놓은 항목은 원칙적으로 전부 "확인된 매칭"임 —
+    **단, 학생이 "모름/안 입력"을 고를 수 있는 선택 입력 3개(소득분위·어학점수·특수상황)는
+    예외**: 그 조건은 leniency 규칙 덕분에 통과된 것뿐일 수 있어서, 학생이 실제로 값을
+    입력했을 때만 센다. 새로 추가된 "확인 불가" 태그(UNVERIFIABLE_CONDITIONS)는 여기서
+    아예 제외하고 unverifiable_condition_count()로만 감."""
     score = 0
     if scholarship.min_age is not None or scholarship.max_age is not None:
         score += 1
@@ -284,7 +299,7 @@ def specificity_score(scholarship: Scholarship) -> int:
         score += 1
     if scholarship.required_military_status is not None:
         score += 1
-    if scholarship.max_income_bracket is not None:
+    if scholarship.max_income_bracket is not None and spec.income_bracket is not None:
         score += 1
     if scholarship.min_gpa is not None:
         score += 1
@@ -294,9 +309,12 @@ def specificity_score(scholarship: Scholarship) -> int:
         score += 1
     if scholarship.foreigner_eligibility is not None:
         score += 1
-    if scholarship.language_test_type is not None:
+    if scholarship.language_test_type is not None and spec.language_test_type is not None:
         score += 1
-    if scholarship.required_special_status:
+    verifiable_special_status = [
+        s for s in scholarship.required_special_status if s not in UNVERIFIABLE_CONDITIONS
+    ]
+    if verifiable_special_status and spec.special_status:
         score += 1
     if scholarship.major is not None:
         score += 1
@@ -313,9 +331,52 @@ def specificity_score(scholarship: Scholarship) -> int:
     return score
 
 
+def unverifiable_condition_count(scholarship: Scholarship, spec: UserSpec) -> int:
+    """이 장학금에 "확인 안 되는" 조건이 몇 개 있는지 (2026-08-04 추가, 08-04 확장).
+    두 가지를 합쳐서 셈:
+    1. 목회자 자녀·부모 직업·시군구 세부거주 등 매칭 필드 자체가 없는 8개 "확인 불가" 태그.
+    2. **필드는 있지만 이 학생이 아직 안 답한 선택 입력 조건**(소득분위 모름/특수상황 안 고름/
+       어학점수 안 넣음)이 이 장학금에 걸려있는 경우 — 처음엔 confirmed_match_count()에서
+       "보너스 점수를 안 주는" 것까지만 했었는데, 그것만으론 부족했음(다른 조건이 잘 맞으면
+       보너스 없이도 여전히 위로 뜸 — 예: "북한이탈주민 대상" 조건이 있어도 특수상황을
+       안 고른 학생한텐 그냥 다른 조건들만으로 순위가 매겨져서 상단에 뜨는 문제가 실사용
+       중 발견됨). 그래서 "확인 불가 태그"랑 똑같이 여기서도 감점 대상에 포함시킴 — 노출
+       여부는 그대로 유지하고(과다노출 정책 불변) 순위만 밀림.
+
+    학생이 실제로 답했는데 장학금 조건과 안 맞는 경우는 애초에 is_eligible()에서 걸러져서
+    여기까지 안 옴 — 그러니 "학생이 답 안 해서 leniency로 통과된 것"만 정확히 골라내는 것."""
+    count = len([s for s in scholarship.required_special_status if s in UNVERIFIABLE_CONDITIONS])
+    verifiable_special_status = [
+        s for s in scholarship.required_special_status if s not in UNVERIFIABLE_CONDITIONS
+    ]
+    if verifiable_special_status and not spec.special_status:
+        count += 1
+    if scholarship.max_income_bracket is not None and spec.income_bracket is None:
+        count += 1
+    if scholarship.language_test_type is not None and spec.language_test_type is None:
+        count += 1
+    return count
+
+
+def personal_fit_key(scholarship: Scholarship, spec: UserSpec) -> tuple[float, int]:
+    """랭킹 정렬 키. (ratio, confirmed) 튜플을 둘 다 내림차순으로 정렬함.
+
+    ratio = confirmed / (confirmed + unverifiable) — "확인 불가" 조건이 없는 장학금들은
+    분모=분자라 전부 ratio 1.0으로 동률이 되고(is_eligible을 이미 통과했으니 그 장학금이
+    건 조건은 다 확인된 것이므로), 그 안에서는 confirmed 값으로 순위가 갈림. "확인 불가"
+    조건이 하나라도 있으면 분모만 커져서 ratio가 1.0 밑으로 내려가 자동으로 뒤로 밀림 —
+    "확인된 것끼리는 개수로, 확인 안 되는 게 섞이면 무조건 그 아래로" 규칙을 하나의 정렬
+    키로 표현한 것."""
+    confirmed = confirmed_match_count(scholarship, spec)
+    unverifiable = unverifiable_condition_count(scholarship, spec)
+    total = confirmed + unverifiable
+    ratio = confirmed / total if total > 0 else 1.0
+    return (ratio, confirmed)
+
+
 def match_scholarships(scholarships: list[Scholarship], spec: UserSpec) -> list[Scholarship]:
     eligible = [s for s in scholarships if is_eligible(s, spec)]
-    eligible.sort(key=specificity_score, reverse=True)
+    eligible.sort(key=lambda s: personal_fit_key(s, spec), reverse=True)
     return eligible
 
 

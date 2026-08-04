@@ -102,6 +102,38 @@ class SpecialStatus(str, Enum):
     JOB_LOSS_OR_DISASTER = "job_loss_or_disaster"  # 실직가정·재난 및 재해
     FINANCIAL_EMERGENCY = "financial_emergency"  # 긴급가계곤란
 
+    # 2026-08-04 추가 — "확인 불가" 조건 태그(matching_gaps.md 5·6·7·14·14후속·15·16·17번).
+    # 매칭 필드가 없어서 걸러줄 수 없는 조건들이라 전원 노출(과다노출) 정책은 그대로 유지하되,
+    # core/matching.py의 랭킹 계산에서만 순위를 밀리게 하는 용도. **사용자가 절대 선택할 수
+    # 없음 — frontend/src/lib/spec.ts의 SPECIAL_STATUS_OPTIONS에는 추가하지 않음**(크롤링
+    # 데이터에만 태그). is_eligible()의 특수상황 체크에서는 이 8개를 제외하고 넘겨서, 노출
+    # 여부에는 전혀 영향 안 주도록 함 — UNVERIFIABLE_CONDITIONS 상수와 그 사용처 참고.
+    PARENT_OCCUPATION_CONDITION = "parent_occupation_condition"  # 부모의 특정 직업/소속 조건
+    RELIGIOUS_OR_CAREER_INTENT_CONDITION = "religious_or_career_intent_condition"  # 종교기관 소속·직분·진로지향 조건
+    SUB_REGION_RESIDENCE_CONDITION = "sub_region_residence_condition"  # 시/군/구 세부 거주지 조건
+    HOMETOWN_SCHOOL_REGION_CONDITION = "hometown_school_region_condition"  # 출신 학교 소재지 기준 조건
+    SUNEUNG_SCORE_CONDITION = "suneung_score_condition"  # 수능성적 기반 조건
+    SCHOOL_RECORD_CONDITION = "school_record_condition"  # 내신/입학성적 조건
+    CREDIT_REQUIREMENT_CONDITION = "credit_requirement_condition"  # 이수학점 조건
+    EXTRACURRICULAR_PROGRAM_CONDITION = "extracurricular_program_condition"  # 학교 자체 비교과 프로그램 이수 조건
+
+
+# is_eligible()에서 걸러줄 수 없는(=매칭 필드가 없는) 조건 태그 — special_status_matches()에
+# 넘기기 전에 이 집합을 제외해야 함(안 그러면 학생이 다른 특수상황을 골랐을 때 이 태그가
+# 붙은 장학금이 실수로 숨겨짐 — 노출 정책 회귀 방지). core/matching.py에서 씀.
+UNVERIFIABLE_CONDITIONS: frozenset[SpecialStatus] = frozenset(
+    {
+        SpecialStatus.PARENT_OCCUPATION_CONDITION,
+        SpecialStatus.RELIGIOUS_OR_CAREER_INTENT_CONDITION,
+        SpecialStatus.SUB_REGION_RESIDENCE_CONDITION,
+        SpecialStatus.HOMETOWN_SCHOOL_REGION_CONDITION,
+        SpecialStatus.SUNEUNG_SCORE_CONDITION,
+        SpecialStatus.SCHOOL_RECORD_CONDITION,
+        SpecialStatus.CREDIT_REQUIREMENT_CONDITION,
+        SpecialStatus.EXTRACURRICULAR_PROGRAM_CONDITION,
+    }
+)
+
 
 class CategoryL1(str, Enum):
     SCHOOL_INTERNAL = "school_internal"  # 교내장학금
