@@ -2,32 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import {
-  CollapsibleToggle,
-  Field,
-  inputClass,
-  MultiPillSelect,
-  PillToggle,
-  SelectField,
-  ToggleChip,
-  TopBar,
-} from "@/components/form-ui";
+import { TopBar } from "@/components/form-ui";
+import { CommonFields, OptionalFields, SchoolFields, deriveSpecFields } from "@/components/spec-fields";
 import { authFetch, isLoggedIn } from "@/lib/auth";
 import { SIDO_LIST } from "@/lib/regions";
-import {
-  DegreeLevel,
-  DISABILITY_TYPES,
-  EnrollmentStatus,
-  gradeOptions,
-  INCOME_BRACKET_OPTIONS,
-  initialOptionalInfo,
-  LANGUAGE_TESTS,
-  OptionalInfo,
-  specFormToUserSpec,
-  SpecForm,
-  SPECIAL_STATUS_OPTIONS,
-  UserSpec,
-} from "@/lib/spec";
+import { initialOptionalInfo, OptionalInfo, specFormToUserSpec, SpecForm, UserSpec } from "@/lib/spec";
 import { UNIVERSITIES } from "@/lib/universities";
 
 const DEFAULT_SIDO = SIDO_LIST.find((s) => s.name === "대전광역시")!;
@@ -75,12 +54,7 @@ export default function SpecWizard() {
     if (!isLoggedIn()) router.replace("/");
   }, [router]);
 
-  const currentUniversity = UNIVERSITIES.find((u) => u.name === spec.university) ?? UNIVERSITIES[0];
-  const gpaScale = currentUniversity.gpaScale;
-  const currentColleges = currentUniversity.colleges;
-  const currentDepartments =
-    currentColleges.find((c) => c.name === spec.college)?.departments ?? [];
-  const currentDistricts = SIDO_LIST.find((s) => s.name === spec.sido)?.districts ?? [];
+  const derived = deriveSpecFields(spec);
 
   async function handleFinalSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -134,157 +108,7 @@ export default function SpecWizard() {
             }}
             className="mt-6 flex flex-col gap-5"
           >
-            <SelectField
-              label="소속 대학"
-              value={spec.university}
-              onChange={(v) => {
-                const next = UNIVERSITIES.find((u) => u.name === v)!;
-                const nextDepartment = next.colleges[0]?.departments[0] ?? "";
-                setSpec({
-                  ...spec,
-                  university: next.name,
-                  college: next.colleges[0]?.name ?? "",
-                  department: nextDepartment,
-                  grade: gradeOptions(nextDepartment, spec.enrollment_status)[0]?.value ?? spec.grade,
-                });
-              }}
-              options={UNIVERSITIES.map((u) => ({ value: u.name, label: u.name }))}
-            />
-
-            {currentColleges.length > 0 && (
-              <SelectField
-                label="단과대"
-                value={spec.college}
-                onChange={(v) => {
-                  const nextCollege = currentColleges.find((c) => c.name === v)!;
-                  const nextDepartment = nextCollege.departments[0] ?? "";
-                  setSpec({
-                    ...spec,
-                    college: v,
-                    department: nextDepartment,
-                    grade: gradeOptions(nextDepartment, spec.enrollment_status)[0]?.value ?? spec.grade,
-                  });
-                }}
-                options={currentColleges.map((c) => ({ value: c.name, label: c.name }))}
-              />
-            )}
-
-            {currentDepartments.length > 0 ? (
-              <SelectField
-                label="학과"
-                value={spec.department}
-                onChange={(v) =>
-                  setSpec({
-                    ...spec,
-                    department: v,
-                    grade: gradeOptions(v, spec.enrollment_status)[0]?.value ?? spec.grade,
-                  })
-                }
-                options={currentDepartments.map((d) => ({ value: d, label: d }))}
-              />
-            ) : (
-              <Field label="학과 (선택)">
-                <input
-                  type="text"
-                  value={spec.department}
-                  onChange={(e) => setSpec({ ...spec, department: e.target.value })}
-                  placeholder="예: 컴퓨터공학과"
-                  className={inputClass}
-                />
-              </Field>
-            )}
-
-            <Field label="재학 상태">
-              <PillToggle
-                value={spec.enrollment_status === "post_undergrad" ? "post_undergrad" : "undergrad"}
-                onChange={(v) =>
-                  setSpec({
-                    ...spec,
-                    enrollment_status: v === "post_undergrad" ? "post_undergrad" : "undergrad_enrolled",
-                  })
-                }
-                options={[
-                  { value: "undergrad", label: "학부" },
-                  { value: "post_undergrad", label: "대학원 등" },
-                ]}
-              />
-            </Field>
-
-            {spec.enrollment_status === "post_undergrad" ? (
-              <SelectField
-                label="과정 구분"
-                value={spec.degree_level ?? "masters"}
-                onChange={(v) => setSpec({ ...spec, degree_level: v as DegreeLevel })}
-                options={[
-                  { value: "masters", label: "석사" },
-                  { value: "doctoral", label: "박사" },
-                  { value: "integrated_ms_phd", label: "석박사통합" },
-                ]}
-              />
-            ) : (
-              <>
-                <Field label="학부 재학 구분">
-                  <PillToggle
-                    value={spec.enrollment_status}
-                    onChange={(v) => {
-                      const nextStatus = v as EnrollmentStatus;
-                      const nextOptions = gradeOptions(spec.department, nextStatus);
-                      // 지금 고른 학년이 새 재학구분에서도 유효하면 그대로 두고,
-                      // 아니면(예: 편입 선택 중 1학년으로 남아있으면) 첫 유효 옵션으로 올려줌
-                      const nextGrade = nextOptions.some((o) => o.value === spec.grade)
-                        ? spec.grade
-                        : nextOptions[0]?.value ?? spec.grade;
-                      setSpec({ ...spec, enrollment_status: nextStatus, grade: nextGrade });
-                    }}
-                    options={[
-                      { value: "undergrad_enrolled", label: "재학" },
-                      { value: "undergrad_leave", label: "휴학" },
-                      { value: "undergrad_transfer", label: "편입" },
-                    ]}
-                  />
-                </Field>
-
-                <div>
-                  <SelectField
-                    label="학년"
-                    value={spec.grade}
-                    onChange={(v) => setSpec({ ...spec, grade: v })}
-                    options={gradeOptions(spec.department, spec.enrollment_status)}
-                  />
-                  {spec.enrollment_status === "undergrad_enrolled" && spec.grade === "1" && (
-                    <p className="mt-1.5 text-xs font-semibold text-blue-500">
-                      ✓ 신입생으로 인식돼요 — 신입생 전용 장학금도 함께 찾아드려요
-                    </p>
-                  )}
-                </div>
-              </>
-            )}
-
-            <Field label={`직전 학기 평점 (${gpaScale} 만점 기준)`}>
-              <input
-                type="number"
-                required
-                step={0.01}
-                min={0}
-                max={gpaScale}
-                value={spec.semester_gpa}
-                onChange={(e) => setSpec({ ...spec, semester_gpa: e.target.value })}
-                className={inputClass}
-              />
-            </Field>
-
-            <Field label={`전체 재학기간 누적 평점 (${gpaScale} 만점 기준)`}>
-              <input
-                type="number"
-                required
-                step={0.01}
-                min={0}
-                max={gpaScale}
-                value={spec.cumulative_gpa}
-                onChange={(e) => setSpec({ ...spec, cumulative_gpa: e.target.value })}
-                className={inputClass}
-              />
-            </Field>
+            <SchoolFields spec={spec} setSpec={setSpec} derived={derived} showFreshmanHint />
 
             <button
               type="submit"
@@ -303,73 +127,7 @@ export default function SpecWizard() {
             }}
             className="mt-6 flex flex-col gap-5"
           >
-            <Field label="나이">
-              <input
-                type="number"
-                required
-                min={0}
-                value={spec.age}
-                onChange={(e) => setSpec({ ...spec, age: e.target.value })}
-                className={inputClass}
-              />
-            </Field>
-
-            <Field label="성별">
-              <PillToggle
-                value={spec.gender}
-                onChange={(v) => setSpec({ ...spec, gender: v as UserSpec["gender"] })}
-                options={[
-                  { value: "male", label: "남성" },
-                  { value: "female", label: "여성" },
-                ]}
-              />
-            </Field>
-
-            <SelectField
-              label="광역자치단체"
-              value={spec.sido}
-              onChange={(v) => {
-                const nextSido = SIDO_LIST.find((s) => s.name === v)!;
-                setSpec({ ...spec, sido: nextSido.name, district: nextSido.districts[0] ?? "" });
-              }}
-              options={SIDO_LIST.map((s) => ({ value: s.name, label: s.name }))}
-            />
-
-            {currentDistricts.length > 0 && (
-              <SelectField
-                label="기초자치단체"
-                value={spec.district}
-                onChange={(v) => setSpec({ ...spec, district: v })}
-                options={currentDistricts.map((d) => ({ value: d, label: d }))}
-              />
-            )}
-
-            <Field label="병역">
-              <PillToggle
-                value={spec.military_status}
-                onChange={(v) =>
-                  setSpec({ ...spec, military_status: v as UserSpec["military_status"] })
-                }
-                options={[
-                  { value: "not_served", label: "미필" },
-                  { value: "completed", label: "군필" },
-                  { value: "exempted", label: "면제" },
-                ]}
-              />
-            </Field>
-
-            <SelectField
-              label="소득분위"
-              value={spec.income_bracket}
-              onChange={(v) => setSpec({ ...spec, income_bracket: v })}
-              options={INCOME_BRACKET_OPTIONS}
-            />
-
-            <ToggleChip
-              checked={spec.is_foreigner}
-              onChange={(v) => setSpec({ ...spec, is_foreigner: v })}
-              label="외국인(유학생)"
-            />
+            <CommonFields spec={spec} setSpec={setSpec} derived={derived} />
 
             <div className="mt-2 flex gap-2">
               <button
@@ -391,65 +149,12 @@ export default function SpecWizard() {
 
         {step === 3 && (
           <form onSubmit={handleFinalSubmit} className="mt-6 flex flex-col gap-5">
-            <CollapsibleToggle
-              checked={optionalInfo.languageTestEnabled}
-              onChange={(v) => setOptionalInfo({ ...optionalInfo, languageTestEnabled: v })}
-              label="어학점수"
-            >
-              <SelectField
-                label="종류"
-                value={optionalInfo.languageTestType}
-                onChange={(v) => setOptionalInfo({ ...optionalInfo, languageTestType: v })}
-                options={LANGUAGE_TESTS.map((t) => ({ value: t.value, label: t.label }))}
-              />
-              <Field
-                label={`점수${
-                  LANGUAGE_TESTS.find((t) => t.value === optionalInfo.languageTestType)?.max != null
-                    ? ` (만점 ${LANGUAGE_TESTS.find((t) => t.value === optionalInfo.languageTestType)?.max})`
-                    : ""
-                }`}
-              >
-                <input
-                  type="number"
-                  min={0}
-                  max={LANGUAGE_TESTS.find((t) => t.value === optionalInfo.languageTestType)?.max ?? undefined}
-                  value={optionalInfo.languageTestScore}
-                  onChange={(e) => setOptionalInfo({ ...optionalInfo, languageTestScore: e.target.value })}
-                  className={inputClass}
-                />
-              </Field>
-            </CollapsibleToggle>
-
-            <CollapsibleToggle
-              checked={spec.has_disability}
-              onChange={(v) => setSpec({ ...spec, has_disability: v })}
-              label="장애인"
-            >
-              <SelectField
-                label="유형"
-                value={optionalInfo.disabilityType}
-                onChange={(v) => setOptionalInfo({ ...optionalInfo, disabilityType: v })}
-                options={DISABILITY_TYPES}
-              />
-            </CollapsibleToggle>
-
-            <CollapsibleToggle
-              checked={optionalInfo.specialStatusEnabled}
-              onChange={(v) =>
-                setOptionalInfo({
-                  ...optionalInfo,
-                  specialStatusEnabled: v,
-                  specialStatus: v ? optionalInfo.specialStatus : [],
-                })
-              }
-              label="특수상황"
-            >
-              <MultiPillSelect
-                values={optionalInfo.specialStatus}
-                onChange={(v) => setOptionalInfo({ ...optionalInfo, specialStatus: v })}
-                options={SPECIAL_STATUS_OPTIONS}
-              />
-            </CollapsibleToggle>
+            <OptionalFields
+              spec={spec}
+              setSpec={setSpec}
+              optionalInfo={optionalInfo}
+              setOptionalInfo={setOptionalInfo}
+            />
 
             {error && (
               <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-500">{error}</p>

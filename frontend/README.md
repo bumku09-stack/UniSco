@@ -13,7 +13,7 @@ src/
 │   ├── signup/
 │   │   └── page.tsx     # "/signup" — 회원가입 폼 → 이메일 인증 코드 입력 (내부 2단계), 완료되면 "/"로 이동
 │   ├── spec/
-│   │   └── page.tsx     # "/spec" — 최초 스펙 입력 2단계 위저드. POST /users/me/spec 성공 시 /home으로 이동
+│   │   └── page.tsx     # "/spec" — 최초 스펙 입력 3단계 위저드. POST /users/me/spec 성공 시 /home으로 이동
 │   ├── home/
 │   │   └── page.tsx     # "/home" — 로그인 유저의 추천 목록(GET /scholarships/recommendations). 정렬/카테고리 필터/페이지네이션 + 마이페이지·로그아웃 버튼
 │   ├── mypage/
@@ -21,7 +21,8 @@ src/
 │   └── scholarship/[id]/
 │       └── page.tsx     # 상세 페이지 — 자격조건 체크리스트, 비슷한 장학금 추천, 신청 링크
 ├── components/
-│   └── form-ui.tsx      # Field/SelectField/PillToggle/ToggleChip/TopBar — /spec, /mypage가 공유하는 필드 UI
+│   ├── form-ui.tsx       # Field/SelectField/PillToggle/ToggleChip/CollapsibleToggle/MultiPillSelect/TopBar — 기본 입력 UI 조각
+│   └── spec-fields.tsx   # SchoolFields/CommonFields/OptionalFields — /spec, /mypage가 그대로 공유하는 필드 묶음(2026-08-04 추출, 아래 참고)
 └── lib/
     ├── auth.ts           # 토큰 저장(localStorage) + authFetch(Authorization 헤더 자동 첨부, 401이면 로그인으로 리다이렉트)
     ├── spec.ts            # UserSpec/SpecForm 타입, specFormToUserSpec/userSpecToSpecForm 변환
@@ -56,11 +57,13 @@ npm run dev                    # http://localhost:3000
 - `/home`은 페이지 진입할 때마다 `GET /users/me/spec-status`를 먼저 확인함 — 스펙이 없으면(예: DB에서 직접 지운 경우 등) `/spec`으로 돌려보냄.
 - `/mypage`는 `GET /users/me/spec`으로 현재 값을 불러와 폼에 채우고, 저장은 `PUT`. `region`은 짧은 시/도 단위로만 저장돼 있어서(구/군 정보 없음) 되돌릴 때 시/도까지만 정확히 복원되고 구/군은 그 시/도의 첫 값으로 기본 설정됨 — 애초에 매칭에 구/군 단위까지는 안 쓰여서 문제없음.
 
-## /spec과 /mypage는 필드를 항상 같이 맞출 것 (2026-08-02 추가)
+## /spec과 /mypage는 필드를 항상 같이 맞출 것 (2026-08-02 추가, 2026-08-04 컴포넌트 공유로 갱신)
 
-`/spec`(최초 입력 위저드)과 `/mypage`(수정 폼)는 같은 스펙을 다루는 서로 다른 화면일 뿐이라, **한쪽에 입력 필드를 추가하면 반드시 다른 쪽에도 똑같이 추가해야 함** — 안 그러면 최초 가입 때만 입력 가능하고 나중에 수정은 못 하는(또는 그 반대) 필드가 생김. 둘 다 `components/form-ui.tsx`의 같은 UI 컴포넌트(Field/SelectField/PillToggle/ToggleChip/CollapsibleToggle/MultiPillSelect)를 공유하니 컴포넌트 자체는 재사용하면 되고, 각 페이지 파일에 실제로 넣는 걸 빠뜨리지 않으면 됨.
+`/spec`(최초 입력 위저드)과 `/mypage`(수정 폼)는 같은 스펙을 다루는 서로 다른 화면임. 처음엔 두 페이지 각자에 거의 동일한 필드 JSX를 그대로 복붙해 넣었었는데(university/college/department 캐스케이딩 select, 학년/GPA, 나이·성별·지역·병역·소득분위·외국인, 어학점수·장애·특수상황 — 세 그룹), 필드가 하나 늘어날 때마다 두 파일을 동시에 고쳐야 하고 실수로 한쪽만 고치기 쉬웠음.
 
-예: 2026-08-02에 `/spec` 3페이지("선택페이지")로 어학점수/장애인 세부유형/특수상황을 추가하면서 `/mypage`에도 동일하게 추가함(둘 다 아직 백엔드 미연결 상태, `supabase/matching_gaps.md` 참고).
+그래서 그 세 그룹을 `components/spec-fields.tsx`의 `SchoolFields`/`CommonFields`/`OptionalFields`(+ 파생값 계산용 `deriveSpecFields`)로 뽑아냈고, 이제 `/spec`과 `/mypage`는 둘 다 이 세 컴포넌트를 그대로 렌더링만 함. **필드를 추가/변경할 땐 `spec-fields.tsx` 한 곳만 고치면 두 페이지 모두에 반영됨** — `lib/spec.ts`의 `SpecForm`/`OptionalInfo` 타입에 필드를 추가하는 것만 별도로 필요.
+
+두 페이지가 다른 부분(위저드 단계 구분, 신입생 안내 문구 `showFreshmanHint`, `/mypage`의 draft 자동저장·복원 배너 등)은 각 `page.tsx`에 그대로 남아있음 — 공유되는 건 순수 필드 편집 UI뿐임.
 
 ## 남은 것 (2026-07-31 기준)
 
