@@ -16,7 +16,7 @@ app/
 │   └── session.py      # SQLAlchemy/SQLModel 엔진 + DB 접근용 get_session() 디펜던시
 ├── api/
 │   ├── health.py        # GET /health, {"status": "ok"} 반환
-│   ├── scholarships.py  # GET /scholarships (전체 목록), GET /scholarships/recommendations (로그인 유저 스펙 기준 추천)
+│   ├── scholarships.py  # GET /scholarships (전체 목록), GET /scholarships/{id} (단건), GET /scholarships/recommendations (로그인 유저 스펙 기준 추천), GET /scholarships/{id}/similar (상세페이지 추천, 2026-08-03 추가)
 │   ├── match.py          # POST /match — 요청 바디로 받은 스펙으로 즉석 매칭 (로그인 없이도 씀, 프론트 스펙 위저드가 아직 이걸 씀)
 │   ├── auth.py            # 회원가입/이메일인증/로그인/토큰재발급 (POST /auth/*)
 │   ├── users.py            # 로그인 유저 스펙 저장/조회/수정 (GET·POST·PUT /users/me/spec*)
@@ -54,14 +54,62 @@ FastAPI가 자동 생성해주는 API 문서: http://localhost:8000/docs
 
 ## 실제 매칭 로직은 어디에
 
-`core/matching.py`의 `is_eligible()`(자격조건 필터링) + `specificity_score()`(통과한 것들 중 더 구체적으로 타겟된 것을 우선 정렬). 규칙 기반, ML 없음(v1 스코프대로). 이 로직을 쓰는 진입점이 두 개 있음:
+`core/matching.py`의 `is_eligible()`(자격조건 필터링) + `personal_fit_key()`(통과한 것들 중
+"나랑 얼마나 잘 맞는지" 기준으로 정렬, 2026-08-04 재설계 — 아래 "정렬(랭킹) 로직" 참고). 규칙
+기반, ML 없음(v1 스코프대로). 이 로직을 쓰는 진입점이 두 개 있음:
 
 - `POST /match` (`api/match.py`) — 요청 바디로 받은 `UserSpec`을 그 자리에서 매칭. 로그인 없이도 되고, 지금 프론트 스펙 위저드가 쓰는 방식.
 - `GET /scholarships/recommendations` (`api/scholarships.py`) — 로그인(JWT) 필요. 요청 바디 없이, DB에 저장된 그 유저의 `SavedSpec`을 불러와서 매칭. 2026-07-31 추가.
+- `GET /scholarships/{id}/similar` (`api/scholarships.py`) — 로그인(JWT) 필요. 상세페이지 "이런 장학금은 어때요?" 전용(2026-08-03 추가). 예전엔 프론트가 `/scholarships`로 전체 목록을 받아서 화면에서 분류만 보고 골랐는데(내 조건 필터가 아예 없어서 무관한 장학금도 추천됐음), 이제 서버에서 그 유저의 `SavedSpec`으로 먼저 걸러낸 "내 조건에 맞는 장학금" 안에서만 같은 중분류(`category_l2`) 우선 → 대분류(`category_l1`) 확장 → 그래도 부족하면 워딩(이름+설명 텍스트 겹침) 유사도 순으로 채워서 최대 `limit`(기본 3)개 반환(`core/matching.py`의 `find_similar`). `exclude_id` 쿼리 파라미터로 A→B로 넘어왔을 때 B의 추천에 A가 다시 뜨는 핑퐁을 막음.
 
-두 진입점 다 결과적으로 같은 `is_eligible`/`specificity_score`를 타므로 동작이 갈릴 일이 없음 — `POST /match`용으로 짠 로직을 다시 구현한 게 아니라 `core/matching.py`로 뽑아내서 그대로 재사용한 것.
+두 진입점 다 결과적으로 같은 `is_eligible`/`personal_fit_key`를 타므로 동작이 갈릴 일이 없음 — `POST /match`용으로 짠 로직을 다시 구현한 게 아니라 `core/matching.py`로 뽑아내서 그대로 재사용한 것.
 
 `category_l1`/`category_l2`(장학금 분류)는 매칭 필터링에는 안 쓰임 — "누가 받을 수 있는지"가 아니라 "어떤 종류인지"라서 프론트 목록 화면 표시/그룹핑 전용. 자세한 값 목록은 [supabase/README.md](../supabase/README.md) 참고.
+
+### 정렬(랭킹) 로직 — "매칭적합도순" (2026-08-04 재설계)
+
+`is_eligible()`을 통과한(=자격 되는) 장학금들 사이에서 어떤 순서로 보여줄지 정하는 로직. 예전
+버전(`specificity_score`, 지금은 삭제됨)은 "이 장학금이 조건을 몇 개나 걸었는지"만 셌는데, 이건
+"학생이랑 얼마나 잘 맞는지"가 아니라 "이 장학금이 얼마나 좁게 타겟됐는지"를 재는 거라 실제
+적합도랑 안 맞는 문제가 있었음(사용자가 발견) — 그래서 아래 방식으로 다시 짬.
+
+**핵심 아이디어**: 장학금마다 두 숫자를 구함.
+
+- `confirmed_match_count(scholarship, spec)` — 이 학생 데이터로 **진짜 확인된** 매칭 조건 개수.
+  나이·성별·거주지·병역·GPA·장애·외국인여부·전공·대학·단과대·재학상태·학년·학위과정처럼
+  `UserSpec`이 항상 값을 받는 필드는, 장학금이 조건을 걸었고 `is_eligible`을 통과했다면 무조건
+  진짜 확인된 매칭이라 그대로 셈. **단, 소득분위·어학점수·특수상황 3개는 예외** — 학생이
+  "모름/안 입력"을 고를 수 있는 선택 입력이라, 장학금이 조건을 걸어놨어도 학생이 실제로 값을
+  입력했을 때만 센다(leniency로 통과된 것까지 "확인됨"으로 잘못 세지 않기 위함).
+- `unverifiable_condition_count(scholarship, spec)` — "확인이 안 되는" 조건 개수. 두 부류를 합침:
+  1. `SpecialStatus` enum에 있는 8개 "확인 불가" 태그(`parent_occupation_condition`,
+     `religious_or_career_intent_condition`, `sub_region_residence_condition`,
+     `hometown_school_region_condition`, `suneung_score_condition`, `school_record_condition`,
+     `credit_requirement_condition`, `extracurricular_program_condition`) — 목회자 자녀·부모
+     직업·수능성적 등 아예 매칭 필드가 없는 조건들. **학생이 절대 선택할 수 없는 값**이고
+     (`frontend/src/lib/spec.ts`의 `SPECIAL_STATUS_OPTIONS`엔 없음), 크롤링할 때 데이터에만
+     태그해둠. 상세 배경은 [supabase/matching_gaps.md](../supabase/matching_gaps.md) 18번.
+  2. 위 leniency 3종(소득분위/어학점수/특수상황) 중, 장학금엔 조건이 걸려있는데 이 학생이
+     아직 값을 안 넣은 경우 — 처음엔 이걸 `confirmed_match_count`에서 "보너스만 안 주는"
+     걸로 끝냈었는데, 그것만으론 부족했음(다른 조건이 잘 맞으면 보너스 없이도 여전히 상단에
+     뜸 — 예: "북한이탈주민 대상" 조건 있는 장학금이 특수상황 안 고른 학생한테 다른 조건만
+     보고 상위 노출되는 문제가 실사용 중 발견됨). 그래서 8개 태그와 동일하게 여기도 감점
+     대상으로 넣음.
+- 정렬 키(`personal_fit_key`) = `(confirmed / (confirmed + unverifiable), confirmed)` 튜플,
+  둘 다 내림차순. "확인 불가"가 하나도 없는 장학금들은 전부 비율 1.0으로 동률이라(분자=분모),
+  그 안에서는 `confirmed` 개수로 순위가 갈림 — "확인 불가"가 하나라도 있으면 비율이 1.0
+  밑으로 내려가서 자동으로 그 아래로 밀림.
+
+**노출 여부(과다노출 정책)는 이 랭킹 로직과 완전히 분리돼 있음** — "확인 불가" 태그가 붙어도
+그 장학금은 계속 모든 학생한테 노출됨(순위만 밀림). `is_eligible()`이 특수상황을 체크할 때
+8개 태그를 먼저 걸러내고 나머지(학생이 실제 선택 가능한 13종)로만 판단하도록 분리해뒀음 —
+안 그러면 학생이 아무 특수상황이나 하나 고른 순간, 8개 태그 붙은 장학금이 "안 겹친다"는
+이유로 실수로 숨겨지는 버그가 생김(구현 초기에 이 문제를 미리 잡아서 고쳤음).
+
+같은 작업 중 어학점수 필터링 버그도 같이 고침: `language_test_matches()`가 "어학점수 안 넣음"과
+"다른 시험 종류 넣음"을 구분 못 하고 둘 다 탈락시키고 있었음 — 3페이지가 "선택 입력"이라는
+설계 의도랑 반대로 동작한 것. 안 넣은 경우는 이제 정상 노출(순위엔 안 잡힘), 다른 시험 넣은
+경우는 여전히 제외(진짜 불일치라 유지).
 
 ## 로그인 유저의 스펙 저장은 어디에
 
@@ -114,3 +162,4 @@ Railway 프로젝트 환경변수(Variables 탭)에 등록해야 하는 값:
 - 회원가입/로그인/스펙저장 API(`/auth/*`, `/users/me/spec*`, `/scholarships/recommendations`)는 프론트까지 연결 완료(2026-07-31) — `/` → `/signup` → `/spec`(최초 1회) → `/home` → `/mypage` 플로우 전체 구현됨. 자세한 건 `frontend/README.md` 참고. `POST /match`(로그인 없이 즉석 매칭)는 그대로 남아있지만 지금 프론트는 안 씀 — 나중에 "로그인 없이 미리 둘러보기" 같은 용도로 재활용하거나, 안 쓰면 정리 대상.
 - 리프레시 토큰 회전/탈취 대응(블랙리스트 등) 없음 — access token이 30분마다 만료되는 것으로만 방어 중. 트래픽 늘면 재검토.
 - Railway `RESEND_API_KEY`를 아직 실제 값으로 안 채워넣었으면 회원가입 시 이메일 발송이 502로 실패함 — 배포 전에 `resend.com`에서 키 발급하고 Variables에 등록 필요.
+3

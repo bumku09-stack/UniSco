@@ -28,7 +28,7 @@ class UserSpec(SQLModel):
     gender: Gender
     region: str
     military_status: MilitaryStatus
-    income_bracket: int
+    income_bracket: int | None = None  # None="모름" — 소득분위 조건이 있는 장학금도 안 거름
     has_disability: bool
     is_foreigner: bool
 

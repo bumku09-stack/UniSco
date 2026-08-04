@@ -84,9 +84,12 @@ function ScholarshipCard({ s }: { s: Scholarship }) {
 
 export default function HomePage() {
   const router = useRouter();
-  // 캐시가 있으면 그걸로 바로 렌더링 시작(로딩 스피너 없이) — 없을 때만 로딩 상태로 시작함.
-  const [results, setResults] = useState<Scholarship[] | null>(() => getCachedRecommendations());
-  const [loading, setLoading] = useState(results === null);
+  // sessionStorage는 서버(SSR)에서 항상 null이라, 초기 state를 캐시값으로 바로 잡으면
+  // 서버는 "로딩 중" 화면을, 캐시가 있는 클라이언트는 바로 결과 화면을 렌더링해서
+  // hydration mismatch가 났었음(2026-08-04) — 그래서 초기값은 항상 서버와 동일하게
+  // null/true로 시작하고, 캐시 확인은 아래 useEffect(클라이언트에서만 실행됨) 안으로 옮김.
+  const [results, setResults] = useState<Scholarship[] | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState<SortBy>("relevance");
@@ -99,11 +102,21 @@ export default function HomePage() {
       return;
     }
 
-    // results를 deps에 안 넣은 건 의도적임 — 마운트 시점의 캐시 유무만 한 번 확인하면
-    // 되고, 이 안에서 나중에 setResults 하는 것 때문에 이펙트가 다시 도는 걸 막기 위함.
-    const hadCache = results !== null;
-
     (async () => {
+      // 캐시가 있으면 마운트 직후(첫 페인트 전에 가깝게) 바로 반영해서 로딩 스피너가
+      // 거의 안 보이게 함 — 없을 때만 실제 loading=true 화면이 유지됨. async 함수는
+      // 첫 await 전까지 동기적으로 실행되므로 타이밍은 이전과 동일함 — effect 본문에
+      // 직접 두면 react-hooks/set-state-in-effect가 걸려서 여기(async 클로저 안)로 옮김.
+      const cached = getCachedRecommendations();
+      if (cached !== null) {
+        setResults(cached);
+        setLoading(false);
+      }
+      // hadCache를 state가 아니라 이 변수로 판단하는 건 의도적임 — 마운트 시점의 캐시
+      // 유무만 한 번 확인하면 되고, 나중에 setResults 하는 것 때문에 이펙트가 다시 도는
+      // 걸 막기 위함.
+      const hadCache = cached !== null;
+
       const statusRes = await authFetch("/users/me/spec-status");
       if (!statusRes.ok) {
         if (!hadCache) {
@@ -133,7 +146,6 @@ export default function HomePage() {
       setCachedRecommendations(data);
       setLoading(false);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   function handleLogout() {

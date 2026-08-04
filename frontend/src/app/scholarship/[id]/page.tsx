@@ -3,13 +3,8 @@
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import { TopBar } from "@/components/form-ui";
-import {
-  CATEGORY_L2_LABEL,
-  eligibilityList,
-  findSimilar,
-  formatAmount,
-  Scholarship,
-} from "@/lib/scholarship";
+import { authFetch } from "@/lib/auth";
+import { CATEGORY_L2_LABEL, eligibilityList, formatAmount, Scholarship } from "@/lib/scholarship";
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return <h2 className="text-[15px] font-bold text-gray-900">{children}</h2>;
@@ -45,7 +40,7 @@ export default function ScholarshipDetailPage({
   const { id } = use(params);
   const { from } = use(searchParams);
   const [scholarship, setScholarship] = useState<Scholarship | null | undefined>(undefined);
-  const [allScholarships, setAllScholarships] = useState<Scholarship[]>([]);
+  const [similar, setSimilar] = useState<Scholarship[]>([]);
 
   // 본문은 GET /scholarships/{id} 하나로 바로 받아서 빠르게 그림 — 예전엔 전체 목록(수백
   // 건)을 받아서 그중 하나를 골라 쓰는 방식이라 상세페이지 열 때마다 느렸음. "이런 장학금은
@@ -55,17 +50,19 @@ export default function ScholarshipDetailPage({
       .then((res) => (res.ok ? res.json() : null))
       .then(setScholarship)
       .catch(() => setScholarship(null));
-
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/scholarships`)
-      .then((res) => res.json())
-      .then(setAllScholarships)
-      .catch(() => setAllScholarships([]));
   }, [id]);
 
-  // A→B로 추천을 타고 넘어온 경우, B의 추천 목록에 A가 다시 뜨는 걸 막음
-  const similar = scholarship
-    ? findSimilar(scholarship, allScholarships, 3, from ? Number(from) : undefined)
-    : [];
+  // 추천은 "내 조건에 맞는 장학금" 안에서만 서버가 골라줌(같은 중분류>대분류>워딩 유사도
+  // 순, core/matching.py의 find_similar 참고) — A→B로 넘어온 경우 exclude_id로 B의
+  // 추천에 A가 다시 뜨는 핑퐁을 막음.
+  useEffect(() => {
+    if (!scholarship) return;
+    const query = from ? `?exclude_id=${from}` : "";
+    authFetch(`/scholarships/${scholarship.id}/similar${query}`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then(setSimilar)
+      .catch(() => setSimilar([]));
+  }, [scholarship, from]);
 
   const hasReferenceInfo =
     scholarship &&
@@ -106,22 +103,22 @@ export default function ScholarshipDetailPage({
               <p className="mt-1 text-sm text-gray-500">{scholarship.provider}</p>
             )}
 
-            {/* 금액 / 마감일 / 선발인원 — 한눈에 보이는 요약 카드 (값이 있을 때만 표시) */}
-            {(formatAmount(scholarship.amount) ||
-              scholarship.application_period ||
-              scholarship.headcount) && (
-              <div className="mt-5 flex gap-2">
-                {formatAmount(scholarship.amount) && (
-                  <StatBox label="지원금액" value={formatAmount(scholarship.amount)!} tone="blue" />
-                )}
-                {scholarship.application_period && (
-                  <StatBox label="신청기간" value={scholarship.application_period} tone="gray" />
-                )}
-                {scholarship.headcount && (
-                  <StatBox label="선발인원" value={scholarship.headcount} tone="gray" />
-                )}
-              </div>
-            )}
+            {/* 금액 / 신청기간 / 선발인원 — 어떤 장학금이든 항상 이 3개를 같은 순서로 보여줌
+                (값이 없으면 "정보 없음"으로 표시 — 장학금마다 보이는 칸 개수가 들쭉날쭉하지
+                않도록 통일). */}
+            <div className="mt-5 flex gap-2">
+              <StatBox
+                label="지원금액"
+                value={formatAmount(scholarship.amount) ?? "정보 없음"}
+                tone="blue"
+              />
+              <StatBox
+                label="신청기간"
+                value={scholarship.application_period ?? "정보 없음"}
+                tone="gray"
+              />
+              <StatBox label="선발인원" value={scholarship.headcount ?? "정보 없음"} tone="gray" />
+            </div>
 
             {/* 장학금 소개 */}
             {scholarship.description && (

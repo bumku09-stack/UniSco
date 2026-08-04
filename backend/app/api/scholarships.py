@@ -2,11 +2,21 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
 from app.api.deps import get_current_user
-from app.core.matching import match_scholarships, to_user_spec
+from app.core.matching import find_similar, match_scholarships, to_user_spec
 from app.db.session import get_session
 from app.models import SavedSpec, Scholarship, User
 
 router = APIRouter()
+
+
+def _get_saved_spec(user: User, session: Session) -> SavedSpec:
+    saved = session.exec(select(SavedSpec).where(SavedSpec.user_id == user.id)).first()
+    if saved is None:
+        raise HTTPException(
+            status_code=404,
+            detail="스펙이 설정되지 않았습니다. POST /users/me/spec으로 먼저 설정해주세요.",
+        )
+    return saved
 
 
 @router.get("/scholarships", response_model=list[Scholarship])
@@ -18,13 +28,7 @@ def list_scholarships(session: Session = Depends(get_session)):
 def recommendations(
     user: User = Depends(get_current_user), session: Session = Depends(get_session)
 ):
-    saved = session.exec(select(SavedSpec).where(SavedSpec.user_id == user.id)).first()
-    if saved is None:
-        raise HTTPException(
-            status_code=404,
-            detail="스펙이 설정되지 않았습니다. POST /users/me/spec으로 먼저 설정해주세요.",
-        )
-    spec = to_user_spec(saved)
+    spec = to_user_spec(_get_saved_spec(user, session))
     scholarships = session.exec(select(Scholarship)).all()
     return match_scholarships(scholarships, spec)
 
@@ -37,3 +41,25 @@ def get_scholarship(scholarship_id: int, session: Session = Depends(get_session)
     if scholarship is None:
         raise HTTPException(status_code=404, detail="장학금을 찾을 수 없습니다.")
     return scholarship
+
+
+@router.get("/scholarships/{scholarship_id}/similar", response_model=list[Scholarship])
+def similar_scholarships(
+    scholarship_id: int,
+    exclude_id: int | None = None,
+    limit: int = 3,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """상세페이지 "이런 장학금은 어때요?" 추천 전용 API(2026-08-03 추가) — 전에는 프론트가
+    /scholarships로 전체 목록을 받아와 화면에서 직접 골라냈는데(내 조건 필터 없이 분류만
+    보고 골랐음), 이제 서버에서 "내 조건에 맞는 것" 안에서만 같은 중분류→대분류→워딩 유사도
+    순으로 추려서 내려줌(core/matching.py의 find_similar 참고)."""
+    target = session.get(Scholarship, scholarship_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="장학금을 찾을 수 없습니다.")
+
+    spec = to_user_spec(_get_saved_spec(user, session))
+    scholarships = session.exec(select(Scholarship)).all()
+    eligible = match_scholarships(scholarships, spec)
+    return find_similar(target, eligible, limit=limit, exclude_id=exclude_id)

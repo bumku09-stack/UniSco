@@ -31,7 +31,11 @@ class SavedSpec(SQLModel, table=True):
     gender: Gender = Field(sa_type=enum_column(Gender))
     region: str
     military_status: MilitaryStatus = Field(sa_type=enum_column(MilitaryStatus))
-    income_bracket: int
+    # 2026-08-03: 필수 -> 선택으로 변경 — 자기 소득분위를 모르는 사용자가 많아서 "모름"으로
+    # 넘어갈 수 있게 함. None이면 소득분위 조건이 있는 장학금도 안 거르고 다 보여줌
+    # (core/matching.py의 is_eligible() 참고, special_status의 "선택 안 함=모름=안 거름"
+    # 원칙과 동일).
+    income_bracket: int | None = None
     has_disability: bool
     is_foreigner: bool
 
