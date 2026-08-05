@@ -1,7 +1,9 @@
-# Python (backend)
+# Python (backend, harness)
 backend/venv/
 backend/__pycache__/
 backend/**/__pycache__/
+harness/venv/
+harness/**/__pycache__/
 *.pyc
 
 # env files (keep .env.example)

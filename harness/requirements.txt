@@ -1,0 +1,10 @@
+# harness/ 전용 의존성 — backend/requirements.txt와 분리(하네스는 백엔드 앱과 무관하게
+# GitHub Actions에서 독립 실행됨). 벡터DB/LangChain 없음(설계안 "제약사항" 참고) —
+# Anthropic API 직접 호출.
+anthropic
+requests
+beautifulsoup4
+lxml
+playwright
+rapidfuzz
+psycopg2-binary

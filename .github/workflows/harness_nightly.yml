@@ -1,0 +1,55 @@
+name: harness nightly
+
+# 매일 밤 대학 1~2곳 분량을 수집·추출·검증해서 초안 PR을 엶(설계안 5장). 머지는 사람이 직접 —
+# 이 워크플로는 PR을 여는 데서 끝나고, DB에는 아무것도 쓰지 않음(harness/build_pr.py 참고).
+on:
+  schedule:
+    # 매일 17:00 UTC = 새벽 2시 KST(UTC+9).
+    - cron: "0 17 * * *"
+  workflow_dispatch:
+    inputs:
+      university:
+        description: "특정 대학만 실행(비우면 로테이션에서 자동 선택)"
+        required: false
+        type: string
+
+permissions:
+  contents: write # harness/state/rotation.json 커밋 + 초안 브랜치 push
+  pull-requests: write # PR 오픈
+
+jobs:
+  run-harness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: harness 의존성 설치
+        run: |
+          pip install -r harness/requirements.txt
+          playwright install --with-deps chromium
+
+      - name: git 커밋 아이덴티티 설정
+        run: |
+          git config user.name "unisco-harness[bot]"
+          git config user.email "unisco-harness[bot]@users.noreply.github.com"
+
+      - name: 하네스 실행
+        env:
+          # GitHub Actions Secret으로 등록 필요 (Settings → Secrets and variables → Actions).
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # dedup.py가 기존 (name, provider) 목록을 읽기 위해 필요 — 설계안 5장은
+          # ANTHROPIC_API_KEY만 언급했지만 dedup 단계에 이것도 필요해서 같이 등록해야 함.
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # actions/checkout이 설정해둔 git 인증(contents: write)을 build_pr.py의
+          # git push/PR 오픈이 그대로 씀 — 별도 PAT 불필요.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -n "${{ inputs.university }}" ]; then
+            python -m harness.run --university "${{ inputs.university }}"
+          else
+            python -m harness.run
+          fi
