@@ -13,7 +13,22 @@
 - 영향받는 테이블/쿼리: (실제로 같이 고친 파일 목록)
 ```
 
-관련 문서: [supabase/matching_gaps.md](supabase/matching_gaps.md) (매칭 로직 미지원 자격조건 목록), [supabase/README.md](supabase/README.md)
+관련 문서: [supabase/matching_gaps.md](supabase/matching_gaps.md) (매칭 로직 미지원 자격조건 목록), [supabase/README.md](supabase/README.md), [EXTERNAL_SCHOLARSHIPS_PLAN.md](EXTERNAL_SCHOLARSHIPS_PLAN.md) (외부 재단/기업 장학금 수집 계획)
+
+---
+
+### 2026-08-05 부모 거주지역 필드 추가 (설계 완료, 구현 예정 — 아직 코드 반영 안 됨)
+
+- 문제: "본인 또는 부모 중 1인이 OO 지역에 거주"가 자격조건인 장학금(재능키움 장학사업, 화성시인재육성재단 주거비지원, 인천 청년 해외배낭연수 장학생 등)이 실제로 존재하는데, `SavedSpec`/`UserSpec`엔 학생 본인의 `region`만 있어서 본인 거주지가 조건과 다르지만 부모가 그 지역에 사는 학생을 부당하게 걸러내고 있었음(false negative). 외부(재단/기업) 장학금을 새로 발굴하는 작업 중 발견 — `supabase/matching_gaps.md` 19번 참고.
+- 결정:
+  - `Scholarship.eligible_region`은 변경 없음(대상 지역 값 하나만 담으면 충분 — 본인/부모 중 누구 기준인지 구분할 필요 없음).
+  - `SavedSpec`/`UserSpec`에 `parent_region: str | None` 추가(선택 입력, 본인 `region`과 동일한 시/도+구/군 옵션 재사용).
+  - `backend/app/core/matching.py`의 `is_eligible()`에서 지역 조건을 `spec.region in eligible_region OR spec.parent_region in eligible_region`으로 변경.
+  - 벤치마크로 참고한 Scholarships.com(매칭 항목 23종)에도 "부모 거주지역"이라는 별도 필드는 없었음(선례 없음, "직장" 항목만 본인/부모를 하나로 합쳐서 처리) — 참고만 하고 우리는 두 필드를 분리하기로 사용자가 직접 결정함.
+  - 16번(부모 직업/소속 조건)은 이번엔 같이 처리 안 함 — 그쪽은 카테고리가 고정 목록이 아니라 계속 늘어나는 유형이라 설계에 시간이 더 필요해서 별도로 보류.
+- 이유: 기존 데이터(`eligible_region` 값)를 재작업할 필요 없이, 학생 쪽 입력 필드 하나만 추가하고 매칭 로직만 OR 조건으로 바꾸는 게 가장 적은 변경으로 정확하게 고쳐짐.
+- 영향받는 테이블/쿼리(예정, 아직 미구현): `savedspec` 테이블(`parent_region` 컬럼 추가), `backend/app/models/user_spec.py`, `backend/app/models/scholarship.py`(변경 없음, 확인만), `backend/app/core/matching.py`, `frontend/src/lib/spec.ts`, `frontend/src/app/spec/page.tsx`, `frontend/src/app/mypage/page.tsx`, `supabase/schema.sql`(스냅샷 갱신).
+- **상태: 설계만 완료된 상태 — 실제 코드 변경은 아직 안 함.** 진행해도 좋다는 확인 있으면 다음 세션에서 구현.
 
 ---
 
