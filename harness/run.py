@@ -100,7 +100,9 @@ def _save_rotation_index(index: int) -> None:
     호출되므로, 여기서 커밋해두지 않으면 이후 `git checkout -b`로 변경사항이 딸려가 버려서
     main엔 영영 반영되지 않고 유실됨."""
     ROTATION_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    ROTATION_STATE_PATH.write_text(json.dumps({"next_index": index}), encoding="utf-8")
+    # 끝에 개행 포함 — 없으면 값이 그대로여도(예: index 0 -> 0) 매번 포맷만 다른 diff가 생겨서
+    # 나이트런마다 의미 없는 커밋이 쌓임(2026-08-05, 첫 실행에서 실제로 발생해서 발견).
+    ROTATION_STATE_PATH.write_text(json.dumps({"next_index": index}) + "\n", encoding="utf-8")
     rel_path = str(ROTATION_STATE_PATH.relative_to(REPO_ROOT))
     subprocess.run(["git", "add", rel_path], cwd=REPO_ROOT, check=True)
     diff = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=REPO_ROOT)
