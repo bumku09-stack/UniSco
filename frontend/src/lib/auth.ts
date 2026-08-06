@@ -39,6 +39,28 @@ export function getAccessTokenExpiry(): number | null {
   return token ? decodeJwtExpiry(token) : null;
 }
 
+// 로그인 전(회원가입/로그인/이메일인증/재발송) 호출용 — 토큰이 아직 없어서 authFetch를 못 씀.
+// "JSON POST → 실패하면 detail 메시지, 네트워크 자체가 끊기면 폴백 메시지"가 로그인·회원가입
+// 페이지 곳곳에서 그대로 반복되길래 하나로 뽑음.
+export async function postJson(
+  path: string,
+  body: Record<string, string>,
+  networkErrorFallback: string
+): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) return { ok: false, error: data.detail ?? networkErrorFallback };
+    return { ok: true, data };
+  } catch {
+    return { ok: false, error: `${networkErrorFallback} 잠시 후 다시 시도해주세요.` };
+  }
+}
+
 // 로그인 필요한 API 호출용 fetch 래퍼 — Authorization 헤더를 자동으로 붙이고,
 // 토큰이 없거나 만료/무효(401)면 로그인 화면으로 보냄. 리프레시 토큰으로 조용히
 // 재시도하는 로직은 없음 — access token 30분 만료면 그냥 재로그인하게 함(단순함 우선).

@@ -16,10 +16,9 @@ import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
 
-import requests
 from bs4 import BeautifulSoup
 
-from harness import build_pr, collect_links, config, db, dedup, extract, sites, verify
+from harness import build_pr, collect_links, config, db, dedup, extract, http, sites, verify
 from harness.models import CollectionResult, Listing, VerifiedScholarship
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -52,14 +51,8 @@ def fetch_source_text(listing: Listing) -> str | None:
         import extract_text  # type: ignore  # supabase/tools/extract_text.py, 그대로 재사용
 
         try:
-            resp = requests.get(
-                listing.url,
-                timeout=config.REQUEST_TIMEOUT_SECONDS,
-                headers={"User-Agent": config.REQUEST_USER_AGENT},
-            )
-            resp.raise_for_status()
             with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
-                tmp.write(resp.content)
+                tmp.write(http.get(listing.url).content)
                 tmp_path = Path(tmp.name)
             try:
                 return extract_text.extract(tmp_path)
@@ -70,16 +63,7 @@ def fetch_source_text(listing: Listing) -> str | None:
             return None
 
     try:
-        resp = requests.get(
-            listing.url,
-            timeout=config.REQUEST_TIMEOUT_SECONDS,
-            headers={"User-Agent": config.REQUEST_USER_AGENT},
-        )
-        resp.raise_for_status()
-        # collect_links._fetch_static과 같은 이유(charset 헤더 누락 사이트가 실제로 있음,
-        # 2026-08-05 실측) — apparent_encoding으로 강제.
-        resp.encoding = resp.apparent_encoding
-        soup = BeautifulSoup(resp.text, "lxml")
+        soup = BeautifulSoup(http.get_text(listing.url), "lxml")
         return soup.get_text(separator="\n", strip=True)
     except Exception as e:  # noqa: BLE001
         _log(f"상세페이지 원문 확보 실패({listing.url}): {e}")

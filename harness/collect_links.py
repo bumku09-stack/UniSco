@@ -11,28 +11,11 @@ import re
 import time
 from urllib.parse import urljoin
 
-import requests
 from bs4 import BeautifulSoup
 
-from harness import config
+from harness import config, http
 from harness.models import CollectionResult, Listing
 from harness.sites import BoardConfig
-
-
-def _fetch_static(url: str) -> str:
-    resp = requests.get(
-        url,
-        timeout=config.REQUEST_TIMEOUT_SECONDS,
-        headers={"User-Agent": config.REQUEST_USER_AGENT},
-    )
-    resp.raise_for_status()
-    # 여러 대학 게시판이 Content-Type 헤더에 charset을 안 넣어서(실제로 UTF-8인데도)
-    # requests가 기본값인 ISO-8859-1로 잘못 디코딩하는 경우가 많음(예: 충남대 plus.cnu.ac.kr,
-    # 2026-08-05 실측). resp.text 대신 apparent_encoding(바이트 내용 자체를 sniffing)으로
-    # 강제해서 한글이 깨지지 않게 함 — 헤더가 맞는 사이트는 apparent_encoding도 보통 같은
-    # 결과를 내서 무해함.
-    resp.encoding = resp.apparent_encoding
-    return resp.text
 
 
 def _fetch_js(url: str) -> str:
@@ -51,7 +34,7 @@ def _fetch_js(url: str) -> str:
 
 
 def fetch_page(url: str, board: BoardConfig) -> str:
-    return _fetch_js(url) if board.requires_js else _fetch_static(url)
+    return _fetch_js(url) if board.requires_js else http.get_text(url)
 
 
 def _parse_expected_count(html: str, board: BoardConfig) -> tuple[int | None, int | None]:

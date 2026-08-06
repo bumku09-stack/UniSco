@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { setTokens } from "@/lib/auth";
+import { postJson, setTokens } from "@/lib/auth";
 
 const inputClass =
   "w-full rounded-2xl bg-gray-100 px-4 py-4 text-[15px] text-gray-900 placeholder:text-gray-400 outline-none transition focus:bg-blue-50 focus:ring-2 focus:ring-blue-500";
@@ -19,26 +19,17 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.detail ?? "로그인에 실패했습니다.");
-        return;
-      }
-      setTokens(data.access_token, data.refresh_token);
-      // 로그인 응답에 spec_completed가 같이 오기 때문에(백엔드에서 로그인 시점에 조회해서
-      // 실어보냄) /users/me/spec-status를 또 부를 필요 없음 — 요청 한 번 줄임.
-      router.push(data.spec_completed ? "/home" : "/spec");
-    } catch {
-      setError("로그인에 실패했습니다. 잠시 후 다시 시도해주세요.");
-    } finally {
-      setLoading(false);
+    const result = await postJson("/auth/login", { username, password }, "로그인에 실패했습니다.");
+    setLoading(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
     }
+    const data = result.data as { access_token: string; refresh_token: string; spec_completed: boolean };
+    setTokens(data.access_token, data.refresh_token);
+    // 로그인 응답에 spec_completed가 같이 오기 때문에(백엔드에서 로그인 시점에 조회해서
+    // 실어보냄) /users/me/spec-status를 또 부를 필요 없음 — 요청 한 번 줄임.
+    router.push(data.spec_completed ? "/home" : "/spec");
   }
 
   return (

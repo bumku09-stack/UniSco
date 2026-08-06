@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { postJson } from "@/lib/auth";
 
 const inputClass =
   "w-full rounded-2xl bg-gray-100 px-4 py-4 text-[15px] text-gray-900 placeholder:text-gray-400 outline-none transition focus:bg-blue-50 focus:ring-2 focus:ring-blue-500";
@@ -24,70 +25,44 @@ export default function SignupPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/signup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password, email }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.detail ?? "회원가입에 실패했습니다.");
-        return;
-      }
-      setNotice("인증 코드를 이메일로 보냈어요. 5분 안에 입력해주세요.");
-      setStep("verify");
-    } catch {
-      setError("회원가입에 실패했습니다. 잠시 후 다시 시도해주세요.");
-    } finally {
-      setLoading(false);
+    const result = await postJson("/auth/signup", { username, password, email }, "회원가입에 실패했습니다.");
+    setLoading(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
     }
+    setNotice("인증 코드를 이메일로 보냈어요. 5분 안에 입력해주세요.");
+    setStep("verify");
   }
 
   async function handleVerify(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/verify-code`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier: username, code }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.detail ?? "인증에 실패했습니다.");
-        return;
-      }
-      router.push("/");
-    } catch {
-      setError("인증에 실패했습니다. 잠시 후 다시 시도해주세요.");
-    } finally {
-      setLoading(false);
+    const result = await postJson(
+      "/auth/verify-code",
+      { identifier: username, code },
+      "인증에 실패했습니다."
+    );
+    setLoading(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
     }
+    router.push("/");
   }
 
   async function handleResend() {
     setLoading(true);
     setError(null);
     setNotice(null);
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/resend-code`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier: username }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.detail ?? "재발송에 실패했습니다.");
-        return;
-      }
-      setNotice("인증 코드를 다시 보냈어요.");
-    } catch {
-      setError("재발송에 실패했습니다. 잠시 후 다시 시도해주세요.");
-    } finally {
-      setLoading(false);
+    const result = await postJson("/auth/resend-code", { identifier: username }, "재발송에 실패했습니다.");
+    setLoading(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
     }
+    setNotice("인증 코드를 다시 보냈어요.");
   }
 
   return (

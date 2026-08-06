@@ -1,22 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
-from app.api.deps import get_current_user
+from app.api.deps import get_saved_spec
 from app.core.matching import find_similar, match_scholarships, to_user_spec
 from app.db.session import get_session
-from app.models import SavedSpec, Scholarship, User
+from app.models import SavedSpec, Scholarship
 
 router = APIRouter()
-
-
-def _get_saved_spec(user: User, session: Session) -> SavedSpec:
-    saved = session.exec(select(SavedSpec).where(SavedSpec.user_id == user.id)).first()
-    if saved is None:
-        raise HTTPException(
-            status_code=404,
-            detail="스펙이 설정되지 않았습니다. POST /users/me/spec으로 먼저 설정해주세요.",
-        )
-    return saved
 
 
 @router.get("/scholarships", response_model=list[Scholarship])
@@ -26,9 +16,9 @@ def list_scholarships(session: Session = Depends(get_session)):
 
 @router.get("/scholarships/recommendations", response_model=list[Scholarship])
 def recommendations(
-    user: User = Depends(get_current_user), session: Session = Depends(get_session)
+    saved: SavedSpec = Depends(get_saved_spec), session: Session = Depends(get_session)
 ):
-    spec = to_user_spec(_get_saved_spec(user, session))
+    spec = to_user_spec(saved)
     scholarships = session.exec(select(Scholarship)).all()
     return match_scholarships(scholarships, spec)
 
@@ -48,7 +38,7 @@ def similar_scholarships(
     scholarship_id: int,
     exclude_id: int | None = None,
     limit: int = 3,
-    user: User = Depends(get_current_user),
+    saved: SavedSpec = Depends(get_saved_spec),
     session: Session = Depends(get_session),
 ):
     """상세페이지 "이런 장학금은 어때요?" 추천 전용 API(2026-08-03 추가) — 전에는 프론트가
@@ -59,7 +49,7 @@ def similar_scholarships(
     if target is None:
         raise HTTPException(status_code=404, detail="장학금을 찾을 수 없습니다.")
 
-    spec = to_user_spec(_get_saved_spec(user, session))
+    spec = to_user_spec(saved)
     scholarships = session.exec(select(Scholarship)).all()
     eligible = match_scholarships(scholarships, spec)
     return find_similar(target, eligible, limit=limit, exclude_id=exclude_id)
