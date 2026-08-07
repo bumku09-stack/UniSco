@@ -18,3 +18,6 @@ TASKS.local.md
 
 # personal Claude Code settings (not shared)
 .claude/settings.local.json
+
+# personal custom slash commands (not shared)
+.claude/commands/
