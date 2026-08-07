@@ -15,6 +15,7 @@ import {
 import { authFetch, isLoggedIn } from "@/lib/auth";
 import { SIDO_LIST } from "@/lib/regions";
 import {
+  applySpecialStatusExclusivity,
   DegreeLevel,
   DISABILITY_TYPES,
   EnrollmentStatus,
@@ -81,6 +82,8 @@ export default function SpecWizard() {
   const currentDepartments =
     currentColleges.find((c) => c.name === spec.college)?.departments ?? [];
   const currentDistricts = SIDO_LIST.find((s) => s.name === spec.sido)?.districts ?? [];
+  const currentParentDistricts =
+    SIDO_LIST.find((s) => s.name === optionalInfo.parentSido)?.districts ?? [];
 
   async function handleFinalSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -344,6 +347,46 @@ export default function SpecWizard() {
               />
             )}
 
+            <Field label="부모님 거주지역">
+              <p className="mb-2 text-xs text-gray-500">
+                지역 장학금 중엔 본인이 아니라 부모님 주소지 기준으로도 자격이 되는 경우가 있어요.
+              </p>
+              <PillToggle
+                value={optionalInfo.parentRegionEnabled ? "different" : "same"}
+                onChange={(v) => setOptionalInfo({ ...optionalInfo, parentRegionEnabled: v === "different" })}
+                options={[
+                  { value: "same", label: "본인과 동일" },
+                  { value: "different", label: "다름" },
+                ]}
+              />
+            </Field>
+
+            {optionalInfo.parentRegionEnabled && (
+              <>
+                <SelectField
+                  label="부모님 광역자치단체"
+                  value={optionalInfo.parentSido}
+                  onChange={(v) => {
+                    const nextSido = SIDO_LIST.find((s) => s.name === v)!;
+                    setOptionalInfo({
+                      ...optionalInfo,
+                      parentSido: nextSido.name,
+                      parentDistrict: nextSido.districts[0] ?? "",
+                    });
+                  }}
+                  options={SIDO_LIST.map((s) => ({ value: s.name, label: s.name }))}
+                />
+                {currentParentDistricts.length > 0 && (
+                  <SelectField
+                    label="부모님 기초자치단체"
+                    value={optionalInfo.parentDistrict}
+                    onChange={(v) => setOptionalInfo({ ...optionalInfo, parentDistrict: v })}
+                    options={currentParentDistricts.map((d) => ({ value: d, label: d }))}
+                  />
+                )}
+              </>
+            )}
+
             <Field label="병역">
               <PillToggle
                 value={spec.military_status}
@@ -446,7 +489,12 @@ export default function SpecWizard() {
             >
               <MultiPillSelect
                 values={optionalInfo.specialStatus}
-                onChange={(v) => setOptionalInfo({ ...optionalInfo, specialStatus: v })}
+                onChange={(v) =>
+                  setOptionalInfo({
+                    ...optionalInfo,
+                    specialStatus: applySpecialStatusExclusivity(optionalInfo.specialStatus, v),
+                  })
+                }
                 options={SPECIAL_STATUS_OPTIONS}
               />
             </CollapsibleToggle>

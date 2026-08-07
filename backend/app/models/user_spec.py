@@ -27,6 +27,16 @@ class UserSpec(SQLModel):
     age: int
     gender: Gender
     region: str
+    # 2026-08-05 추가 (matching_gaps.md 14번) — 시/도(region)만으론 "정읍시 거주자만" 같은
+    # 시/군/구 단위 지자체 장학금을 못 걸러서 추가함. 프론트에서 이미 물어보던 값인데 그동안
+    # 서버로 안 보내고 버리고 있었음(frontend/src/lib/spec.ts 참고). 세종처럼 하위 구/군이
+    # 없는 시/도는 빈 문자열/None일 수 있음.
+    district: str | None = None
+    # 2026-08-05 추가 (matching_gaps.md 19번) — "본인 또는 부모 중 1인이 OO에 거주" 조건을
+    # 표현하기 위한 선택 입력. None="입력 안 함/모름" — 이때는 매칭에 아예 안 쓰이고 기존처럼
+    # region(본인 거주지)만으로 판단함. core/matching.py의 region_matches() 참고.
+    parent_region: str | None = None
+    parent_district: str | None = None  # 2026-08-05 추가 (matching_gaps.md 14번 후속) — 부모 쪽 시/군/구 단위
     military_status: MilitaryStatus
     income_bracket: int | None = None  # None="모름" — 소득분위 조건이 있는 장학금도 안 거름
     has_disability: bool

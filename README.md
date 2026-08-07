@@ -4,7 +4,7 @@ Unisco — 대전 지역 대학생을 위한 맞춤형 장학금·지원금 매�
 
 배경, 스코프, 왜 이렇게 결정했는지는 [PROJECT_BRIEF.md](./PROJECT_BRIEF.md) 참고.
 
-## 배포 주소 (2026-07-31 기준)
+## 배포 주소 (2026-08-06 기준)
 
 - **서비스(프론트)**: https://unisco-pi.vercel.app — Vercel, `main` 브랜치 푸시할 때마다 자동 재배포
 - **API(백엔드)**: https://unisco-production.up.railway.app — Railway, `main` 브랜치 푸시할 때마다 자동 재배포
@@ -45,11 +45,11 @@ cd frontend && npm run dev                                                # http
 
 최초 셋업(venv 생성, `pip install`, `.env` 파일 등)은 각 폴더 README에 있습니다.
 
-## 진행 상황 (2026-07-31 기준)
+## 진행 상황 (2026-08-06 기준)
 
 1. ~~**Supabase 프로젝트 생성**~~ — 완료. `supabase/README.md` 참고.
 2. ~~**데이터 모델 정의**~~ — 완료. `Scholarship`(자격조건 필드 + `category_l1`/`category_l2` 분류), `UserSpec`/`SavedSpec`, `User`, 관련 enum 전부 `backend/app/models/`에 있음.
-3. **장학금 데이터 입력** — 진행 중. 친구가 Supabase Studio로 수동 입력 중(현재 133건). 최근 추가된 정밀 매칭 필드(`eligible_university`, `eligible_college`, `category_l1`/`l2` 등)는 새 항목부터 채워지는 중이고, 기존 항목 백필은 안 함.
+3. **장학금 데이터 입력** — 계속 진행 중(현재 662건). 대전권 10개 대학 크롤링 + 외부(재단·지자체) 장학금 발굴을 병행 중. 상세는 `supabase/scholarship_dedup_list.md`, `supabase/matching_gaps.md` 참고.
 4. ~~**매칭 엔드포인트**~~ — 완료. `POST /match`, `GET /scholarships`, `GET /scholarships/recommendations`(로그인 유저용) (`backend/app/api/`). 규칙 기반, ML 없음.
 5. ~~**프론트엔드 스펙 입력 폼 + 결과 리스트**~~ — 완료. 로그인 → 2단계 스펙 위저드 → 매칭 결과(15개씩 페이지네이션). Toss 스타일 UI로 구현됨. `frontend/README.md` 참고.
 6. **마이그레이션** — 아직 안 함. 스키마가 계속 바뀌는 중이라 지금은 `SQLModel.metadata.create_all()` + 수동 `ALTER TABLE`로 운영, 안정되면 Alembic 등 도입 검토.

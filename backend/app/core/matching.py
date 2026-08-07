@@ -171,6 +171,56 @@ def deadline_matches(scholarship: Scholarship, today: datetime.date | None = Non
     return scholarship.application_deadline >= (today or datetime.date.today())
 
 
+_SIDO_NAMES = [
+    "서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종",
+    "경기", "강원", "충북", "충남", "전북", "전남", "경북", "경남", "제주",
+]
+
+
+def region_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
+    """거주지 조건 (matching_gaps.md 14번·19번, 2026-08-05). eligible_region 하나에 두 가지
+    다른 정밀도가 섞여서 저장됨 — 시/도 단위(예: "충남", "대전·충남·충북·세종")와, 시/도로
+    좁히면 과다매칭이라 그동안 못 채우고 있던 시/군/구 단위(예: "정읍시", 14번 갭 — "부 또는
+    모 1인이 정읍시에 1년 이상 거주"). 어느 쪽이든 "eligible_region 문자열 안에 이 후보가
+    부분 문자열로 들어있는지"만 보면 같은 방식으로 처리 가능해서(구/군 이름이 시/도
+    shortName의 부분 문자열이 되는 경우는 없음), 후보 4개(본인 시/도, 본인 시/군/구, 부모
+    시/도, 부모 시/군/구)를 전부 OR로 검사함 — 지자체 장학금 대부분이 "본인 또는 부모"
+    조건이라(19번) 시/군/구 쪽도 부모 후보까지 봐야 정읍시민장학재단 같은 케이스가 제대로
+    걸러짐. district/parent_district가 없으면(None) 그 후보는 그냥 건너뜀 — 다른 선택
+    입력들과 마찬가지로 "몰라서 안 넣음"을 "해당 지역 아님"으로 단정하지 않음.
+
+    2026-08-07 추가 — "중구" 충돌 버그 수정: "중구"처럼 여러 시/도에 동시에 있는 구/군
+    이름은(서울·부산·대구·인천·대전·울산 전부 "중구"가 있음) 구/군 이름만 부분 문자열로
+    비교하면 완전히 다른 도시 사용자에게도 걸림 — 실제 사고: 대전 중구 거주자한테
+    "인천광역시 중구·미추홀구·연수구" 한정 장학금(eligible_region에 예외적으로 시/도 이름이
+    같이 박혀 있던 케이스)이 노출됨. eligible_region 안에 시/도 이름이 하나라도 있으면,
+    구/군 후보가 매칭되더라도 그 구/군에 대응하는 사용자 시/도(spec.region 또는
+    spec.parent_region)가 그 시/도 이름과 같은지까지 추가로 확인함. eligible_region에
+    시/도 이름이 없으면(기존 컨벤션 — 구/군 이름만 넣는 게 정상, 예: "정읍시") 이 추가
+    확인 없이 기존 방식 그대로 동작 — 대다수 케이스는 영향 없음."""
+    if scholarship.eligible_region is None:
+        return True
+    region = scholarship.eligible_region
+    named_sido = [s for s in _SIDO_NAMES if s in region]
+
+    def district_ok(sido: str | None) -> bool:
+        if not named_sido:
+            return True
+        return bool(sido) and sido in named_sido
+
+    # 빈 문자열("")은 세종처럼 하위 구/군이 없는 경우의 district 기본값인데, 빈 문자열은
+    # 어떤 문자열에도 항상 부분 문자열로 포함되기 때문에(`"" in "충남"` == True) 그대로
+    # 후보에 넣으면 지역 조건이 있는 장학금이 전부 통과해버리는 심각한 버그가 됨 — 빈
+    # 문자열은 "값 없음"과 동일하게 취급해서 제외함.
+    candidates = [
+        (spec.region, True),
+        (spec.district, district_ok(spec.region)),
+        (spec.parent_region, True),
+        (spec.parent_district, district_ok(spec.parent_region)),
+    ]
+    return any(c and ok and c in region for c, ok in candidates)
+
+
 def enrollment_status_matches(
     required: EnrollmentStatus | None, spec_status: EnrollmentStatus
 ) -> bool:
@@ -200,7 +250,7 @@ def is_eligible(scholarship: Scholarship, spec: UserSpec) -> bool:
         return False
     if scholarship.required_gender is not None and scholarship.required_gender != spec.gender:
         return False
-    if scholarship.eligible_region is not None and spec.region not in scholarship.eligible_region:
+    if not region_matches(scholarship, spec):
         return False
     if (
         scholarship.required_military_status is not None
@@ -334,7 +384,8 @@ def confirmed_match_count(scholarship: Scholarship, spec: UserSpec) -> int:
 def unverifiable_condition_count(scholarship: Scholarship, spec: UserSpec) -> int:
     """이 장학금에 "확인 안 되는" 조건이 몇 개 있는지 (2026-08-04 추가, 08-04 확장).
     두 가지를 합쳐서 셈:
-    1. 목회자 자녀·부모 직업·시군구 세부거주 등 매칭 필드 자체가 없는 8개 "확인 불가" 태그.
+    1. 목회자 자녀·부모 직업·시군구 세부거주·의사상자 유족 등 매칭 필드 자체가 없는 "확인
+       불가" 태그(UNVERIFIABLE_CONDITIONS, 2026-08-06 기준 9개).
     2. **필드는 있지만 이 학생이 아직 안 답한 선택 입력 조건**(소득분위 모름/특수상황 안 고름/
        어학점수 안 넣음)이 이 장학금에 걸려있는 경우 — 처음엔 confirmed_match_count()에서
        "보너스 점수를 안 주는" 것까지만 했었는데, 그것만으론 부족했음(다른 조건이 잘 맞으면

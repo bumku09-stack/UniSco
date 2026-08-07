@@ -69,20 +69,18 @@ FastAPI가 자동 생성해주는 API 문서: http://localhost:8000/docs
 ### 정렬(랭킹) 로직 — "매칭적합도순" (2026-08-04 재설계)
 
 `is_eligible()`을 통과한(=자격 되는) 장학금들 사이에서 어떤 순서로 보여줄지 정하는 로직. 예전
-버전(`specificity_score`, 지금은 삭제됨)은 "이 장학금이 조건을 몇 개나 걸었는지"만 셌는데, 이건
-"학생이랑 얼마나 잘 맞는지"가 아니라 "이 장학금이 얼마나 좁게 타겟됐는지"를 재는 거라 실제
-적합도랑 안 맞는 문제가 있었음(사용자가 발견) — 그래서 아래 방식으로 다시 짬.
+버전(`specificity_score`, 삭제됨)은 "학생이랑 얼마나 잘 맞는지"가 아니라 "장학금이 조건을 몇
+개나 걸었는지"만 셌던 설계 결함이 있어 아래 방식으로 재설계함.
 
 **핵심 아이디어**: 장학금마다 두 숫자를 구함.
 
 - `confirmed_match_count(scholarship, spec)` — 이 학생 데이터로 **진짜 확인된** 매칭 조건 개수.
   나이·성별·거주지·병역·GPA·장애·외국인여부·전공·대학·단과대·재학상태·학년·학위과정처럼
-  `UserSpec`이 항상 값을 받는 필드는, 장학금이 조건을 걸었고 `is_eligible`을 통과했다면 무조건
-  진짜 확인된 매칭이라 그대로 셈. **단, 소득분위·어학점수·특수상황 3개는 예외** — 학생이
-  "모름/안 입력"을 고를 수 있는 선택 입력이라, 장학금이 조건을 걸어놨어도 학생이 실제로 값을
-  입력했을 때만 센다(leniency로 통과된 것까지 "확인됨"으로 잘못 세지 않기 위함).
+  `UserSpec`이 항상 값을 받는 필드는 그대로 셈. **단, 소득분위·어학점수·특수상황 3개는 예외** —
+  학생이 "모름/안 입력"을 고를 수 있는 선택 입력이라, 실제로 값을 입력했을 때만 센다
+  (leniency로 통과된 것까지 "확인됨"으로 잘못 세지 않기 위함).
 - `unverifiable_condition_count(scholarship, spec)` — "확인이 안 되는" 조건 개수. 두 부류를 합침:
-  1. `SpecialStatus` enum에 있는 8개 "확인 불가" 태그(`parent_occupation_condition`,
+  1. `SpecialStatus` enum의 8개 "확인 불가" 태그(`parent_occupation_condition`,
      `religious_or_career_intent_condition`, `sub_region_residence_condition`,
      `hometown_school_region_condition`, `suneung_score_condition`, `school_record_condition`,
      `credit_requirement_condition`, `extracurricular_program_condition`) — 목회자 자녀·부모
@@ -90,11 +88,8 @@ FastAPI가 자동 생성해주는 API 문서: http://localhost:8000/docs
      (`frontend/src/lib/spec.ts`의 `SPECIAL_STATUS_OPTIONS`엔 없음), 크롤링할 때 데이터에만
      태그해둠. 상세 배경은 [supabase/matching_gaps.md](../supabase/matching_gaps.md) 18번.
   2. 위 leniency 3종(소득분위/어학점수/특수상황) 중, 장학금엔 조건이 걸려있는데 이 학생이
-     아직 값을 안 넣은 경우 — 처음엔 이걸 `confirmed_match_count`에서 "보너스만 안 주는"
-     걸로 끝냈었는데, 그것만으론 부족했음(다른 조건이 잘 맞으면 보너스 없이도 여전히 상단에
-     뜸 — 예: "북한이탈주민 대상" 조건 있는 장학금이 특수상황 안 고른 학생한테 다른 조건만
-     보고 상위 노출되는 문제가 실사용 중 발견됨). 그래서 8개 태그와 동일하게 여기도 감점
-     대상으로 넣음.
+     아직 값을 안 넣은 경우 — 8개 태그와 동일하게 감점 대상으로 넣음(안 그러면 다른 조건만
+     잘 맞아도 감점 없이 상위 노출되는 문제가 있었음).
 - 정렬 키(`personal_fit_key`) = `(confirmed / (confirmed + unverifiable), confirmed)` 튜플,
   둘 다 내림차순. "확인 불가"가 하나도 없는 장학금들은 전부 비율 1.0으로 동률이라(분자=분모),
   그 안에서는 `confirmed` 개수로 순위가 갈림 — "확인 불가"가 하나라도 있으면 비율이 1.0
@@ -104,12 +99,10 @@ FastAPI가 자동 생성해주는 API 문서: http://localhost:8000/docs
 그 장학금은 계속 모든 학생한테 노출됨(순위만 밀림). `is_eligible()`이 특수상황을 체크할 때
 8개 태그를 먼저 걸러내고 나머지(학생이 실제 선택 가능한 13종)로만 판단하도록 분리해뒀음 —
 안 그러면 학생이 아무 특수상황이나 하나 고른 순간, 8개 태그 붙은 장학금이 "안 겹친다"는
-이유로 실수로 숨겨지는 버그가 생김(구현 초기에 이 문제를 미리 잡아서 고쳤음).
+이유로 실수로 숨겨지는 버그가 생김.
 
-같은 작업 중 어학점수 필터링 버그도 같이 고침: `language_test_matches()`가 "어학점수 안 넣음"과
-"다른 시험 종류 넣음"을 구분 못 하고 둘 다 탈락시키고 있었음 — 3페이지가 "선택 입력"이라는
-설계 의도랑 반대로 동작한 것. 안 넣은 경우는 이제 정상 노출(순위엔 안 잡힘), 다른 시험 넣은
-경우는 여전히 제외(진짜 불일치라 유지).
+`language_test_matches()`는 "어학점수 안 넣음"과 "다른 시험 종류 넣음"을 구분함 — 안 넣은
+경우는 정상 노출(순위엔 안 잡힘), 다른 시험 넣은 경우는 제외(진짜 불일치).
 
 ## 로그인 유저의 스펙 저장은 어디에
 
@@ -122,13 +115,13 @@ FastAPI가 자동 생성해주는 API 문서: http://localhost:8000/docs
 
 **주의**: 이 저장소를 처음 받았을 당시 `User`/`Scholarship`에 스펙 관련 필드가 이미 있다고 알고 있었다면 그건 사실이 아니었음 — `UserSpec`(`models/user_spec.py`)은 처음부터 "저장 안 하는 `/match` 요청 바디"였고(주석에도 "로그인 생기면 실제 테이블로 옮길 것"이라고 적혀있었음), `User` 테이블엔 스펙 필드가 전혀 없었음. 그래서 새 테이블 `SavedSpec`을 추가했음 — `User` 테이블 자체는 안 건드림.
 
-**매칭 재계산 캐싱은 안 함(제안)**: 스펙 수정 후 `/scholarships/recommendations`를 다시 부르면 매번 전체 `Scholarship` 테이블(현재 133건)을 다시 읽어서 필터링함. 지금 규모에선 이게 SQL 쿼리 한 번 + O(n) 필터링이라 밀리초 단위라 캐싱 안 함(캐시 무효화 로직이 버그 리스크 대비 얻는 게 적음). 장학금 건수가 수천 단위로 늘고 동시 사용자가 많아지면, 그때 "스펙 해시 → 결과" 캐시(스펙 수정 시 무효화)를 고려하면 됨 — 지금 붙이는 건 이르다고 판단.
+**매칭 재계산 캐싱은 안 함(제안)**: 스펙 수정 후 `/scholarships/recommendations`를 다시 부르면 매번 전체 `Scholarship` 테이블(현재 400여 건)을 다시 읽어서 필터링함. 지금 규모에선 SQL 쿼리 한 번 + O(n) 필터링이 밀리초 단위라 캐싱 안 함. 장학금 건수가 수천 단위로 늘고 동시 사용자가 많아지면, 그때 "스펙 해시 → 결과" 캐시(스펙 수정 시 무효화)를 고려하면 됨.
 
 ## 회원가입/로그인은 어디에
 
 `api/auth.py`, `core/security.py`(비밀번호 해싱 + JWT), `core/email.py`(인증 코드 이메일 발송) — 전부 2026-07-31에 추가됨.
 
-- **비밀번호**: `bcrypt` 패키지로 직접 해싱함. 원래 `passlib[bcrypt]`로 시작했는데 passlib이 2020년 이후 유지보수가 끊겨서 최신 `bcrypt` 5.x랑 호환이 안 되는 문제(`AttributeError: module 'bcrypt' has no attribute '__about__'`)가 있어 — passlib 없이 `bcrypt.hashpw`/`bcrypt.checkpw`를 직접 씀.
+- **비밀번호**: `bcrypt` 패키지로 직접 해싱함(`bcrypt.hashpw`/`bcrypt.checkpw`) — `passlib[bcrypt]`는 최신 `bcrypt` 5.x와 호환 문제가 있어 안 씀.
 - **JWT**: `pyjwt`. access token(`ACCESS_TOKEN_EXPIRE_MINUTES`, 기본 30분)은 매 요청에 실어 보내는 용도, refresh token(`REFRESH_TOKEN_EXPIRE_DAYS`, 기본 30일)은 `POST /auth/refresh`로 새 토큰 발급받을 때만 씀. 둘 다 페이로드에 `type`(`access`/`refresh`)을 넣어서 access token으로 refresh를 시도하는 걸 막음. 리프레시 토큰 회전/블랙리스트(탈취 시 무효화)는 아직 없음 — 필요해지면 추가.
 - **이메일 인증 코드**: 6자리 숫자, 5분 유효, 계정당 시도 5회 실패하면 그 코드는 잠기고 재발송 필요(`POST /auth/resend-code`). `identifier`(username 또는 email) 아무거나로 조회 가능.
 - **로그인 실패 메시지 통일**: 아이디가 없거나 비밀번호가 틀리거나 항상 "아이디 또는 비밀번호가 일치하지 않습니다"만 반환 — 아이디 존재 여부가 새지 않게. 단, "이메일 인증 안 됨"은 이미 로그인 자체는 맞게 한 사용자에게 알려줘야 하는 정보라 별도 403으로 분리함.
@@ -155,11 +148,9 @@ Railway 프로젝트 환경변수(Variables 탭)에 등록해야 하는 값:
 
 배포되면 Railway가 `https://<프로젝트명>.up.railway.app` 같은 URL을 발급함 — 이걸 프론트의 `NEXT_PUBLIC_API_URL`로 등록하면 됨.
 
-## 남은 것 (2026-07-31 기준)
+## 남은 것
 
-- 기존에 입력된 장학금 데이터 중 `eligible_university`/`eligible_college`/`category_l1`/`category_l2` 등 새로 추가된 정밀 매칭·분류 필드가 비어있는 항목이 있음 — Supabase Studio에서 계속 채워지는 중.
 - 스키마가 계속 바뀌고 있어서 마이그레이션 툴(Alembic 등)은 아직 도입 안 함 — 지금은 `SQLModel.metadata.create_all()` + 수동 `ALTER TABLE`로 운영.
-- 회원가입/로그인/스펙저장 API(`/auth/*`, `/users/me/spec*`, `/scholarships/recommendations`)는 프론트까지 연결 완료(2026-07-31) — `/` → `/signup` → `/spec`(최초 1회) → `/home` → `/mypage` 플로우 전체 구현됨. 자세한 건 `frontend/README.md` 참고. `POST /match`(로그인 없이 즉석 매칭)는 그대로 남아있지만 지금 프론트는 안 씀 — 나중에 "로그인 없이 미리 둘러보기" 같은 용도로 재활용하거나, 안 쓰면 정리 대상.
+- `POST /match`(로그인 없이 즉석 매칭)는 그대로 남아있지만 지금 프론트는 안 씀 — 나중에 "로그인 없이 미리 둘러보기" 같은 용도로 재활용하거나, 안 쓰면 정리 대상.
 - 리프레시 토큰 회전/탈취 대응(블랙리스트 등) 없음 — access token이 30분마다 만료되는 것으로만 방어 중. 트래픽 늘면 재검토.
 - Railway `RESEND_API_KEY`를 아직 실제 값으로 안 채워넣었으면 회원가입 시 이메일 발송이 502로 실패함 — 배포 전에 `resend.com`에서 키 발급하고 Variables에 등록 필요.
-3

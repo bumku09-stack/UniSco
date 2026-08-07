@@ -16,6 +16,13 @@ export type UserSpec = {
   age: number;
   gender: "male" | "female";
   region: string;
+  // 2026-08-05 추가 (matching_gaps.md 14번) — "정읍시 거주자만" 같은 시/군/구 단위 지자체
+  // 장학금 매칭용. 세종처럼 하위 구/군이 없으면 빈 문자열/null일 수 있음.
+  district: string | null;
+  // 2026-08-05 추가 (matching_gaps.md 19번) — "본인 또는 부모 중 1인이 OO에 거주" 조건을
+  // 표현하기 위한 선택 입력. null="입력 안 함" — OptionalInfo.parentRegionEnabled로 관리됨.
+  parent_region: string | null;
+  parent_district: string | null; // 2026-08-05 추가 (matching_gaps.md 14번 후속)
   military_status: "completed" | "exempted" | "not_served";
   income_bracket: number | null; // null="모름" — 소득분위 조건이 있는 장학금도 안 거름
   has_disability: boolean;
@@ -82,6 +89,9 @@ export type SpecForm = Omit<
   | "cumulative_gpa"
   | "income_bracket"
   | "region"
+  | "district"
+  | "parent_region"
+  | "parent_district"
   | "grade"
   | "department"
   | "language_test_type"
@@ -109,6 +119,11 @@ export function specFormToUserSpec(spec: SpecForm, optionalInfo: OptionalInfo): 
     age: Number(spec.age),
     gender: spec.gender,
     region: regionShortName(spec.sido, spec.district),
+    district: spec.district || null,
+    parent_region: optionalInfo.parentRegionEnabled
+      ? regionShortName(optionalInfo.parentSido, optionalInfo.parentDistrict)
+      : null,
+    parent_district: optionalInfo.parentRegionEnabled ? optionalInfo.parentDistrict || null : null,
     military_status: spec.military_status,
     income_bracket: spec.income_bracket === "unknown" ? null : Number(spec.income_bracket),
     has_disability: spec.has_disability,
@@ -153,6 +168,8 @@ export const DISABILITY_TYPES = [
   { value: "disabled_parent", label: "장애가 있는 부모(자녀 대상)" },
 ];
 
+export const SPECIAL_STATUS_NOT_APPLICABLE = "not_applicable";
+
 export const SPECIAL_STATUS_OPTIONS = [
   { value: "north_korean_defector", label: "북한이탈주민" },
   { value: "multicultural_family", label: "다문화가정" },
@@ -160,7 +177,7 @@ export const SPECIAL_STATUS_OPTIONS = [
   { value: "student_council_officer", label: "학생회장(임원)" },
   { value: "single_parent_family", label: "한부모가정" },
   { value: "grandparent_family", label: "조손가정" },
-  { value: "multi_child_family", label: "다자녀가정(3자녀 이상)" },
+  { value: "multi_child_family", label: "다자녀가정(2자녀 이상)" },
   { value: "national_merit", label: "국가보훈대상자" },
   // 2026-08-03 추가 — 배재대 희망복지장학금·대전대 장학사정관장학금 같은 복합조건
   // 장학금을 재분류하면서 새로 필요해진 항목들 (matching_gaps.md 참고)
@@ -169,7 +186,28 @@ export const SPECIAL_STATUS_OPTIONS = [
   { value: "severe_illness_or_injury", label: "중증질병 및 상해" },
   { value: "job_loss_or_disaster", label: "실직가정·재난 및 재해" },
   { value: "financial_emergency", label: "긴급가계곤란" },
+  // 2026-08-07 추가 — "해당사항 없음" 명시적 선택지. 지금까지는 특수상황을 하나도 안 고르면
+  // "아직 대답 안 함(모름)"으로 취급돼서 leniency로 관련 장학금이 계속 보였는데, "나는 이
+  // 중 어디에도 해당 안 함"을 확정하고 싶은 학생을 위한 선택지(사용자 지적으로 추가). 다른
+  // 항목과 상호배타적으로 골라지도록 처리함 — applySpecialStatusExclusivity() 참고.
+  { value: SPECIAL_STATUS_NOT_APPLICABLE, label: "해당사항 없음" },
 ];
+
+/** SPECIAL_STATUS_OPTIONS의 MultiPillSelect onChange에 그대로 씌워서, "해당사항 없음"과
+ * 다른 항목이 동시에 선택되지 않도록 함 — 방금 "해당사항 없음"을 새로 고르면 나머지를 전부
+ * 비우고, "해당사항 없음"이 이미 선택된 상태에서 다른 항목을 고르면 "해당사항 없음"만
+ * 빼고 나머지를 유지함. */
+export function applySpecialStatusExclusivity(prev: string[], next: string[]): string[] {
+  const prevHasNone = prev.includes(SPECIAL_STATUS_NOT_APPLICABLE);
+  const nextHasNone = next.includes(SPECIAL_STATUS_NOT_APPLICABLE);
+  if (nextHasNone && !prevHasNone) {
+    return [SPECIAL_STATUS_NOT_APPLICABLE];
+  }
+  if (nextHasNone && next.length > 1) {
+    return next.filter((v) => v !== SPECIAL_STATUS_NOT_APPLICABLE);
+  }
+  return next;
+}
 
 export type OptionalInfo = {
   languageTestEnabled: boolean;
@@ -178,6 +216,12 @@ export type OptionalInfo = {
   disabilityType: string;
   specialStatusEnabled: boolean;
   specialStatus: string[];
+  // 2026-08-05 추가 (matching_gaps.md 19번·14번). "본인과 동일/다름" 토글 — 다름을 고르면
+  // 본인 거주지 폼과 똑같은 시/도+구/군 캐스케이딩 드롭다운으로 부모님 거주지를 따로 입력함
+  // (스펙 입력/마이페이지 페이지 쪽에서 SIDO_LIST로 렌더링).
+  parentRegionEnabled: boolean;
+  parentSido: string;
+  parentDistrict: string;
 };
 
 export const initialOptionalInfo: OptionalInfo = {
@@ -187,14 +231,18 @@ export const initialOptionalInfo: OptionalInfo = {
   disabilityType: DISABILITY_TYPES[0].value,
   specialStatusEnabled: false,
   specialStatus: [],
+  parentRegionEnabled: false,
+  parentSido: SIDO_LIST[0].name,
+  parentDistrict: SIDO_LIST[0].districts[0] ?? "",
 };
 
 // 마이페이지에서 서버에 저장된 스펙(UserSpec)을 불러와 수정 폼(SpecForm)에 채울 때 씀 —
-// specFormToUserSpec의 반대 방향. region은 구/군 정보 없이 짧은 시/도 단위로만 저장돼
-// 있어서, sido는 복원되지만 district는 그 시/도의 첫 번째 값으로 기본 설정됨.
+// specFormToUserSpec의 반대 방향. sido는 region(짧은 시/도 단위)에서 복원하고, district는
+// 2026-08-05부터 실제로 저장되는 spec.district 값을 그대로 씀(matching_gaps.md 14번 전에는
+// district 자체를 안 보내고 버려서 그 시/도의 첫 번째 구/군으로만 근사 복원했었음).
 export function userSpecToSpecForm(spec: UserSpec): SpecForm {
   const sido = sidoNameFromRegion(spec.region);
-  const district = SIDO_LIST.find((s) => s.name === sido)?.districts[0] ?? "";
+  const district = spec.district || (SIDO_LIST.find((s) => s.name === sido)?.districts[0] ?? "");
   return {
     university: spec.university,
     college: spec.college,
@@ -225,5 +273,13 @@ export function userSpecToOptionalInfo(spec: UserSpec): OptionalInfo {
     disabilityType: spec.disability_type ?? DISABILITY_TYPES[0].value,
     specialStatusEnabled: spec.special_status.length > 0,
     specialStatus: spec.special_status,
+    parentRegionEnabled: spec.parent_region != null,
+    parentSido: spec.parent_region != null ? sidoNameFromRegion(spec.parent_region) : SIDO_LIST[0].name,
+    parentDistrict:
+      spec.parent_district ||
+      SIDO_LIST.find(
+        (s) => s.name === (spec.parent_region != null ? sidoNameFromRegion(spec.parent_region) : SIDO_LIST[0].name)
+      )?.districts[0] ||
+      "",
   };
 }

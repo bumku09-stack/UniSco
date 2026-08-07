@@ -141,6 +141,9 @@ CREATE TABLE savedspec (
     age INTEGER NOT NULL,
     gender gender NOT NULL,
     region VARCHAR NOT NULL,
+    district VARCHAR,  -- 2026-08-05 추가(matching_gaps.md 14번), 선택 입력(세종 등은 없음)
+    parent_region VARCHAR,  -- 2026-08-05 추가(matching_gaps.md 19번), 선택 입력
+    parent_district VARCHAR,  -- 2026-08-05 추가(matching_gaps.md 14번 후속), 선택 입력
     military_status militarystatus NOT NULL,
     income_bracket INTEGER NOT NULL,
     has_disability BOOLEAN NOT NULL,

@@ -14,3 +14,7 @@ backend/**/__pycache__/
 
 # personal local notes (not shared)
 CLAUDE.local.md
+TASKS.local.md
+
+# personal Claude Code settings (not shared)
+.claude/settings.local.json
