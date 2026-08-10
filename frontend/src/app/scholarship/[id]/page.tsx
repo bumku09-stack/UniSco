@@ -10,6 +10,16 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
   return <h2 className="text-[15px] font-bold text-gray-900">{children}</h2>;
 }
 
+// description이 문장 하나로 다 이어붙어 있어서(줄바꿈 없음) 읽기 힘들다는 지적(2026-08-11) —
+// 마침표+공백을 문장 경계로 보고 줄 단위로 쪼개서 보여줌. "3.0 이상"처럼 소수점 뒤에 공백이
+// 없는 숫자는 마침표 뒤에 공백이 없어서 안 쪼개짐(의도한 동작).
+function splitSentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?])\s+(?=\S)/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 function StatBox({
   label,
   value,
@@ -115,13 +125,18 @@ export default function ScholarshipDetailPage({
               <StatBox label="선발인원" value={scholarship.headcount ?? "정보 없음"} tone="gray" />
             </div>
 
-            {/* 장학금 소개 */}
+            {/* 장학금 소개 — 문장 단위로 줄을 나눠서 표시(2026-08-11, 한 문단으로 다 이어붙어
+                있어서 읽기 힘들다는 지적 반영) */}
             {scholarship.description && (
               <div className="mt-7 border-b border-gray-100 pb-7">
                 <SectionHeading>장학금 소개</SectionHeading>
-                <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-gray-700">
-                  {scholarship.description}
-                </p>
+                <div className="mt-3 flex flex-col gap-2">
+                  {splitSentences(scholarship.description).map((sentence, i) => (
+                    <p key={i} className="whitespace-pre-line text-sm leading-relaxed text-gray-700">
+                      {sentence}
+                    </p>
+                  ))}
+                </div>
               </div>
             )}
 
