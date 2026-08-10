@@ -62,6 +62,14 @@ class Scholarship(SQLModel, table=True):
     required_special_status: list[SpecialStatus] = Field(
         default_factory=list, sa_column=Column(ARRAY(String), nullable=False, server_default="{}")
     )
+    # 2026-08-10 추가(matching_gaps.md "특수상황 AND 조건"). required_special_status(하나만
+    # 맞아도 통과, OR)와 별개로 "이건 전부 다 있어야 함" 목록. 빈 리스트=추가 AND 조건 없음
+    # (기존과 동일). 예: 다문화가정학생장학금(영암군) "다문화가정 이면서 (기초수급자 또는
+    # 차상위)"는 required_special_status_all=[multicultural_family],
+    # required_special_status=[basic_livelihood_recipient, near_poor]로 표현.
+    required_special_status_all: list[SpecialStatus] = Field(
+        default_factory=list, sa_column=Column(ARRAY(String), nullable=False, server_default="{}")
+    )
     # 2026-08-03 추가 — 구조화된 마감일(matching_gaps.md 7번). 대부분의 기존 데이터는
     # "매 학기 초 공지"류 상시/반복 프로그램이라 NULL로 남아있고(마감 자동판정 대상 아님),
     # 실제 확정 마감일이 있는 공고만 이 값을 채워서 자동으로 걸러지게 함(match_scholarships()
@@ -76,6 +84,10 @@ class Scholarship(SQLModel, table=True):
     # (core/matching.py의 major_matches() 참고). 콤마로 여러 학과가 나열된 기존 데이터
     # (예: "융합디자인전공,회화전공,미술교육과")도 그대로 지원함 — 그 중 하나만 일치해도 통과.
     major: str | None = None
+    # 2026-08-10 추가(matching_gaps.md "전공 제외 조건") — "이 학과만 빼고 나머지 전부 됨"
+    # 조건 (major는 반대로 "이 학과만 됨"). major와 동일한 컨벤션(콤마 구분).
+    # None=제외 학과 없음(기존과 동일). core/matching.py의 major_matches() 참고.
+    excluded_major: str | None = None
     affiliated_institution: str | None = None  # (레거시, 구조화 전 원문) 소속 대학/학과 텍스트
     min_credits: str | None = None  # 이수학점 조건 (형식이 제각각이라 텍스트)
     admission_score_condition: str | None = None  # 내신/입학성적 조건

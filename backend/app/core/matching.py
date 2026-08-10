@@ -125,6 +125,21 @@ def special_status_matches(
     return bool(set(scholarship_special_status) & set(spec_special_status))
 
 
+def special_status_all_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
+    """required_special_status_all(전부 다 있어야 통과, AND) 체크 — 기존 required_special_status
+    (하나만 맞아도 통과, OR)와 독립적으로 항상 추가 적용됨(matching_gaps.md "특수상황 AND 조건",
+    2026-08-10). 예: 다문화가정학생장학금(영암군) "다문화가정 이면서 (기초수급자 또는
+    차상위)"는 required_special_status_all=[multicultural_family](이 함수가 체크) +
+    required_special_status=[basic_livelihood_recipient, near_poor](기존 OR 체크, 둘 다
+    통과해야 최종 매칭). 다른 특수상황 필드와 같은 원칙 — 학생이 특수상황을 아예 선택
+    안 했으면(빈 리스트) "아직 대답 안 한 것"으로 보고 걸러내지 않음."""
+    if not scholarship.required_special_status_all:
+        return True
+    if not spec.special_status:
+        return True
+    return set(scholarship.required_special_status_all).issubset(set(spec.special_status))
+
+
 def special_status_matches_strict(
     scholarship_special_status: list[SpecialStatus], spec_special_status: list[SpecialStatus]
 ) -> bool:
@@ -176,7 +191,21 @@ def major_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
     이름과 정확히 일치하는 항목을 못 찾아 매칭에서 빠지는 문제가 있었음(2026-08-03 발견).
     그래서 콤마로 나눈 한 조각을 통째로도 후보에 넣고, 그 조각을 가운뎃점으로 다시 쪼갠
     부분들도 같이 후보에 넣어서 어느 쪽 해석이든 맞으면 통과시킴(과다매칭이 과소매칭보다
-    덜 해로움 — gpa_matches와 동일한 원칙)."""
+    덜 해로움 — gpa_matches와 동일한 원칙).
+
+    2026-08-10 추가: `excluded_major`("이 학과만 빼고 나머지 전부 됨" — major와 정반대 의미)가
+    있으면 이 체크를 최우선으로 봄. 학생 학과가 excluded_major 목록에 있으면 major 포함
+    목록 체크와 무관하게 무조건 탈락시킴(예: 대전대 특별장학금 — 한의예과·군사학과 제외,
+    나머지 학과는 전부 지원 가능)."""
+    if scholarship.excluded_major and spec.department:
+        excluded_candidates: set[str] = set()
+        for chunk in scholarship.excluded_major.split(","):
+            chunk = chunk.strip()
+            excluded_candidates.add(chunk)
+            if "·" in chunk:
+                excluded_candidates.update(part.strip() for part in chunk.split("·"))
+        if spec.department in excluded_candidates:
+            return False
     if not scholarship.major:
         return True
     if not spec.department:
@@ -294,6 +323,8 @@ def is_eligible(scholarship: Scholarship, spec: UserSpec) -> bool:
     if not gpa_matches(scholarship, spec):
         return False
     if not disability_or_special_status_matches(scholarship, spec):
+        return False
+    if not special_status_all_matches(scholarship, spec):
         return False
     if not language_test_matches(scholarship, spec):
         return False
