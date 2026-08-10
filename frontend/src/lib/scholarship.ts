@@ -72,6 +72,9 @@ function eligibilityParts(s: Scholarship): string[] {
   const parts: string[] = [];
   if (s.eligible_university) parts.push(`대학: ${s.eligible_university}`);
   if (s.eligible_college) parts.push(`단과대: ${s.eligible_college}`);
+  // major_matches()가 실제로 필터링에 쓰는 필드인데(backend/app/core/matching.py) 프론트
+  // 목록에서 빠져있던 버그 — 2026-08-11 발견, 여기로 옮김(예전엔 "참고조건"으로 잘못 표시).
+  if (s.major) parts.push(`전공: ${s.major}`);
   if (s.required_enrollment_status) {
     parts.push(`재학상태: ${ENROLLMENT_STATUS_LABEL[s.required_enrollment_status]}`);
   }

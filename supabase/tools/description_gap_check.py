@@ -85,13 +85,16 @@ FIELD_GAP_RULES: dict[str, tuple[list[str], list[str]]] = {
         ["major"],
         [r"전공", r"학과.{0,4}(만|한정)", r"해당\s*전공", r"전공자\s*외", r"전공.{0,4}지원\s*불가"],
     ),
+    # "차상위"/"기초생활수급자" 등은 소득분위 숫자가 아니라 특수상황 태그로 표현하는 게 맞는
+    # 경우가 많아(2026-08-10, id=232 사례) max_income_bracket 규칙에서 빼고 아래
+    # special_status 규칙으로 옮김. 여기는 "소득분위 N" 형태의 숫자 조건만 남김.
     "min_gpa": (
         ["min_gpa"],
         [r"평점", r"학점\s*[0-9]", r"GPA", r"성적.{0,3}등급\s*이내"],
     ),
     "max_income_bracket": (
         ["max_income_bracket"],
-        [r"소득분위", r"중위소득", r"차상위"],
+        [r"소득분위", r"중위소득"],
     ),
     "disability": (
         ["requires_disability", "required_disability_type"],
@@ -120,6 +123,50 @@ FIELD_GAP_RULES: dict[str, tuple[list[str], list[str]]] = {
     "period_or_deadline": (
         ["application_period", "application_deadline"],
         [r"매년\s*[0-9]+\s*월", r"20[0-9]{2}[-./]\s*[0-9]{1,2}[-./]\s*[0-9]{1,2}", r"20[0-9]{2}년\s*[0-9]+월"],
+    ),
+    # 2026-08-10 추가 — 지금까지 자동검사에 아예 없었던 항목들(data_collection_guide.md
+    # 체크리스트 21개 중 아래 8개는 이번까지 자동검사 커버리지가 0건이었음).
+    "special_status": (
+        ["required_special_status"],
+        [
+            r"다문화가정", r"새터민", r"북한이탈주민", r"한부모가정", r"조손가정",
+            r"다자녀", r"자녀\s*[2-9]\s*(명|인)", r"국가유공자", r"보훈대상자",
+            r"기초생활수급자", r"기초수급", r"차상위", r"중증질병", r"실직가정",
+            r"재난.{0,4}(피해|가정)", r"긴급가계곤란", r"의사상자",
+            r"학생회.{0,4}(임원|회장)", r"학생자치단체.{0,4}임원", r"아동양육시설",
+        ],
+    ),
+    "excluded_major": (
+        ["excluded_major"],
+        [r"전공.{0,6}제외", r"학과.{0,6}제외"],
+    ),
+    "degree_level": (
+        ["required_degree_level"],
+        [r"석사", r"박사", r"석·박사", r"석박사"],
+    ),
+    "region": (
+        ["eligible_region"],
+        [r"거주자", r"거주.{0,4}[0-9]\s*년", r"관내\s*(거주|주민)", r"주민등록", r"전입"],
+    ),
+    "gender": (
+        ["required_gender"],
+        [r"여학생", r"남학생", r"여성\s*(만|한정)", r"남성\s*(만|한정)", r"^사모\b|\s사모\b"],
+    ),
+    "military_status": (
+        ["required_military_status"],
+        [r"군필", r"병역\s*(특례|의무|필)", r"미필자"],
+    ),
+    "age": (
+        ["min_age", "max_age"],
+        [r"만\s*[0-9]{1,2}\s*세", r"[0-9]{1,2}\s*세\s*(이하|미만|이상)"],
+    ),
+    "min_credits": (
+        ["min_credits"],
+        [r"[0-9]+\s*학점\s*(이상|이수)"],
+    ),
+    "admission_score_condition": (
+        ["admission_score_condition"],
+        [r"수능\s*(성적|등급|백분위)", r"내신\s*(성적|등급)", r"학생부.{0,4}(교과|종합)"],
     ),
 }
 
