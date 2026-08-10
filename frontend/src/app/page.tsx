@@ -52,6 +52,10 @@ export default function LandingPage() {
           <Link href="/login" className="font-semibold text-blue-500">
             로그인
           </Link>
+          {" · "}
+          <Link href="/signup" className="font-semibold text-blue-500">
+            회원가입
+          </Link>
         </p>
       </div>
     </div>
