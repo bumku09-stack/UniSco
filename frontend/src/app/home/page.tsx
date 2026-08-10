@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { TopBar } from "@/components/form-ui";
-import { SessionExpiryBanner } from "@/components/SessionExpiryBanner";
 import { authFetch, clearTokens, isLoggedIn } from "@/lib/auth";
 import { getCachedRecommendations, setCachedRecommendations } from "@/lib/recommendations-cache";
 import {
@@ -181,7 +180,6 @@ export default function HomePage() {
             </div>
           }
         />
-        <SessionExpiryBanner />
 
         {loading && <p className="mt-8 text-center text-sm text-gray-400">매칭 중...</p>}
 

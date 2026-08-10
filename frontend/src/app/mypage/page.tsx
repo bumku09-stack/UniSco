@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
 import { TopBar } from "@/components/form-ui";
-import { SessionExpiryBanner } from "@/components/SessionExpiryBanner";
 import { CommonFields, OptionalFields, SchoolFields, deriveSpecFields } from "@/components/spec-fields";
 import { authFetch, isLoggedIn } from "@/lib/auth";
 import { clearCachedRecommendations } from "@/lib/recommendations-cache";
@@ -145,7 +144,6 @@ export default function MyPage() {
     <div className="min-h-screen bg-white pb-16">
       <div className="mx-auto w-full max-w-md px-6 py-6">
         <TopBar right={<Link href="/home" className="text-sm font-semibold text-gray-400">← 홈으로</Link>} />
-        <SessionExpiryBanner />
 
         <h1 className="mt-6 text-xl font-bold leading-snug text-gray-900">마이페이지</h1>
         <p className="mt-1 text-sm text-gray-500">스펙을 수정하면 추천 목록도 새로 계산돼요</p>

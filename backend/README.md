@@ -150,5 +150,5 @@ Railway 프로젝트 환경변수(Variables 탭)에 등록해야 하는 값:
 
 - 스키마가 계속 바뀌고 있어서 마이그레이션 툴(Alembic 등)은 아직 도입 안 함 — 지금은 `SQLModel.metadata.create_all()` + 수동 `ALTER TABLE`로 운영.
 - 회원가입/로그인/스펙저장 API(`/auth/*`, `/users/me/spec*`, `/scholarships/recommendations`)는 프론트까지 연결 완료(2026-07-31) — `/` → `/signup` → `/spec`(최초 1회) → `/home` → `/mypage` 플로우 전체 구현됨. 자세한 건 `frontend/README.md` 참고. `POST /match`(로그인 없이 즉석 매칭)는 프론트가 안 써서 2026-08-04에 제거함 — "로그인 없이 미리 둘러보기" 같은 용도가 실제로 필요해지면 `core/matching.py`의 `match_scholarships`로 다시 얇게 붙이면 됨.
-- 리프레시 토큰 회전/탈취 대응(블랙리스트 등) 없음 — access token이 30분마다 만료되는 것으로만 방어 중. 트래픽 늘면 재검토.
+- 프론트(`lib/auth.ts`의 `authFetch`)가 2026-08-10부터 access token 만료(401) 시 `POST /auth/refresh`로 조용히 재발급받고 원 요청을 재시도함 — 그전엔 이 엔드포인트가 있어도 프론트가 안 불러서 30분마다 그냥 강제 로그아웃이었음. 리프레시 토큰 자체의 회전/탈취 대응(블랙리스트 등)은 여전히 없음 — 트래픽 늘면 재검토.
 - Railway `RESEND_API_KEY`를 아직 실제 값으로 안 채워넣었으면 회원가입 시 이메일 발송이 502로 실패함 — 배포 전에 `resend.com`에서 키 발급하고 Variables에 등록 필요.

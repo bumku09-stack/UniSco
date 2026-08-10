@@ -10,6 +10,10 @@ export function setTokens(accessToken: string, refreshToken: string) {
   localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
 }
 
+export function getRefreshToken(): string | null {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
 export function clearTokens() {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
@@ -61,21 +65,56 @@ export async function postJson(
   }
 }
 
-// 로그인 필요한 API 호출용 fetch 래퍼 — Authorization 헤더를 자동으로 붙이고,
-// 토큰이 없거나 만료/무효(401)면 로그인 화면으로 보냄. 리프레시 토큰으로 조용히
-// 재시도하는 로직은 없음 — access token 30분 만료면 그냥 재로그인하게 함(단순함 우선).
-export async function authFetch(path: string, options: RequestInit = {}): Promise<Response> {
-  const token = getAccessToken();
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${path}`, {
-    ...options,
-    headers: {
-      ...(options.headers ?? {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-  if (res.status === 401) {
-    clearTokens();
-    window.location.href = "/";
+function authHeaders(token: string | null, extra?: HeadersInit): HeadersInit {
+  return { ...(extra ?? {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+}
+
+// 동시에 여러 authFetch가 401을 맞아도 refresh 요청은 한 번만 나가게 함 — 진행 중인
+// refresh가 있으면 새로 시작하지 않고 그 결과를 같이 기다림.
+let refreshPromise: Promise<boolean> | null = null;
+
+async function refreshAccessToken(): Promise<boolean> {
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      const refreshToken = getRefreshToken();
+      if (!refreshToken) return false;
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+        if (!res.ok) return false;
+        const data = await res.json();
+        setTokens(data.access_token, data.refresh_token);
+        return true;
+      } catch {
+        return false;
+      }
+    })();
   }
+  try {
+    return await refreshPromise;
+  } finally {
+    refreshPromise = null;
+  }
+}
+
+// 로그인 필요한 API 호출용 fetch 래퍼 — Authorization 헤더를 자동으로 붙임. access token이
+// 만료돼 401이 오면 refresh token으로 한 번 조용히 갱신을 시도하고 원래 요청을 재시도함
+// (2026-08-07 추가 — 예전엔 access token 30분 만료되면 그냥 강제 로그아웃이었음, refresh
+// 엔드포인트는 백엔드에 있었는데 프론트가 안 쓰고 있었음). refresh 자체도 실패하면(refresh
+// token 없음/만료/네트워크 오류) 그때만 로그아웃 처리.
+export async function authFetch(path: string, options: RequestInit = {}): Promise<Response> {
+  const url = `${process.env.NEXT_PUBLIC_API_URL}${path}`;
+  const res = await fetch(url, { ...options, headers: authHeaders(getAccessToken(), options.headers) });
+  if (res.status !== 401) return res;
+
+  if (await refreshAccessToken()) {
+    return fetch(url, { ...options, headers: authHeaders(getAccessToken(), options.headers) });
+  }
+
+  clearTokens();
+  window.location.href = "/";
   return res;
 }
