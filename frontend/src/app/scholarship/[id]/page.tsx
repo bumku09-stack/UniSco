@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import { TopBar } from "@/components/form-ui";
-import { authFetch } from "@/lib/auth";
+import { authFetch, isLoggedIn } from "@/lib/auth";
 import { CATEGORY_L2_LABEL, eligibilityList, formatAmount, Scholarship } from "@/lib/scholarship";
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
@@ -54,9 +54,11 @@ export default function ScholarshipDetailPage({
 
   // 추천은 "내 조건에 맞는 장학금" 안에서만 서버가 골라줌(같은 중분류>대분류>워딩 유사도
   // 순, core/matching.py의 find_similar 참고) — A→B로 넘어온 경우 exclude_id로 B의
-  // 추천에 A가 다시 뜨는 핑퐁을 막음.
+  // 추천에 A가 다시 뜨는 핑퐁을 막음. 이 API는 로그인(저장된 스펙) 필요라 게스트는 애초에
+  // 호출 안 함(2026-08-10부터 상세페이지도 로그인 없이 열람 가능해져서, 안 그러면 이 요청이
+  // 401을 맞고 authFetch가 로그인 화면으로 튕겨버림 — lib/auth.ts의 authFetch 참고).
   useEffect(() => {
-    if (!scholarship) return;
+    if (!scholarship || !isLoggedIn()) return;
     const query = from ? `?exclude_id=${from}` : "";
     authFetch(`/scholarships/${scholarship.id}/similar${query}`)
       .then((res) => (res.ok ? res.json() : []))

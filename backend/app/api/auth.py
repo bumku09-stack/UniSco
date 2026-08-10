@@ -43,6 +43,18 @@ def _find_user_by_identifier(session: Session, identifier: str) -> User | None:
     ).first()
 
 
+def _send_code_or_502(email: str, code: str, context: str) -> None:
+    """인증 코드 발송, 실패하면 502로 변환. signup/resend-code 둘 다 이 로직이 그대로
+    복붙돼 있어서 하나로 합침 — context는 로그에 남는 호출 위치 구분용("signup"/"resend-code")."""
+    try:
+        send_verification_code(email, code)
+    except Exception as e:
+        print(f"[auth/{context}] send_verification_code failed for {email}: {e!r}", flush=True)
+        raise HTTPException(
+            status_code=502, detail="인증 메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요."
+        ) from e
+
+
 @router.post("/signup", response_model=SignupResponse)
 def signup(body: SignupRequest, session: Session = Depends(get_session)):
     if session.exec(select(User).where(User.username == body.username)).first():
@@ -55,13 +67,7 @@ def signup(body: SignupRequest, session: Session = Depends(get_session)):
     # 안 되고(409) 로그인도 안 되고(인증 미완료) 재발송도 또 같은 이유로 실패하는
     # 막다른 상태가 됨.
     code = _generate_code()
-    try:
-        send_verification_code(body.email, code)
-    except Exception as e:
-        print(f"[auth/signup] send_verification_code failed for {body.email}: {e!r}", flush=True)
-        raise HTTPException(
-            status_code=502, detail="인증 메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요."
-        ) from e
+    _send_code_or_502(body.email, code, "signup")
 
     user = User(
         username=body.username, email=body.email, hashed_password=hash_password(body.password)
@@ -135,15 +141,7 @@ def resend_code(body: ResendCodeRequest, session: Session = Depends(get_session)
     # 여기서도 발송을 먼저 시도함 — 실패했는데 기존 유효 코드까지 먼저 지워버리면
     # 재시도할 방법이 없어짐 (signup과 같은 이유).
     code = _generate_code()
-    try:
-        send_verification_code(user.email, code)
-    except Exception as e:
-        print(
-            f"[auth/resend-code] send_verification_code failed for {user.email}: {e!r}", flush=True
-        )
-        raise HTTPException(
-            status_code=502, detail="인증 메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요."
-        ) from e
+    _send_code_or_502(user.email, code, "resend-code")
 
     # 기존에 안 쓴 코드가 남아있으면 무효화 — verify-code가 항상 "최신 코드"만
     # 보게 해서 예전 코드로 통과되는 일이 없게 함

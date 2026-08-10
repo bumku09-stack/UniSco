@@ -12,11 +12,12 @@ from app.models.enums import (
 
 
 class UserSpec(SQLModel):
-    """Matching request payload shape — not a DB table (for now).
+    """/users/me/spec request/response body shape, and also POST /match's
+    request body (게스트 즉석 매칭, 2026-08-10 재도입) — not a DB table itself.
 
-    Frontend currently persists this client-side (localStorage) since there's
-    no real login yet — see frontend/src/app/login. Once auth exists this
-    should move to a real per-user table instead.
+    SavedSpec (app/models/saved_spec.py) is the persisted per-user table with
+    the same field shape; to_user_spec() in core/matching.py converts one to
+    the other.
     """
 
     university: str  # 소속 대학 (예: 충남대학교, KAIST) — GPA 만점 기준을 정하는 데도 씀

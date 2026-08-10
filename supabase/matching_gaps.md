@@ -88,6 +88,62 @@ OR을 표현 못 함 — 섣불리 `required_special_status`/`requires_disabilit
 - id=230 고른기회장학금 — 명칭 자체를 원문에서 못 찾음.
 - id=233 검정고시출신자장학금 — 독립 장학금이 아니라 "다니엘장학금" 산정 방식의 한 조항일 가능성.
 
+### 19번: 학생 본인 vs 부모 거주지역 OR 조건 (2026-08-05 발견, 설계 완료·구현 대기)
+
+외부(재단/기업) 장학금을 새로 찾으러 다니다가 발견. 이미 운영 DB에도 몇 건 있었음 — 예:
+- **2026년 재능키움 장학사업**(충남평생교육진흥원): "본인 또는 부모 중 1인이 충남에 1년 이상 거주"
+- **화성시인재육성재단 주거비지원**: "본인 또는 부모 1인이 화성시에 1년 이상 거주"
+- **인천 청년 해외배낭연수 장학생**(인천인재평생교육진흥원, 한밭대 크롤링 때 발견): "본인 또는
+  부모의 주소지가 1년 이상 인천"
+
+**영향**: `SavedSpec.region`(학생 본인 거주지) 하나만 있고 부모 거주지역을 입력받는 필드가 없어서,
+**학생 본인 거주지는 자격 지역과 다르지만 부모님이 그 지역에 사는 학생**이 이런 장학금에서 부당하게
+제외됨(실제로는 자격이 되는데 매칭 안 됨 — false negative). 반대로 `eligible_region` 자체의 값은
+바뀔 필요 없음 — "충남"이라는 지역 값 하나면 충분하고, 문제는 그 값과 비교할 때 학생 쪽 정보가
+한 개뿐이라는 것.
+
+**벤치마크 조사(Scholarships.com)**: 참고할 선례가 있는지 확인차 스콜러십닷컴의 매칭 항목 23종
+전체(`scholarships_com_전체항목_한국어정리.pdf`, 기존 9·10·12번 작업 때 쓴 것과 같은 자료)를
+다시 훑어봄. 결과: **거기도 "부모 거주지역"이라는 별도 필드는 없음.** 지역 관련 항목은 "거주 주
+(Residence State, 본인이 사는 곳)"와 "재학 예정 주(School Attendance State, 학교가 있는 곳)"
+두 축으로만 나뉘어 있고, "본인 또는 부모"를 명시적으로 묶어서 다루는 항목은 **"소속 직장
+(Employer)"** 하나뿐(본인/부모 직장을 분리 안 하고 하나의 필드로 합쳐서 처리). 즉 우리가 지금
+겪는 "거주지역에서의 본인/부모 OR 조건"과 똑같은 선례는 없었음 — 참고만 하고 사용자가 직접 결정.
+
+**사용자 결정(2026-08-05)**: 부모 거주지역을 **직장(Employer)처럼 하나로 합치지 않고, 본인
+거주지역과 별개의 필드로 따로 만들기로 확정.** (참고: 16번 "부모 직업/소속" 조건은 이번엔 같이
+안 하기로 하고 보류 — 그쪽은 카테고리가 고정된 목록이 아니라 계속 늘어나는 유형이라 설계가
+더 오래 걸림, 나중에 별도로.)
+
+**설계(구현 시 필요한 변경)**:
+- `Scholarship` 테이블: **변경 없음.** `eligible_region`은 지금처럼 "인정되는 지역 값 하나"만
+  담으면 됨 — 이 필드가 "본인 기준"인지 "부모 기준"인지 구분할 필요가 없음(둘 중 하나만 맞아도
+  통과이므로 대상 지역 값 자체는 동일).
+- `SavedSpec`(및 `UserSpec`)에 `parent_region: str | None` 추가 — 본인 `region`과 동일한 옵션
+  목록(`frontend/src/lib/regions.ts`의 `SIDO_LIST`) 재사용, **선택 입력**(모르면 비워도 됨,
+  비우면 "부모 조건 불일치"로만 처리되고 본인 조건은 별개로 그대로 평가됨).
+- `backend/app/core/matching.py`의 `is_eligible()` (현재 line 203):
+  ```python
+  if scholarship.eligible_region is not None and spec.region not in scholarship.eligible_region:
+      return False
+  ```
+  →
+  ```python
+  if scholarship.eligible_region is not None:
+      own_match = spec.region in scholarship.eligible_region
+      parent_match = spec.parent_region is not None and spec.parent_region in scholarship.eligible_region
+      if not (own_match or parent_match):
+          return False
+  ```
+- 프론트(`frontend/src/app/spec/page.tsx`, `frontend/src/lib/spec.ts`, `frontend/src/app/mypage/page.tsx`):
+  "광역자치단체/기초자치단체" 입력 칸 바로 아래에 "부모님 거주지역"용 칸을 동일한 UI로 하나 더
+  추가(선택 입력이라고 명시).
+- **데이터 재작업은 불필요** — 기존 366건의 `eligible_region` 값은 그대로 두면 됨(위 설계 이유
+  참고). 다만 "본인 또는 부모" 문구가 description에 있는데 `eligible_region`이 아예 안 채워진
+  건이 있는지 확인하는 감사(audit)는 필요 — 아래 `EXTERNAL_SCHOLARSHIPS_PLAN.md` 참고.
+
+상세 결정 기록은 `SCHEMA_DECISIONS.md`에도 남김.
+
 ---
 
 ## 그 외 호성과 논의할 사항 (자격조건 매칭과는 별개)

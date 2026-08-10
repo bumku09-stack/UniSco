@@ -152,6 +152,34 @@ def special_status_matches_strict(
     return bool(set(scholarship_special_status) & set(spec_special_status))
 
 
+def _verifiable_special_status(scholarship: Scholarship) -> list[SpecialStatus]:
+    """required_special_status에서 학생이 절대 고를 수 없는 "확인 불가" 태그
+    (UNVERIFIABLE_CONDITIONS)를 뺀 나머지만 반환. 자격 거름(노출 여부) 판단은 항상 이것만
+    써야 함 — 안 그러면 학생이 다른 특수상황을 골랐을 때 "확인 불가" 태그만 붙은 장학금이
+    실수로 숨겨짐(노출 정책 회귀). "확인 불가" 태그 자체는 랭킹 계산(unverifiable_condition_count)
+    에서만 씀."""
+    return [s for s in scholarship.required_special_status if s not in UNVERIFIABLE_CONDITIONS]
+
+
+def disability_or_special_status_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
+    """장애 조건과 특수상황 조건이 둘 다 걸려있는 장학금(예: 배재대 "배재사랑장학금" — 장애학생
+    또는 다문화가정 학생 대상)은 각각 따로 AND로 걸면 틀림 — 실제로는 "둘 중 하나만 만족해도
+    통과"하는 OR 조건이라, 이 경우만 예외적으로 OR로 처리함(2026-08-03, 사용자 확정). 둘 중
+    하나만 걸려있으면(대부분의 장학금) 평소처럼 그 조건만 확인."""
+    verifiable_special_status = _verifiable_special_status(scholarship)
+    has_disability_condition = scholarship.requires_disability or (
+        scholarship.required_disability_type is not None
+    )
+    has_special_status_condition = bool(verifiable_special_status)
+    if has_disability_condition and has_special_status_condition:
+        return disability_matches(scholarship, spec) or special_status_matches_strict(
+            verifiable_special_status, spec.special_status
+        )
+    return disability_matches(scholarship, spec) and special_status_matches(
+        verifiable_special_status, spec.special_status
+    )
+
+
 def major_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
     """전공/학과 조건 (matching_gaps.md 2번, 2026-08-03 구현). 장학금 쪽 `major`는 크롤링
     원문 그대로라 콤마로 여러 학과가 나열된 경우가 있음(예: "융합디자인전공,회화전공,
@@ -294,32 +322,8 @@ def is_eligible(scholarship: Scholarship, spec: UserSpec) -> bool:
         return False
     if not gpa_matches(scholarship, spec):
         return False
-    # required_special_status에는 학생이 실제로 고를 수 있는 특수상황 값과, 학생이 절대
-    # 고를 수 없는 "확인 불가" 태그(UNVERIFIABLE_CONDITIONS — 2026-08-04 추가, 랭킹 전용)가
-    # 섞여 있을 수 있음. 자격 거름(노출 여부)은 항상 "확인 불가" 태그를 뺀 나머지로만 판단함 —
-    # 안 그러면 학생이 다른 특수상황을 골랐을 때 "확인 불가" 태그만 붙은 장학금이 실수로
-    # 숨겨져버림(노출 정책 회귀). "확인 불가" 태그는 core/matching.py의 랭킹 계산에서만 씀.
-    verifiable_special_status = [
-        s for s in scholarship.required_special_status if s not in UNVERIFIABLE_CONDITIONS
-    ]
-    # 장애 조건과 특수상황 조건이 둘 다 걸려있는 장학금(예: 배재대 "배재사랑장학금" — 장애학생
-    # 또는 다문화가정 학생 대상)은 각각 따로 AND로 걸면 틀림 — 실제로는 "둘 중 하나만 만족해도
-    # 통과"하는 OR 조건이라, 이 경우만 예외적으로 OR로 처리함(2026-08-03, 사용자 확정).
-    has_disability_condition = scholarship.requires_disability or (
-        scholarship.required_disability_type is not None
-    )
-    has_special_status_condition = bool(verifiable_special_status)
-    if has_disability_condition and has_special_status_condition:
-        if not (
-            disability_matches(scholarship, spec)
-            or special_status_matches_strict(verifiable_special_status, spec.special_status)
-        ):
-            return False
-    else:
-        if not disability_matches(scholarship, spec):
-            return False
-        if not special_status_matches(verifiable_special_status, spec.special_status):
-            return False
+    if not disability_or_special_status_matches(scholarship, spec):
+        return False
     if not special_status_all_matches(scholarship, spec):
         return False
     if not language_test_matches(scholarship, spec):
@@ -392,10 +396,7 @@ def confirmed_match_count(scholarship: Scholarship, spec: UserSpec) -> int:
         score += 1
     if scholarship.language_test_type is not None and spec.language_test_type is not None:
         score += 1
-    verifiable_special_status = [
-        s for s in scholarship.required_special_status if s not in UNVERIFIABLE_CONDITIONS
-    ]
-    if verifiable_special_status and spec.special_status:
+    if _verifiable_special_status(scholarship) and spec.special_status:
         score += 1
     if scholarship.major is not None:
         score += 1
@@ -428,10 +429,7 @@ def unverifiable_condition_count(scholarship: Scholarship, spec: UserSpec) -> in
     학생이 실제로 답했는데 장학금 조건과 안 맞는 경우는 애초에 is_eligible()에서 걸러져서
     여기까지 안 옴 — 그러니 "학생이 답 안 해서 leniency로 통과된 것"만 정확히 골라내는 것."""
     count = len([s for s in scholarship.required_special_status if s in UNVERIFIABLE_CONDITIONS])
-    verifiable_special_status = [
-        s for s in scholarship.required_special_status if s not in UNVERIFIABLE_CONDITIONS
-    ]
-    if verifiable_special_status and not spec.special_status:
+    if _verifiable_special_status(scholarship) and not spec.special_status:
         count += 1
     if scholarship.max_income_bracket is not None and spec.income_bracket is None:
         count += 1

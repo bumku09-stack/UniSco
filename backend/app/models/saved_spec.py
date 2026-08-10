@@ -15,9 +15,8 @@ from app.models.enums import (
 
 class SavedSpec(SQLModel, table=True):
     """Persisted counterpart of UserSpec (app/models/user_spec.py) — one row
-    per user. UserSpec stays as the shape /match's request body uses; this is
-    what /users/me/spec reads and writes so a user's spec survives across
-    logins instead of only living in the frontend's localStorage."""
+    per user. This is what /users/me/spec reads and writes so a user's spec
+    survives across logins."""
 
     id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", unique=True, index=True)

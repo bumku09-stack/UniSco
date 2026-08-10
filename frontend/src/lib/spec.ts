@@ -179,6 +179,10 @@ export const SPECIAL_STATUS_OPTIONS = [
   { value: "grandparent_family", label: "조손가정" },
   { value: "multi_child_family", label: "다자녀가정(2자녀 이상)" },
   { value: "national_merit", label: "국가보훈대상자" },
+  // 2026-08-10 추가 — 원래 크롤링 데이터 전용 "확인 불가" 랭킹 태그였는데, national_merit과
+  // 마찬가지로 명확한 법적 지위(의사상자 등 예우 및 지원에 관한 법률, 보건복지부 소관)라
+  // 사용자가 직접 선택할 수 있는 항목으로 승격함(matching_gaps.md 20번).
+  { value: "righteous_person_family_condition", label: "의사상자 유족·가족" },
   // 2026-08-03 추가 — 배재대 희망복지장학금·대전대 장학사정관장학금 같은 복합조건
   // 장학금을 재분류하면서 새로 필요해진 항목들 (matching_gaps.md 참고)
   { value: "basic_livelihood_recipient", label: "기초생활수급자" },
