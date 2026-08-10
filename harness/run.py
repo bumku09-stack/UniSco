@@ -13,6 +13,7 @@ import json
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -151,7 +152,9 @@ def run_for_university(university: str) -> None:
     _log(f"[dedup] 신규 {len(new_listings)}건 / 스킵(기존 중복 추정) {len(skipped)}건")
 
     verified_list: list[VerifiedScholarship] = []
-    for listing in new_listings:
+    for i, listing in enumerate(new_listings):
+        if i > 0:
+            time.sleep(config.REQUEST_DELAY_SECONDS)  # 같은 호스트로 몰아치지 않게(config.py 참고)
         source_text = fetch_source_text(listing)
         if not source_text or not source_text.strip():
             _log(f"[extract] 원문 확보 실패로 스킵: {listing.url}")

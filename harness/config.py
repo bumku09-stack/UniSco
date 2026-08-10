@@ -58,6 +58,15 @@ LINK_COLLECTION_MAX_RETRIES = 2
 # ── 이름+기관 중복 판정 임계값 (설계안 6장 표 "LLM으로 중복 판정" 대신 채택한 방식) ──
 DEDUP_SIMILARITY_THRESHOLD = int(os.environ.get("HARNESS_DEDUP_THRESHOLD", "90"))  # 0~100
 
+# ── 7.6 같은 호스트로의 요청 간격 ───────────────────────────────────────
+# 목록 페이지 순회(collect_links.py)와 상세페이지/첨부파일 확보(run.py)가 같은 대학 사이트로
+# 짧은 시간에 요청을 몰아서 보내면, 대학 쪽 방화벽(WAF)이 봇 트래픽으로 판단해 그 IP를
+# 일시적으로 막을 수 있음(2026-08-10 — 31건을 몇 초 만에 연달아 요청한 첫 실행 직후,
+# 재실행이 GitHub Actions 러너에서만 계속 connect timeout으로 실패. 같은 시각 사람이 직접
+# 접속하면 1초 안에 정상 응답해서, 사이트 자체가 아니라 요청 패턴이 원인으로 추정됨).
+# 요청 사이에 짧게 쉬어서 이런 버스트 패턴 자체를 피함.
+REQUEST_DELAY_SECONDS = float(os.environ.get("HARNESS_REQUEST_DELAY_SECONDS", "0.7"))
+
 # ── 기타 ────────────────────────────────────────────────────────────────
 GITHUB_REPO = os.environ.get("HARNESS_GITHUB_REPO", "hoseongdev/UniSco")
 PR_BASE_BRANCH = "main"

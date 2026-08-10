@@ -109,6 +109,8 @@ def collect_board_links(board: BoardConfig) -> CollectionResult:
         seen: set[str] = set()
         listings: list[Listing] = []
         for page_num in range(board.first_page_index, board.first_page_index + total_pages):
+            if page_num != board.first_page_index:
+                time.sleep(config.REQUEST_DELAY_SECONDS)  # 같은 호스트로 몰아치지 않게(config.py 참고)
             html = (
                 first_html
                 if page_num == board.first_page_index
