@@ -10,6 +10,7 @@ Anthropic API를 직접 호출함(LangChain 없음). 출력은 tool-use로 스�
 """
 from __future__ import annotations
 
+import time
 from functools import lru_cache
 from pathlib import Path
 
@@ -17,6 +18,12 @@ import anthropic
 
 from harness import config
 from harness.models import SCHOLARSHIP_FIELD_NAMES, ExtractedField, ExtractedScholarship
+
+# 레이트리밋(429)/서버 과부하(5xx)처럼 지나가는 오류는 재시도할 가치가 있지만, 스키마 위반
+# 같은 4xx는 몇 번을 다시 불러도 똑같이 실패하므로 재시도하지 않음 — status_code로 구분함
+# (anthropic SDK 버전마다 예외 클래스 이름이 달라질 수 있어 이름 대신 상태 코드로 판단).
+_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 529}
+_MAX_RETRIES = 2
 
 _PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
@@ -165,19 +172,28 @@ def extract_scholarship(source_text: str, source_url: str) -> ExtractedScholarsh
         ),
         "input_schema": _build_input_schema(),
     }
-    response = client.messages.create(
-        model=config.EXTRACTION_MODEL,
-        max_tokens=config.EXTRACTION_MAX_TOKENS,
-        system=load_extraction_spec(),
-        tools=[tool],
-        tool_choice={"type": "tool", "name": "extract_scholarship"},
-        messages=[
-            {
-                "role": "user",
-                "content": f"공고문 원문 (출처: {source_url}):\n\n{source_text}",
-            }
-        ],
-    )
+    response = None
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            response = client.messages.create(
+                model=config.EXTRACTION_MODEL,
+                max_tokens=config.EXTRACTION_MAX_TOKENS,
+                system=load_extraction_spec(),
+                tools=[tool],
+                tool_choice={"type": "tool", "name": "extract_scholarship"},
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"공고문 원문 (출처: {source_url}):\n\n{source_text}",
+                    }
+                ],
+            )
+            break
+        except anthropic.APIStatusError as e:
+            if e.status_code not in _RETRYABLE_STATUS_CODES or attempt == _MAX_RETRIES:
+                raise
+            wait = 5 * (2**attempt)  # 5s, 10s
+            time.sleep(wait)
 
     tool_use_block = next(b for b in response.content if b.type == "tool_use")
     raw: dict = tool_use_block.input  # type: ignore[assignment]

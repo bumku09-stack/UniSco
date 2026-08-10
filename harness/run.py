@@ -122,6 +122,18 @@ def run_for_university(university: str) -> None:
         _log(f"{university}: sites.py에 등록된 게시판이 없음 — 스킵")
         return
 
+    # 수집·추출(Anthropic API 비용 발생 구간)을 시작하기 전에, 오늘 이 대학으로 이미 열려있는
+    # PR이 있는지 먼저 확인함 — 같은 날 재실행(예: 이전 실행이 도중에 실패해서 다시 돌리는
+    # 경우) 때 이미 끝난 작업을 또 돌려서 토큰을 이중으로 쓰는 걸 막기 위함(2026-08-10).
+    try:
+        existing_pr = build_pr.find_existing_open_pr(university)
+    except Exception as e:  # noqa: BLE001 — 확인 자체가 실패해도(네트워크 등) 원래 하려던 작업은 계속 진행
+        _log(f"{university}: 기존 PR 확인 실패(무시하고 계속) — {e}")
+        existing_pr = None
+    if existing_pr:
+        _log(f"{university}: 오늘자 PR이 이미 열려있어 스킵 — {existing_pr}")
+        return
+
     _log(f"[collect] {university} — 게시판 {len(boards)}개 순회 시작")
     collection_results: list[CollectionResult] = collect_links.collect_all(boards)
     for r in collection_results:
@@ -148,10 +160,16 @@ def run_for_university(university: str) -> None:
         _log(f"[extract] {(listing.title[:40] or listing.url)}")
         # 숫자 핵심 필드 대조용 2중 추출 — 매번 동일 함수를 상태 없이 두 번 호출함
         # (설계안 "동일 함수를 파라미터만 바꿔 2회 독립 호출할 수 있게 구성").
-        primary = extract.extract_scholarship(source_text, listing.url)
-        secondary = extract.extract_scholarship(source_text, listing.url)
-
-        verified = verify.verify_scholarship(primary, source_text, listing.title, secondary)
+        try:
+            primary = extract.extract_scholarship(source_text, listing.url)
+            secondary = extract.extract_scholarship(source_text, listing.url)
+            verified = verify.verify_scholarship(primary, source_text, listing.title, secondary)
+        except Exception as e:  # noqa: BLE001
+            # 항목 하나가 API 에러(레이트리밋 등, extract.py가 자체 재시도 후에도 실패한 경우)로
+            # 죽어도 배치 전체를 죽이면 이미 이 항목들보다 앞서 처리된 나머지 항목에 쓴 토큰이
+            # 통째로 날아감 — 이 항목만 로그 남기고 건너뜀(2026-08-10).
+            _log(f"[extract] 추출 실패로 스킵({listing.url}): {e}")
+            continue
         verified_list.append(verified)
 
     flagged = sum(1 for v in verified_list if v.has_flags)
@@ -179,8 +197,20 @@ def main() -> None:
         _log("처리할 대학이 없음 — harness/sites.py의 SITES 레지스트리를 먼저 채울 것.")
         return
 
+    failures: list[str] = []
     for university in universities:
-        run_for_university(university)
+        try:
+            run_for_university(university)
+        except Exception as e:  # noqa: BLE001
+            # 한 대학에서 git/PR 단계가 실패해도(build_pr.build_and_open_pr가 재전파) 같은
+            # 나이트런에 묶인 다른 대학까지 통째로 스킵되면 안 됨 — 나머지는 계속 진행하고,
+            # 실패한 대학만 모아뒀다가 마지막에 명시적으로 실패로 표시함(2026-08-10).
+            _log(f"{university}: 처리 중 실패 — {e}")
+            failures.append(university)
+
+    if failures:
+        _log(f"실패한 대학: {', '.join(failures)} — 워크플로 로그에서 산출물 복구 후 재실행할 것")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
