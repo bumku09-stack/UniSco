@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -151,29 +152,51 @@ def run_for_university(university: str) -> None:
     new_listings, skipped = dedup.filter_new(all_listings, existing)
     _log(f"[dedup] 신규 {len(new_listings)}건 / 스킵(기존 중복 추정) {len(skipped)}건")
 
-    verified_list: list[VerifiedScholarship] = []
+    # 1단계: 원문 확보는 대학 사이트로 가는 HTTP 요청이라 계속 순차 + 간격 유지(WAF 대비,
+    # config.REQUEST_DELAY_SECONDS 참고). Anthropic API 호출과는 별개 자원이라 여기서 미리
+    # 분리해둠 — 이래야 다음 단계(추출)를 이 순차 제약 없이 동시에 돌릴 수 있음(2026-08-11).
+    fetched: list[tuple[Listing, str]] = []
     for i, listing in enumerate(new_listings):
         if i > 0:
-            time.sleep(config.REQUEST_DELAY_SECONDS)  # 같은 호스트로 몰아치지 않게(config.py 참고)
+            time.sleep(config.REQUEST_DELAY_SECONDS)
         source_text = fetch_source_text(listing)
         if not source_text or not source_text.strip():
             _log(f"[extract] 원문 확보 실패로 스킵: {listing.url}")
             continue
+        fetched.append((listing, source_text))
 
-        _log(f"[extract] {(listing.title[:40] or listing.url)}")
-        # 숫자 핵심 필드 대조용 2중 추출 — 매번 동일 함수를 상태 없이 두 번 호출함
-        # (설계안 "동일 함수를 파라미터만 바꿔 2회 독립 호출할 수 있게 구성").
+    # 2단계: 구조화 추출은 항목마다 상태를 공유하지 않는 독립 호출이라(설계안 원칙) 동시에
+    # 여러 개를 돌려도 결과가 달라지지 않음 — 나이트런 소요시간을 줄이려고 병렬화함
+    # (config.EXTRACTION_CONCURRENCY, 기본 4개 동시).
+    def _extract_one(listing: Listing, source_text: str) -> VerifiedScholarship | None:
         try:
             primary = extract.extract_scholarship(source_text, listing.url)
-            secondary = extract.extract_scholarship(source_text, listing.url)
-            verified = verify.verify_scholarship(primary, source_text, listing.title, secondary)
+            # 숫자 핵심 필드만 대조하면 되므로 전체를 다시 뽑지 않고 그 필드들만, 더 싸고
+            # 빠른 모델로 뽑음(2026-08-11 — 예전엔 대조에 안 쓰는 필드까지 통째로 두 번 뽑았음).
+            secondary = extract.extract_scholarship(
+                source_text,
+                listing.url,
+                field_names=tuple(config.DUAL_EXTRACT_FIELDS),
+                model=config.DUAL_EXTRACT_MODEL,
+            )
+            return verify.verify_scholarship(primary, source_text, listing.title, secondary)
         except Exception as e:  # noqa: BLE001
             # 항목 하나가 API 에러(레이트리밋 등, extract.py가 자체 재시도 후에도 실패한 경우)로
             # 죽어도 배치 전체를 죽이면 이미 이 항목들보다 앞서 처리된 나머지 항목에 쓴 토큰이
             # 통째로 날아감 — 이 항목만 로그 남기고 건너뜀(2026-08-10).
             _log(f"[extract] 추출 실패로 스킵({listing.url}): {e}")
-            continue
-        verified_list.append(verified)
+            return None
+
+    verified_list: list[VerifiedScholarship] = []
+    _log(f"[extract] {len(fetched)}건 추출 시작 (동시 {config.EXTRACTION_CONCURRENCY}개)")
+    with ThreadPoolExecutor(max_workers=config.EXTRACTION_CONCURRENCY) as executor:
+        futures = {executor.submit(_extract_one, listing, text): listing for listing, text in fetched}
+        for future in as_completed(futures):
+            listing = futures[future]
+            verified = future.result()
+            if verified is not None:
+                _log(f"[extract] 완료: {(listing.title[:40] or listing.url)}")
+                verified_list.append(verified)
 
     flagged = sum(1 for v in verified_list if v.has_flags)
     _log(f"[verify] 총 {len(verified_list)}건 중 플래그 있는 항목 {flagged}건")

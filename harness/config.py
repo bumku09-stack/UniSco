@@ -47,6 +47,16 @@ UNIVERSITIES_PER_NIGHTLY_RUN = int(os.environ.get("HARNESS_UNIVERSITIES_PER_RUN"
 # — 그 전까지는 최신 Sonnet으로 시작. 워크플로 파일 수정 없이 이 환경변수만 바꿔서 실험 가능.
 EXTRACTION_MODEL = os.environ.get("HARNESS_EXTRACTION_MODEL", "claude-sonnet-5")
 EXTRACTION_MAX_TOKENS = 4096
+# 2중 추출의 대조용 호출(DUAL_EXTRACT_FIELDS 9개만 뽑음)은 primary처럼 전체 판단을 책임지는
+# 게 아니라 숫자만 맞는지 교차 확인하는 용도라 더 싸고 빠른 모델로도 충분함(2026-08-11) —
+# 여기서 값이 달라 보이면 그냥 needs_review로 플래그만 될 뿐 데이터가 틀리게 나가진 않으므로,
+# Haiku가 가끔 Sonnet과 다르게 봐도 안전한 방향(더 보수적인 리뷰 큐)으로만 작용함.
+DUAL_EXTRACT_MODEL = os.environ.get("HARNESS_DUAL_EXTRACT_MODEL", "claude-haiku-4-5-20251001")
+# 추출(Anthropic API 호출)을 항목 여러 개 동시에 돌림 — 항목마다 서로 상태를 공유하지 않는
+# 독립 호출이라(설계안 "상태 없음" 원칙) 병렬화해도 결과가 달라지지 않음. 목록 수집/원문
+# 확보 쪽 지연(REQUEST_DELAY_SECONDS)은 대학 사이트로 가는 요청이라 그대로 순차 유지하고,
+# 이건 Anthropic API로 가는 요청이라 별개로 동시 처리함(2026-08-11, 나이트런 소요시간 단축).
+EXTRACTION_CONCURRENCY = int(os.environ.get("HARNESS_EXTRACTION_CONCURRENCY", "4"))
 
 # ── 7.5 목록 수집 실패 처리 ─────────────────────────────────────────────
 # 총 개수 파싱 자체가 안 되거나(게시판 구조가 특이한 학교), 페이지 순회 후에도 수집된 링크 수가
