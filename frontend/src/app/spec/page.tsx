@@ -127,7 +127,13 @@ export default function SpecWizard() {
             }}
             className="mt-6 flex flex-col gap-5"
           >
-            <CommonFields spec={spec} setSpec={setSpec} derived={derived} />
+            <CommonFields
+              spec={spec}
+              setSpec={setSpec}
+              derived={derived}
+              optionalInfo={optionalInfo}
+              setOptionalInfo={setOptionalInfo}
+            />
 
             <div className="mt-2 flex gap-2">
               <button

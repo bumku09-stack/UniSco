@@ -176,7 +176,13 @@ export default function MyPage() {
 
         <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-5">
           <SchoolFields spec={spec} setSpec={setNonNullSpec} derived={derived} />
-          <CommonFields spec={spec} setSpec={setNonNullSpec} derived={derived} />
+          <CommonFields
+            spec={spec}
+            setSpec={setNonNullSpec}
+            derived={derived}
+            optionalInfo={optionalInfo}
+            setOptionalInfo={setOptionalInfo}
+          />
           <OptionalFields
             spec={spec}
             setSpec={setNonNullSpec}

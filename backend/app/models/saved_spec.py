@@ -29,6 +29,9 @@ class SavedSpec(SQLModel, table=True):
     age: int
     gender: Gender = Field(sa_type=enum_column(Gender))
     region: str
+    district: str | None = None  # 2026-08-05 추가, matching_gaps.md 14번
+    parent_region: str | None = None  # 2026-08-05 추가, matching_gaps.md 19번
+    parent_district: str | None = None  # 2026-08-05 추가, matching_gaps.md 14번 후속
     military_status: MilitaryStatus = Field(sa_type=enum_column(MilitaryStatus))
     # 2026-08-03: 필수 -> 선택으로 변경 — 자기 소득분위를 모르는 사용자가 많아서 "모름"으로
     # 넘어갈 수 있게 함. None이면 소득분위 조건이 있는 장학금도 안 거르고 다 보여줌

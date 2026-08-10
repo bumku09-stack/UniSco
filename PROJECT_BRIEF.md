@@ -25,12 +25,3 @@ Korea already has government-run matching services (온통청년, 복지로, 한
 ## Naming
 - Repo: `UniSco` (owner: hoseongdev)
 - Name is a portmanteau of "University" + "Scholarship" — intentional choice, not up for bikeshedding
-
-## Immediate ask (this session)
-Do NOT start building features yet. First, just set up the project skeleton:
-- Recommend and set up a tech stack (full-stack, reasonably simple — this is a portfolio + real-use project, not an enterprise system)
-- Initialize folder structure, basic tooling (linting, env config, etc.)
-- Set up a minimal placeholder frontend + backend that runs locally
-- Leave a clear TODO/next-steps section for where feature work picks up
-
-Ask clarifying questions if the stack choice needs my input before proceeding.
