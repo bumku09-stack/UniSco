@@ -51,10 +51,13 @@ _SPECIAL_STATUS = [
     "severe_illness_or_injury",
     "job_loss_or_disaster",
     "financial_emergency",
-    # UNVERIFIABLE_CONDITIONS (매칭 필드는 없지만 표시·랭킹용으로 태그만 하는 8개)
+    # 2026-08-10 승격 — national_merit과 같은 명확한 법적 지위라 일반 선택 항목으로 옮김
+    # (예전엔 UNVERIFIABLE_CONDITIONS였음, backend/app/models/enums.py 참고).
+    "righteous_person_family_condition",
+    # UNVERIFIABLE_CONDITIONS (매칭 필드는 없지만 표시·랭킹용으로 태그만 하는 것들 — 2026-08-10
+    # 기준 sub_region_residence_condition은 district 매칭으로 실제 해결돼서 여기서 빠짐)
     "parent_occupation_condition",
     "religious_or_career_intent_condition",
-    "sub_region_residence_condition",
     "hometown_school_region_condition",
     "suneung_score_condition",
     "school_record_condition",

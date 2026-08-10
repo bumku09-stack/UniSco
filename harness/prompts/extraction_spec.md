@@ -108,21 +108,21 @@
 - `student_council_officer` (학생회장·임원)
 - `single_parent_family` (한부모가정)
 - `grandparent_family` (조손가정)
-- `multi_child_family` (다자녀가정, 3자녀 이상)
+- `multi_child_family` (다자녀가정, 2자녀 이상)
 - `national_merit` (국가보훈대상자)
 - `basic_livelihood_recipient` (기초생활수급자)
 - `near_poor` (차상위계층)
 - `severe_illness_or_injury` (중증질병 및 상해)
 - `job_loss_or_disaster` (실직가정·재난 및 재해)
 - `financial_emergency` (긴급가계곤란)
+- `righteous_person_family_condition` (의사상자 유족·가족 — 의사상자 등 예우 및 지원에 관한 법률, 보건복지부 소관. `national_merit`(국가유공자, 국가보훈부 소관)와는 다른 법률이니 섞지 말 것)
 
-이 8개는 **매칭 필드가 아예 없어서** 코드로 걸러줄 수 없는 조건인데, 공고문에 이런 조건이
+아래는 **매칭 필드가 아예 없어서** 코드로 걸러줄 수 없는 조건인데, 공고문에 이런 조건이
 실제로 적혀 있으면 그래도 표시는 해야 하니 넣는다(순위 계산에서만 쓰이고, 노출 여부엔 영향
 없음 — 너는 그냥 원문에 있으면 넣으면 됨):
 - `parent_occupation_condition` (부모의 특정 직업/소속 조건)
 - `religious_or_career_intent_condition` (종교기관 소속·직분·진로지향 조건)
-- `sub_region_residence_condition` (시/군/구 세부 거주지 조건 — `eligible_region`으로 담기엔 너무 좁은 단위)
-- `hometown_school_region_condition` (출신 학교 소재지 기준 조건)
+- `hometown_school_region_condition` (출신 학교 소재지 기준 조건 — 특정 개별 학교 한정이나 향우회 조건도 포함)
 - `suneung_score_condition` (수능성적 기반 조건)
 - `school_record_condition` (내신/입학성적 조건)
 - `credit_requirement_condition` (이수학점 조건)

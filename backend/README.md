@@ -78,15 +78,19 @@ FastAPI가 자동 생성해주는 API 문서: http://localhost:8000/docs
   학생이 "모름/안 입력"을 고를 수 있는 선택 입력이라, 실제로 값을 입력했을 때만 센다
   (leniency로 통과된 것까지 "확인됨"으로 잘못 세지 않기 위함).
 - `unverifiable_condition_count(scholarship, spec)` — "확인이 안 되는" 조건 개수. 두 부류를 합침:
-  1. `SpecialStatus` enum의 8개 "확인 불가" 태그(`parent_occupation_condition`,
-     `religious_or_career_intent_condition`, `sub_region_residence_condition`,
-     `hometown_school_region_condition`, `suneung_score_condition`, `school_record_condition`,
-     `credit_requirement_condition`, `extracurricular_program_condition`) — 목회자 자녀·부모
-     직업·수능성적 등 아예 매칭 필드가 없는 조건들. **학생이 절대 선택할 수 없는 값**이고
+  1. `SpecialStatus` enum의 "확인 불가" 태그(`parent_occupation_condition`,
+     `religious_or_career_intent_condition`, `hometown_school_region_condition`,
+     `suneung_score_condition`, `school_record_condition`, `credit_requirement_condition`,
+     `extracurricular_program_condition`) — 목회자 자녀·부모 직업·수능성적 등 아예 매칭
+     필드가 없는 조건들. **학생이 절대 선택할 수 없는 값**이고
      (`frontend/src/lib/spec.ts`의 `SPECIAL_STATUS_OPTIONS`엔 없음), 크롤링할 때 데이터에만
      태그해둠. 상세 배경은 [supabase/matching_gaps.md](../supabase/matching_gaps.md) 18번.
+     (`sub_region_residence_condition`은 2026-08-05 district 매칭으로 실제 해결돼서 태그
+     자체를 없앴고, `righteous_person_family_condition`은 2026-08-10 `national_merit`처럼
+     명확한 법적 지위라 판단해서 학생이 직접 선택 가능한 일반 항목으로 승격함 — 이제 이
+     목록엔 없음.)
   2. 위 leniency 3종(소득분위/어학점수/특수상황) 중, 장학금엔 조건이 걸려있는데 이 학생이
-     아직 값을 안 넣은 경우 — 8개 태그와 동일하게 감점 대상으로 넣음(안 그러면 다른 조건만
+     아직 값을 안 넣은 경우 — 위 태그들과 동일하게 감점 대상으로 넣음(안 그러면 다른 조건만
      잘 맞아도 감점 없이 상위 노출되는 문제가 있었음).
 - 정렬 키(`personal_fit_key`) = `(confirmed / (confirmed + unverifiable), confirmed)` 튜플,
   둘 다 내림차순. "확인 불가"가 하나도 없는 장학금들은 전부 비율 1.0으로 동률이라(분자=분모),

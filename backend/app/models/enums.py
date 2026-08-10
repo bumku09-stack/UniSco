@@ -99,6 +99,13 @@ class SpecialStatus(str, Enum):
     # "다자녀가정(2자녀 이상)"으로 맞춰서 사용자에게 정확한 기준을 안내함.
     MULTI_CHILD_FAMILY = "multi_child_family"  # 다자녀가정(2자녀 이상)
     NATIONAL_MERIT = "national_merit"  # 국가보훈대상자
+    # 2026-08-10 추가 — 원래 "확인 불가" 랭킹 전용 태그였다가 여기로 승격함. "의사상자 등
+    # 예우 및 지원에 관한 법률"(보건복지부 소관) 상의 의사상자로 인정된 사람의 유족·가족 —
+    # national_merit(국가유공자, 국가보훈부 소관)와는 근거 법률이 달라 그쪽으로 합치면 안 됨.
+    # national_merit과 똑같이 명확하게 정의된 법적 지위라 사용자가 직접 선택 가능한 항목으로
+    # 두는 게 맞음(matching_gaps.md 20번, 2026-08-06에 "확인 불가"로 처음 추가됐던 것을
+    # 재검토해서 승격). frontend/src/lib/spec.ts의 SPECIAL_STATUS_OPTIONS에도 추가할 것.
+    RIGHTEOUS_PERSON_FAMILY_CONDITION = "righteous_person_family_condition"  # 의사상자 유족·가족
     # 2026-08-03 추가 — 배재대 희망복지장학금·대전대 장학사정관장학금 같은 복합조건
     # 장학금을 재분류하면서 새로 필요해진 값들
     BASIC_LIVELIHOOD_RECIPIENT = "basic_livelihood_recipient"  # 기초생활수급자
@@ -119,29 +126,30 @@ class SpecialStatus(str, Enum):
     # 이걸 고르면 다른 항목들이 풀림).
     NOT_APPLICABLE = "not_applicable"  # 해당사항 없음
 
-    # 2026-08-04 추가 — "확인 불가" 조건 태그(matching_gaps.md 5·6·7·14·14후속·15·16·17번).
+    # 2026-08-04 추가 — "확인 불가" 조건 태그(matching_gaps.md 5·6·7·14후속·15·16·17번).
     # 매칭 필드가 없어서 걸러줄 수 없는 조건들이라 전원 노출(과다노출) 정책은 그대로 유지하되,
     # core/matching.py의 랭킹 계산에서만 순위를 밀리게 하는 용도. **사용자가 절대 선택할 수
     # 없음 — frontend/src/lib/spec.ts의 SPECIAL_STATUS_OPTIONS에는 추가하지 않음**(크롤링
-    # 데이터에만 태그). is_eligible()의 특수상황 체크에서는 이 8개를 제외하고 넘겨서, 노출
+    # 데이터에만 태그). is_eligible()의 특수상황 체크에서는 이 태그들을 제외하고 넘겨서, 노출
     # 여부에는 전혀 영향 안 주도록 함 — UNVERIFIABLE_CONDITIONS 상수와 그 사용처 참고.
+    # (14번 "시/군/구 세부 거주지"는 2026-08-05 district/parent_district 매칭으로 실제
+    # 해결돼서 태그 자체를 없앰 — region_matches() 참고, 운영 DB에도 0건이었음.)
     PARENT_OCCUPATION_CONDITION = "parent_occupation_condition"  # 부모의 특정 직업/소속 조건
     RELIGIOUS_OR_CAREER_INTENT_CONDITION = "religious_or_career_intent_condition"  # 종교기관 소속·직분·진로지향 조건
-    SUB_REGION_RESIDENCE_CONDITION = "sub_region_residence_condition"  # 시/군/구 세부 거주지 조건
     # 출신 학교 소재지 기준 조건. 2026-08-06 범위 확장 — "현재 거주지가 아니라 출신지"라는
     # 점이 핵심이라, 특정 개별 학교(예: "북평고 졸업생만") 한정 조건이나 향우회 등 "타지
     # 거주해도 되는 출신지 기반" 조건(예: "영암 출신 향우자녀")도 같은 이유(현재 거주지
     # 매칭으로는 표현 불가)로 이 태그를 재사용함 — 전부 새 태그 없이 여기로 묶어서 처리.
+    # 2026-08-10 재검토: 이 태그로 묶인 7건을 실제로 확인해보니 지역(예: 폐광지역 7개 시/군
+    # 소재 고교 졸업)으로 표현 가능한 건 2건뿐이고, 나머지는 특정 개별 학교 한정(고교 목록
+    # 자체가 없음)·향우회 가입+추천서 필요·농어촌특별전형 여부(거주지가 아니라 입시전형
+    # 종류) 등 지역 필드 하나로는 못 푸는 서로 다른 종류라 hometown_region 필드를 새로 만들어도
+    # 대부분 안 풀림 — 그래서 필드 추가 없이 "확인 불가"로 유지하기로 함.
     HOMETOWN_SCHOOL_REGION_CONDITION = "hometown_school_region_condition"  # 출신 학교/출신지 기준 조건(비거주 허용)
     SUNEUNG_SCORE_CONDITION = "suneung_score_condition"  # 수능성적 기반 조건
     SCHOOL_RECORD_CONDITION = "school_record_condition"  # 내신/입학성적 조건
     CREDIT_REQUIREMENT_CONDITION = "credit_requirement_condition"  # 이수학점 조건
     EXTRACURRICULAR_PROGRAM_CONDITION = "extracurricular_program_condition"  # 학교 자체 비교과 프로그램 이수 조건
-    # 2026-08-06 추가 — 외부 장학금 3차 배치(지자체 재단 25곳) 조사 중 청송군·공주시·제주도
-    # 3개 기관에서 독립적으로 발견된 조건. "의사상자 등 예우 및 지원에 관한 법률"(보건복지부
-    # 소관) 상의 의사상자로 인정된 사람의 유족·가족 — national_merit(국가유공자, 국가보훈부
-    # 소관)와는 근거 법률 자체가 달라 그쪽으로 분류하면 안 됨. matching_gaps.md 20번 참고.
-    RIGHTEOUS_PERSON_FAMILY_CONDITION = "righteous_person_family_condition"  # 의사상자 유족·가족 조건
 
 
 # is_eligible()에서 걸러줄 수 없는(=매칭 필드가 없는) 조건 태그 — special_status_matches()에
@@ -151,13 +159,11 @@ UNVERIFIABLE_CONDITIONS: frozenset[SpecialStatus] = frozenset(
     {
         SpecialStatus.PARENT_OCCUPATION_CONDITION,
         SpecialStatus.RELIGIOUS_OR_CAREER_INTENT_CONDITION,
-        SpecialStatus.SUB_REGION_RESIDENCE_CONDITION,
         SpecialStatus.HOMETOWN_SCHOOL_REGION_CONDITION,
         SpecialStatus.SUNEUNG_SCORE_CONDITION,
         SpecialStatus.SCHOOL_RECORD_CONDITION,
         SpecialStatus.CREDIT_REQUIREMENT_CONDITION,
         SpecialStatus.EXTRACURRICULAR_PROGRAM_CONDITION,
-        SpecialStatus.RIGHTEOUS_PERSON_FAMILY_CONDITION,
     }
 )
 
