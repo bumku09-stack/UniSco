@@ -34,7 +34,9 @@ export default function MyPage() {
 
   useEffect(() => {
     if (!isLoggedIn()) {
-      router.replace("/");
+      // 마이페이지는 게스트 모드가 아예 성립 안 함(계정 없인 저장된 스펙 자체가 없음) —
+      // 랜딩(/)이 아니라 로그인 화면으로 바로 보냄.
+      router.replace("/login");
       return;
     }
 

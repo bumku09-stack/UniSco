@@ -49,7 +49,7 @@ export default function SignupPage() {
       setError(result.error);
       return;
     }
-    router.push("/");
+    router.push("/login");
   }
 
   async function handleResend() {
@@ -175,7 +175,7 @@ export default function SignupPage() {
 
         <p className="mt-6 text-center text-xs text-gray-400">
           이미 계정이 있으신가요?{" "}
-          <Link href="/" className="font-semibold text-blue-500">
+          <Link href="/login" className="font-semibold text-blue-500">
             로그인
           </Link>
         </p>

@@ -105,10 +105,18 @@ async function refreshAccessToken(): Promise<boolean> {
 // (2026-08-07 추가 — 예전엔 access token 30분 만료되면 그냥 강제 로그아웃이었음, refresh
 // 엔드포인트는 백엔드에 있었는데 프론트가 안 쓰고 있었음). refresh 자체도 실패하면(refresh
 // token 없음/만료/네트워크 오류) 그때만 로그아웃 처리.
+//
+// 처음부터 토큰이 아예 없었으면(게스트) 로그아웃 처리를 안 하고 401을 그대로 돌려줌 —
+// 2026-08-10부터 로그인 없이 접근 가능한 페이지(예: 상세페이지)가 배경에서 인증 필요한
+// API(예: 비슷한 장학금 추천)를 호출했다가 401 맞을 수 있는데, 그때마다 게스트를 로그인
+// 화면으로 강제 이동시키면 안 됨 — "로그인된 적 없는데 로그아웃"은 애초에 성립 안 하는
+// 상태라, 이런 요청은 그냥 실패로 두고 호출한 쪽이 조용히 처리하게 함.
 export async function authFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const url = `${process.env.NEXT_PUBLIC_API_URL}${path}`;
-  const res = await fetch(url, { ...options, headers: authHeaders(getAccessToken(), options.headers) });
+  const tokenAtRequestTime = getAccessToken();
+  const res = await fetch(url, { ...options, headers: authHeaders(tokenAtRequestTime, options.headers) });
   if (res.status !== 401) return res;
+  if (tokenAtRequestTime === null) return res;
 
   if (await refreshAccessToken()) {
     return fetch(url, { ...options, headers: authHeaders(getAccessToken(), options.headers) });

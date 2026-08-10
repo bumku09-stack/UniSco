@@ -12,7 +12,8 @@ from app.models.enums import (
 
 
 class UserSpec(SQLModel):
-    """/users/me/spec request/response body shape — not a DB table itself.
+    """/users/me/spec request/response body shape, and also POST /match's
+    request body (게스트 즉석 매칭, 2026-08-10 재도입) — not a DB table itself.
 
     SavedSpec (app/models/saved_spec.py) is the persisted per-user table with
     the same field shape; to_user_spec() in core/matching.py converts one to

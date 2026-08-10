@@ -17,6 +17,7 @@ app/
 ├── api/
 │   ├── health.py        # GET /health, {"status": "ok"} 반환
 │   ├── scholarships.py  # GET /scholarships (전체 목록), GET /scholarships/{id} (단건), GET /scholarships/recommendations (로그인 유저 스펙 기준 추천), GET /scholarships/{id}/similar (상세페이지 추천, 2026-08-03 추가)
+│   ├── match.py           # POST /match — 로그인 없이 요청 바디의 스펙으로 즉석 매칭(게스트 플로우 전용, 2026-08-10 재도입)
 │   ├── auth.py            # 회원가입/이메일인증/로그인/토큰재발급 (POST /auth/*)
 │   ├── users.py            # 로그인 유저 스펙 저장/조회/수정 (GET·POST·PUT /users/me/spec*)
 │   └── deps.py              # get_current_user — Authorization 헤더의 JWT로 User 로드하는 공용 디펜던시
@@ -55,12 +56,13 @@ FastAPI가 자동 생성해주는 API 문서: http://localhost:8000/docs
 
 `core/matching.py`의 `is_eligible()`(자격조건 필터링) + `personal_fit_key()`(통과한 것들 중
 "나랑 얼마나 잘 맞는지" 기준으로 정렬, 2026-08-04 재설계 — 아래 "정렬(랭킹) 로직" 참고). 규칙
-기반, ML 없음(v1 스코프대로). 이 로직을 쓰는 진입점이 두 개 있음:
+기반, ML 없음(v1 스코프대로). 이 로직을 쓰는 진입점이 세 개 있음:
 
 - `GET /scholarships/recommendations` (`api/scholarships.py`) — 로그인(JWT) 필요. 요청 바디 없이, DB에 저장된 그 유저의 `SavedSpec`을 불러와서 매칭. 2026-07-31 추가.
-- `GET /scholarships/{id}/similar` (`api/scholarships.py`) — 로그인(JWT) 필요. 상세페이지 "이런 장학금은 어때요?" 전용(2026-08-03 추가). 예전엔 프론트가 `/scholarships`로 전체 목록을 받아서 화면에서 분류만 보고 골랐는데(내 조건 필터가 아예 없어서 무관한 장학금도 추천됐음), 이제 서버에서 그 유저의 `SavedSpec`으로 먼저 걸러낸 "내 조건에 맞는 장학금" 안에서만 같은 중분류(`category_l2`) 우선 → 대분류(`category_l1`) 확장 → 그래도 부족하면 워딩(이름+설명 텍스트 겹침) 유사도 순으로 채워서 최대 `limit`(기본 3)개 반환(`core/matching.py`의 `find_similar`). `exclude_id` 쿼리 파라미터로 A→B로 넘어왔을 때 B의 추천에 A가 다시 뜨는 핑퐁을 막음.
+- `POST /match` (`api/match.py`) — 로그인 불필요. 요청 바디로 받은 `UserSpec`을 그 자리에서 채점만 하고 아무것도 저장 안 함. "로그인 없이 가볍게 둘러보기" 게스트 플로우 전용(프론트 `/spec`이 비로그인 상태일 때 여기로 보냄, 2026-08-10) — 한 번 지웠다가(2026-08-04, 그땐 프론트가 안 썼음) 다시 붙임.
+- `GET /scholarships/{id}/similar` (`api/scholarships.py`) — 로그인(JWT) 필요. 상세페이지 "이런 장학금은 어때요?" 전용(2026-08-03 추가). 예전엔 프론트가 `/scholarships`로 전체 목록을 받아서 화면에서 분류만 보고 골랐는데(내 조건 필터가 아예 없어서 무관한 장학금도 추천됐음), 이제 서버에서 그 유저의 `SavedSpec`으로 먼저 걸러낸 "내 조건에 맞는 장학금" 안에서만 같은 중분류(`category_l2`) 우선 → 대분류(`category_l1`) 확장 → 그래도 부족하면 워딩(이름+설명 텍스트 겹침) 유사도 순으로 채워서 최대 `limit`(기본 3)개 반환(`core/matching.py`의 `find_similar`). `exclude_id` 쿼리 파라미터로 A→B로 넘어왔을 때 B의 추천에 A가 다시 뜨는 핑퐁을 막음. 게스트는 저장된 스펙이 없어서 이 엔드포인트를 아예 안 부름(프론트가 `isLoggedIn()`으로 미리 거름).
 
-두 진입점 다 결과적으로 같은 `is_eligible`/`personal_fit_key`를 타므로 동작이 갈릴 일이 없음 — 로그인 유저 전용으로 각자 짠 게 아니라 `core/matching.py`로 뽑아내서 그대로 재사용한 것.
+세 진입점 다 결과적으로 같은 `is_eligible`/`personal_fit_key`를 타므로 동작이 갈릴 일이 없음 — 로그인 유저 전용으로 각자 짠 게 아니라 `core/matching.py`로 뽑아내서 그대로 재사용한 것.
 
 `category_l1`/`category_l2`(장학금 분류)는 매칭 필터링에는 안 쓰임 — "누가 받을 수 있는지"가 아니라 "어떤 종류인지"라서 프론트 목록 화면 표시/그룹핑 전용. 자세한 값 목록은 [supabase/README.md](../supabase/README.md) 참고.
 
@@ -153,6 +155,6 @@ Railway 프로젝트 환경변수(Variables 탭)에 등록해야 하는 값:
 ## 남은 것
 
 - 스키마가 계속 바뀌고 있어서 마이그레이션 툴(Alembic 등)은 아직 도입 안 함 — 지금은 `SQLModel.metadata.create_all()` + 수동 `ALTER TABLE`로 운영.
-- 회원가입/로그인/스펙저장 API(`/auth/*`, `/users/me/spec*`, `/scholarships/recommendations`)는 프론트까지 연결 완료(2026-07-31) — `/` → `/signup` → `/spec`(최초 1회) → `/home` → `/mypage` 플로우 전체 구현됨. 자세한 건 `frontend/README.md` 참고. `POST /match`(로그인 없이 즉석 매칭)는 프론트가 안 써서 2026-08-04에 제거함 — "로그인 없이 미리 둘러보기" 같은 용도가 실제로 필요해지면 `core/matching.py`의 `match_scholarships`로 다시 얇게 붙이면 됨.
+- 회원가입/로그인/스펙저장 API(`/auth/*`, `/users/me/spec*`, `/scholarships/recommendations`)는 프론트까지 연결 완료(2026-07-31) — 게스트 플로우 추가(2026-08-10)로 `/`(랜딩) → `/spec`(비로그인=게스트 2단계, 로그인=3단계) → `/home` → (전환 시) `/signup` → `/login` → `/spec`(이어서 3단계) 순으로 이어짐. 자세한 건 `frontend/README.md` 참고. `POST /match`는 2026-08-04에 지웠다가 이 게스트 플로우 때문에 2026-08-10에 다시 붙임.
 - 프론트(`lib/auth.ts`의 `authFetch`)가 2026-08-10부터 access token 만료(401) 시 `POST /auth/refresh`로 조용히 재발급받고 원 요청을 재시도함 — 그전엔 이 엔드포인트가 있어도 프론트가 안 불러서 30분마다 그냥 강제 로그아웃이었음. 리프레시 토큰 자체의 회전/탈취 대응(블랙리스트 등)은 여전히 없음 — 트래픽 늘면 재검토.
 - Railway `RESEND_API_KEY`를 아직 실제 값으로 안 채워넣었으면 회원가입 시 이메일 발송이 502로 실패함 — 배포 전에 `resend.com`에서 키 발급하고 Variables에 등록 필요.
