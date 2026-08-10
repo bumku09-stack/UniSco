@@ -18,19 +18,32 @@ from harness.models import CollectionResult, Listing
 from harness.sites import BoardConfig
 
 
+_JS_FETCH_MAX_RETRIES = 2
+
+
 def _fetch_js(url: str) -> str:
     # 설계안 3.1절 5번 — JS 렌더링에 의존하는 게시판은 Playwright로 렌더링 완료 후 HTML을 가져옴.
+    from playwright.sync_api import Error as PlaywrightError
     from playwright.sync_api import sync_playwright
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
+    # http.get()과 같은 이유로 재시도함(일시적 네트워크 블립, 2026-08-10) — 이 경로는
+    # requests가 아니라 Playwright라 http.py의 재시도 로직을 못 씀, 여기 따로 둠.
+    for attempt in range(_JS_FETCH_MAX_RETRIES + 1):
         try:
-            page = browser.new_page(user_agent=config.REQUEST_USER_AGENT)
-            page.goto(url, timeout=config.REQUEST_TIMEOUT_SECONDS * 1000)
-            page.wait_for_load_state("networkidle")
-            return page.content()
-        finally:
-            browser.close()
+            with sync_playwright() as p:
+                browser = p.chromium.launch()
+                try:
+                    page = browser.new_page(user_agent=config.REQUEST_USER_AGENT)
+                    page.goto(url, timeout=config.REQUEST_TIMEOUT_SECONDS * 1000)
+                    page.wait_for_load_state("networkidle")
+                    return page.content()
+                finally:
+                    browser.close()
+        except PlaywrightError:
+            if attempt == _JS_FETCH_MAX_RETRIES:
+                raise
+            time.sleep(3 * (attempt + 1))
+    raise AssertionError("unreachable")
 
 
 def fetch_page(url: str, board: BoardConfig) -> str:

@@ -6,9 +6,12 @@ supabase/tools/run_sql.py를 직접 실행함(기존 워크플로 그대로).
 """
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import psycopg2
+
+_MAX_RETRIES = 2
 
 
 def load_database_url() -> str:
@@ -34,7 +37,18 @@ def load_database_url() -> str:
 
 def fetch_existing_scholarships() -> list[tuple[str, str]]:
     """중복 판정용 (name, provider) 전체 목록. provider가 NULL이면 빈 문자열로 취급."""
-    conn = psycopg2.connect(load_database_url())
+    url = load_database_url()
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            conn = psycopg2.connect(url)
+            break
+        except psycopg2.OperationalError:
+            # Supabase 쪽 순간적인 연결 거부/타임아웃 대비(harness/http.py의 재시도와 같은
+            # 이유, 2026-08-10) — 이 단계는 LLM 추출 이전이라 실패해도 토큰 손실은 없지만,
+            # 매번 나이트런을 통째로 실패시키는 것보다는 재시도가 나음.
+            if attempt == _MAX_RETRIES:
+                raise
+            time.sleep(3 * (attempt + 1))
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT name, COALESCE(provider, '') FROM scholarship")
