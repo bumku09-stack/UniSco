@@ -65,16 +65,40 @@ def _parse_expected_count(html: str, board: BoardConfig) -> tuple[int | None, in
     return None, None
 
 
+_JS_HREF_PLACEHOLDERS = {"#", "#view", "javascript:void(0)", "javascript:void(0);", ""}
+
+
 def _extract_links(html: str, board: BoardConfig) -> list[tuple[str, str]]:
-    """[(절대 URL, 게시글 제목)] — 제목은 dedup.py가 이름 대용으로 씀(harness/dedup.py 참고)."""
+    """[(절대 URL, 게시글 제목)] — 제목은 dedup.py가 이름 대용으로 씀(harness/dedup.py 참고).
+
+    일부 대학 게시판(전자정부프레임워크 스킨 등)은 제목 링크의 href가 "#"/"javascript:" 같은
+    자리표시자고, 실제 게시글 ID는 다른 속성에만 있어서(예: onclick="fn_search_detail('B0001')",
+    또는 data-id="553608") href만 봐서는 모든 행이 같은 URL로 뭉개짐(2026-08-11, 한밭대·배재대·
+    대전대에서 실제로 확인 — 각기 다른 속성을 쓰지만 같은 부류 문제). href가 못 쓸 값이고
+    board.id_source_attr/view_url_template가 설정돼 있으면 그 속성값(필요하면 id_pattern으로
+    정규식 추출)으로 URL을 직접 조립하는 걸로 대체함 — 기존 대학(href가 정상인 경우)은 이
+    분기를 안 타므로 동작이 그대로임."""
     soup = BeautifulSoup(html, "lxml")
     results: list[tuple[str, str]] = []
     for a in soup.select(board.link_selector):
-        href = a.get("href")
-        if not href:
-            continue
-        url = urljoin(board.link_base_url, href) if board.link_base_url else href
         title = a.get_text(strip=True)
+        href = a.get("href")
+        if href and href.strip() not in _JS_HREF_PLACEHOLDERS and not href.lower().startswith("javascript:"):
+            url = urljoin(board.link_base_url, href) if board.link_base_url else href
+        elif board.id_source_attr and board.view_url_template:
+            raw = (a.get(board.id_source_attr) or "").strip()
+            if board.id_pattern:
+                m = re.search(board.id_pattern, raw)
+                if not m:
+                    continue
+                item_id = m.group(1)
+            elif raw:
+                item_id = raw
+            else:
+                continue
+            url = board.view_url_template.format(id=item_id)
+        else:
+            continue
         results.append((url, title))
     return results
 
