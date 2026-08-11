@@ -65,6 +65,32 @@ def _send_code_or_502(email: str, code: str, context: str, send_fn=send_verifica
 # reset-password, resend-code/forgot-password가 각각 이 로직을 거의 그대로 복붙하고 있었음.
 _OtpModel = EmailVerification | PasswordReset
 
+# resend-code/forgot-password는 로그인 없이(아이디만 알면) 누구나 호출 가능해서, 막아두지
+# 않으면 특정 계정 메일함으로 재발송/재설정 메일을 무한정 스팸으로 보낼 수 있음(2026-08-11,
+# 배포 전 점검 중 발견 — rate limit이 아예 없었음). 이 계정한테 가장 최근 코드를 보낸 지
+# COOLDOWN 안이면 새로 안 보내고 429로 막음 — signup은 대상에서 뺌(이메일이 이미
+# User.email unique 제약으로 막혀있어서, 같은 주소로 다시 가입 시도해봤자 409로 막히고
+# 메일 자체가 안 나감 — signup 자체는 한 주소당 최초 1통 이상 나갈 방법이 없어서 이 문제에
+# 해당 안 함).
+CODE_REQUEST_COOLDOWN = timedelta(seconds=60)
+
+
+def _check_not_rate_limited(session: Session, model: type[_OtpModel], user_id: int) -> None:
+    latest = session.exec(
+        select(model).where(model.user_id == user_id).order_by(model.id.desc())
+    ).first()
+    if latest is None:
+        return
+    created_at = latest.created_at
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=UTC)
+    elapsed = datetime.now(UTC) - created_at
+    if elapsed < CODE_REQUEST_COOLDOWN:
+        wait = int((CODE_REQUEST_COOLDOWN - elapsed).total_seconds())
+        raise HTTPException(
+            status_code=429, detail=f"너무 자주 요청했습니다. {wait}초 후 다시 시도해주세요."
+        )
+
 
 def _issue_code(session: Session, model: type[_OtpModel], user_id: int, code: str) -> None:
     """기존에 안 쓴 코드가 있으면 무효화하고 새 코드를 저장함 — 반드시 이메일 발송이
@@ -173,6 +199,7 @@ def resend_code(body: ResendCodeRequest, session: Session = Depends(get_session)
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
     if user.is_verified:
         raise HTTPException(status_code=400, detail="이미 인증된 계정입니다.")
+    _check_not_rate_limited(session, EmailVerification, user.id)
 
     # 여기서도 발송을 먼저 시도함 — 실패했는데 기존 유효 코드까지 먼저 지워버리면
     # 재시도할 방법이 없어짐 (signup과 같은 이유).
@@ -188,6 +215,7 @@ def forgot_password(body: ForgotPasswordRequest, session: Session = Depends(get_
     user = _find_user_by_identifier(session, body.identifier)
     if user is None:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    _check_not_rate_limited(session, PasswordReset, user.id)
 
     code = _generate_code()
     _send_code_or_502(user.email, code, "forgot-password", send_fn=send_password_reset_code)
