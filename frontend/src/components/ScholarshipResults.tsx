@@ -123,7 +123,16 @@ function ScholarshipCard({
   );
 }
 
-export function ScholarshipResults({ results }: { results: Scholarship[] }) {
+export function ScholarshipResults({
+  results,
+  onSaveChange,
+}: {
+  results: Scholarship[];
+  // "내 찜 목록" 페이지처럼 찜 취소 즉시 목록에서 빠져야 하는 화면용 — results 배열 자체는
+  // 이 컴포넌트가 아니라 부모가 들고 있어서(props로 받음), 부모한테 알려줘야 뺄 수 있음.
+  // /home처럼 그럴 필요 없는 화면은 그냥 안 넘기면 됨(옵션이라 기본 동작 그대로).
+  onSaveChange?: (id: number, saved: boolean) => void;
+}) {
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState<SortBy>("relevance");
   const [categoryL1, setCategoryL1] = useState<CategoryL1 | "all">("all");
@@ -154,6 +163,7 @@ export function ScholarshipResults({ results }: { results: Scholarship[] }) {
       const wasSaved = next.has(id);
       if (wasSaved) next.delete(id);
       else next.add(id);
+      onSaveChange?.(id, !wasSaved);
 
       // 낙관적 업데이트 먼저 반영, 실패하면 되돌림 — API 자체는 idempotent라 재시도/중복
       // 클릭에도 안전함(app/api/scholarships.py의 save/unsave 참고).

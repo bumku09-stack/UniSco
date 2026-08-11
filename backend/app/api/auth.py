@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
-from app.core.email import send_verification_code
+from app.core.email import send_password_reset_code, send_verification_code
 from app.core.security import (
     InvalidTokenError,
     create_access_token,
@@ -16,9 +16,13 @@ from app.core.security import (
 from app.db.session import get_session
 from app.models import (
     EmailVerification,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
     LoginRequest,
+    PasswordReset,
     RefreshRequest,
     ResendCodeRequest,
+    ResetPasswordRequest,
     SavedSpec,
     SignupRequest,
     SignupResponse,
@@ -43,13 +47,14 @@ def _find_user_by_identifier(session: Session, identifier: str) -> User | None:
     ).first()
 
 
-def _send_code_or_502(email: str, code: str, context: str) -> None:
-    """인증 코드 발송, 실패하면 502로 변환. signup/resend-code 둘 다 이 로직이 그대로
-    복붙돼 있어서 하나로 합침 — context는 로그에 남는 호출 위치 구분용("signup"/"resend-code")."""
+def _send_code_or_502(email: str, code: str, context: str, send_fn=send_verification_code) -> None:
+    """인증 코드 발송, 실패하면 502로 변환. signup/resend-code/forgot-password가 이 로직을
+    공유함 — context는 로그에 남는 호출 위치 구분용, send_fn은 실제 발송 함수(용도별로
+    이메일 문구가 달라서 core/email.py의 함수를 다르게 넘김)."""
     try:
-        send_verification_code(email, code)
+        send_fn(email, code)
     except Exception as e:
-        print(f"[auth/{context}] send_verification_code failed for {email}: {e!r}", flush=True)
+        print(f"[auth/{context}] {send_fn.__name__} failed for {email}: {e!r}", flush=True)
         raise HTTPException(
             status_code=502, detail="인증 메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요."
         ) from e
@@ -159,6 +164,79 @@ def resend_code(body: ResendCodeRequest, session: Session = Depends(get_session)
     session.commit()
 
     return SignupResponse()
+
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+def forgot_password(body: ForgotPasswordRequest, session: Session = Depends(get_session)):
+    user = _find_user_by_identifier(session, body.identifier)
+    if user is None:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+
+    code = _generate_code()
+    _send_code_or_502(user.email, code, "forgot-password", send_fn=send_password_reset_code)
+
+    # 기존에 안 쓴 코드가 남아있으면 무효화 — resend-code와 같은 이유(verify가 항상
+    # "최신 코드"만 보게 함).
+    old_codes = session.exec(
+        select(PasswordReset).where(
+            PasswordReset.user_id == user.id, PasswordReset.is_used == False  # noqa: E712
+        )
+    ).all()
+    for old in old_codes:
+        old.is_used = True
+        session.add(old)
+    session.add(PasswordReset(user_id=user.id, code=code, expires_at=datetime.now(UTC) + CODE_TTL))
+    session.commit()
+
+    return ForgotPasswordResponse()
+
+
+@router.post("/reset-password", response_model=ForgotPasswordResponse)
+def reset_password(body: ResetPasswordRequest, session: Session = Depends(get_session)):
+    user = _find_user_by_identifier(session, body.identifier)
+    if user is None:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+
+    reset = session.exec(
+        select(PasswordReset)
+        .where(PasswordReset.user_id == user.id, PasswordReset.is_used == False)  # noqa: E712
+        .order_by(PasswordReset.id.desc())
+    ).first()
+    if reset is None:
+        raise HTTPException(status_code=400, detail="재설정 코드가 없습니다. 다시 요청해주세요.")
+
+    now = datetime.now(UTC)
+    expires_at = reset.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+    if now > expires_at:
+        reset.is_used = True
+        session.add(reset)
+        session.commit()
+        raise HTTPException(
+            status_code=400, detail="재설정 코드가 만료되었습니다. 다시 요청해주세요."
+        )
+
+    if reset.attempts >= MAX_ATTEMPTS:
+        reset.is_used = True
+        session.add(reset)
+        session.commit()
+        raise HTTPException(status_code=429, detail="시도 횟수를 초과했습니다. 다시 요청해주세요.")
+
+    if reset.code != body.code:
+        reset.attempts += 1
+        session.add(reset)
+        session.commit()
+        raise HTTPException(status_code=400, detail="재설정 코드가 일치하지 않습니다.")
+
+    reset.is_used = True
+    user.hashed_password = hash_password(body.new_password)
+    session.add(reset)
+    session.add(user)
+    session.commit()
+    return ForgotPasswordResponse(
+        message="비밀번호가 재설정되었습니다. 새 비밀번호로 로그인해주세요."
+    )
 
 
 @router.post("/login", response_model=TokenResponse)

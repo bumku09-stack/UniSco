@@ -1,7 +1,11 @@
 from app.models.auth import (
+    DeleteAccountRequest,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
     LoginRequest,
     RefreshRequest,
     ResendCodeRequest,
+    ResetPasswordRequest,
     SignupRequest,
     SignupResponse,
     TokenResponse,
@@ -25,7 +29,7 @@ from app.models.enums import (
 from app.models.saved_scholarship import SavedScholarship
 from app.models.saved_spec import SavedSpec
 from app.models.scholarship import Scholarship
-from app.models.user import EmailVerification, User
+from app.models.user import EmailVerification, PasswordReset, User
 from app.models.user_spec import SpecStatusResponse, UserSpec
 
 __all__ = [
@@ -34,17 +38,22 @@ __all__ = [
     "CategoryL1",
     "CategoryL2",
     "DegreeLevel",
+    "DeleteAccountRequest",
     "DisabilityType",
     "EmailVerification",
     "EnrollmentStatus",
     "ForeignerEligibility",
+    "ForgotPasswordRequest",
+    "ForgotPasswordResponse",
     "Gender",
     "GpaBasis",
     "LanguageTestType",
     "LoginRequest",
     "MilitaryStatus",
+    "PasswordReset",
     "RefreshRequest",
     "ResendCodeRequest",
+    "ResetPasswordRequest",
     "SavedScholarship",
     "SavedSpec",
     "Scholarship",
