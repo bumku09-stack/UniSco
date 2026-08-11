@@ -4,7 +4,13 @@ import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import { TopBar } from "@/components/form-ui";
 import { authFetch, isLoggedIn } from "@/lib/auth";
-import { CATEGORY_L2_LABEL, eligibilityList, formatAmount, Scholarship } from "@/lib/scholarship";
+import {
+  CATEGORY_L2_LABEL,
+  eligibilityList,
+  formatAmount,
+  Scholarship,
+  unverifiableConditionParts,
+} from "@/lib/scholarship";
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return <h2 className="text-[15px] font-bold text-gray-900">{children}</h2>;
@@ -140,12 +146,16 @@ export default function ScholarshipDetailPage({
               </div>
             )}
 
-            {/* 지원조건 — 시스템이 실제로 걸러낸 조건과, 원문엔 있지만 아직 필터에는 못 쓰는
-                조건(이수학점·입학성적)을 한 목록으로 통일해서 보여줌. 예전엔 "자격조건"/
-                "참고조건" 두 섹션으로 나뉘어 있어서 "참고조건"이 덜 중요한 정보처럼 보였는데,
-                둘 다 학생 입장에선 똑같이 지켜야 할 지원조건이라 하나로 합침(2026-08-11). */}
+            {/* 지원조건 — 시스템이 실제로 걸러낸 조건(파란 점)과, 원문엔 있지만 아직 필터에는
+                못 쓰는 조건(이수학점·입학성적, 노란 점 — 학생이 직접 확인해야 함)을 한
+                목록 안에서 점 색깔로 구분해서 보여줌(2026-08-11, 사용자 아이디어). */}
             <div className="mt-7">
               <SectionHeading>지원조건</SectionHeading>
+              <p className="mt-1 text-xs text-gray-400">
+                <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-blue-400" />
+                시스템이 확인한 조건 · <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
+                직접 확인 필요한 조건
+              </p>
               <ul className="mt-3 flex flex-col gap-2.5">
                 {eligibilityList(scholarship).map((item, i) => (
                   <li key={`e-${i}`} className="flex items-start gap-2.5 text-sm leading-relaxed text-gray-700">
@@ -155,7 +165,7 @@ export default function ScholarshipDetailPage({
                 ))}
                 {scholarship.min_credits && (
                   <li className="flex items-start gap-2.5 text-sm leading-relaxed text-gray-700">
-                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400" />
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
                     <span>
                       <span className="font-semibold text-gray-500">이수학점</span> ·{" "}
                       {scholarship.min_credits}
@@ -164,13 +174,19 @@ export default function ScholarshipDetailPage({
                 )}
                 {scholarship.admission_score_condition && (
                   <li className="flex items-start gap-2.5 text-sm leading-relaxed text-gray-700">
-                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400" />
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
                     <span>
                       <span className="font-semibold text-gray-500">입학성적</span> ·{" "}
                       {scholarship.admission_score_condition}
                     </span>
                   </li>
                 )}
+                {unverifiableConditionParts(scholarship).map((item, i) => (
+                  <li key={`u-${i}`} className="flex items-start gap-2.5 text-sm leading-relaxed text-gray-700">
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
+                    {item}
+                  </li>
+                ))}
               </ul>
             </div>
 

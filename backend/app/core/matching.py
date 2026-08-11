@@ -140,6 +140,19 @@ def special_status_all_matches(scholarship: Scholarship, spec: UserSpec) -> bool
     return set(scholarship.required_special_status_all).issubset(set(spec.special_status))
 
 
+def excluded_special_status_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
+    """특수상황 "제외" 조건 (excluded_major와 동일한 컨벤션, 2026-08-11 추가) — 학생이
+    excluded_special_status 목록의 태그를 하나라도 선택했으면 무조건 탈락. 학생이 특수상황을
+    아예 선택 안 했거나(다른 필드들과 동일한 "아직 대답 안 함" 예외) 그 제외 태그가 아닌
+    다른 것만 선택했으면 걸리지 않음. 예: 청년밥상(id=952, 우양재단)이 2026년부터
+    자립준비청년·북한이탈주민을 지원 대상에서 제외한 것을 표현(그 전에는 오히려 우대 대상)."""
+    if not scholarship.excluded_special_status:
+        return True
+    if not spec.special_status:
+        return True
+    return not (set(scholarship.excluded_special_status) & set(spec.special_status))
+
+
 def special_status_matches_strict(
     scholarship_special_status: list[SpecialStatus], spec_special_status: list[SpecialStatus]
 ) -> bool:
@@ -325,6 +338,8 @@ def is_eligible(scholarship: Scholarship, spec: UserSpec) -> bool:
     if not disability_or_special_status_matches(scholarship, spec):
         return False
     if not special_status_all_matches(scholarship, spec):
+        return False
+    if not excluded_special_status_matches(scholarship, spec):
         return False
     if not language_test_matches(scholarship, spec):
         return False
