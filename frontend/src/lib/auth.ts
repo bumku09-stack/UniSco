@@ -1,5 +1,12 @@
+import { clearCachedRecommendations } from "@/lib/recommendations-cache";
+
 const ACCESS_TOKEN_KEY = "unisco_access_token";
 const REFRESH_TOKEN_KEY = "unisco_refresh_token";
+
+// mypage/page.tsx가 "작성하다 만 내용" 임시저장에 씀 — 여기서 export하는 이유는 clearTokens가
+// 이것도 같이 지워야 해서(유저 구분 없이 sessionStorage에 저장되는 건 전부 로그아웃/탈퇴 시
+// 같이 지워야 다음 사람한테 안 새어나감, 위 recommendations-cache와 같은 이유).
+export const MYPAGE_DRAFT_KEY = "unisco_mypage_draft";
 
 export function getAccessToken(): string | null {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
@@ -17,6 +24,13 @@ export function getRefreshToken(): string | null {
 export function clearTokens() {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
+  // recommendations-cache는 유저 구분 없이 sessionStorage에 저장돼서, 이걸 안 지우면
+  // 로그아웃/회원탈퇴 후 같은 브라우저로 다른 계정에 들어왔을 때 이전 사람의 매칭 결과가
+  // 잠깐 화면에 떴다가 새로고침되는 문제가 있었음(2026-08-11 발견 — 공용 PC에서는 특히
+  // 문제). clearTokens를 호출하는 모든 곳(로그아웃, 회원탈퇴)이 자동으로 같이 지워지게
+  // 여기서 처리 — 호출부마다 따로 챙기게 하면 나중에 또 빠뜨리기 쉬움.
+  clearCachedRecommendations();
+  sessionStorage.removeItem(MYPAGE_DRAFT_KEY);
 }
 
 export function isLoggedIn(): boolean {

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
 import { TopBar } from "@/components/form-ui";
 import { CommonFields, OptionalFields, SchoolFields, deriveSpecFields } from "@/components/spec-fields";
-import { authFetch, clearTokens, isLoggedIn } from "@/lib/auth";
+import { authFetch, clearTokens, isLoggedIn, MYPAGE_DRAFT_KEY as DRAFT_KEY } from "@/lib/auth";
 import { clearCachedRecommendations } from "@/lib/recommendations-cache";
 import {
   initialOptionalInfo,
@@ -19,7 +19,8 @@ import {
 
 // 세션(access token 30분) 만료로 강제 로그아웃되면 작성 중이던 내용이 그냥 날아가던 문제
 // 때문에 추가함 — 편집할 때마다 여기에 임시 저장해두고, 재로그인 후 돌아오면 복원할지 물어봄.
-const DRAFT_KEY = "unisco_mypage_draft";
+// 키 자체는 lib/auth.ts에서 export함 — clearTokens()가 로그아웃/탈퇴 시 이것도 같이 지워야
+// 해서(2026-08-11, 다른 계정으로 전환됐을 때 이전 사람 임시저장이 새어나가는 문제 발견).
 
 export default function MyPage() {
   const router = useRouter();
