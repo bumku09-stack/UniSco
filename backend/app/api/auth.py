@@ -60,6 +60,67 @@ def _send_code_or_502(email: str, code: str, context: str, send_fn=send_verifica
         ) from e
 
 
+# EmailVerification/PasswordReset은 필드 구성이 동일해서(user_id, code, expires_at, is_used,
+# attempts) 아래 두 헬퍼가 타입만 바꿔가며 공유함 — 2026-08-11 리팩터링, 원래는 verify-code/
+# reset-password, resend-code/forgot-password가 각각 이 로직을 거의 그대로 복붙하고 있었음.
+_OtpModel = EmailVerification | PasswordReset
+
+
+def _issue_code(session: Session, model: type[_OtpModel], user_id: int, code: str) -> None:
+    """기존에 안 쓴 코드가 있으면 무효화하고 새 코드를 저장함 — 반드시 이메일 발송이
+    이미 성공한 뒤에만 호출할 것(발송 실패 시 아무 행도 안 생기게 하려고 순서를 각
+    라우트에서 관리함, signup의 "메일 먼저" 원칙과 동일)."""
+    old_codes = session.exec(
+        select(model).where(model.user_id == user_id, model.is_used == False)  # noqa: E712
+    ).all()
+    for old in old_codes:
+        old.is_used = True
+        session.add(old)
+    session.add(model(user_id=user_id, code=code, expires_at=datetime.now(UTC) + CODE_TTL))
+    session.commit()
+
+
+def _consume_code(
+    session: Session, model: type[_OtpModel], user_id: int, code: str, label: str
+) -> _OtpModel:
+    """OTP 코드 하나를 검증하고 소비(is_used=True) 처리함 — 통과하면 그 행을 반환하니
+    호출부가 이어서 실제 효과(계정 인증/비밀번호 변경)를 적용하고 커밋할 것(여기서는 커밋
+    안 함, 검증 실패 케이스만 여기서 바로 커밋 후 예외를 던짐). label은 에러 메시지에 쓰이는
+    명사("인증 코드"/"재설정 코드")."""
+    row = session.exec(
+        select(model)
+        .where(model.user_id == user_id, model.is_used == False)  # noqa: E712
+        .order_by(model.id.desc())
+    ).first()
+    if row is None:
+        raise HTTPException(status_code=400, detail=f"{label}가 없습니다. 재발송해주세요.")
+
+    now = datetime.now(UTC)
+    expires_at = row.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+    if now > expires_at:
+        row.is_used = True
+        session.add(row)
+        session.commit()
+        raise HTTPException(status_code=400, detail=f"{label}가 만료되었습니다. 재발송해주세요.")
+
+    if row.attempts >= MAX_ATTEMPTS:
+        row.is_used = True
+        session.add(row)
+        session.commit()
+        raise HTTPException(status_code=429, detail="시도 횟수를 초과했습니다. 재발송해주세요.")
+
+    if row.code != code:
+        row.attempts += 1
+        session.add(row)
+        session.commit()
+        raise HTTPException(status_code=400, detail=f"{label}가 일치하지 않습니다.")
+
+    row.is_used = True
+    return row
+
+
 @router.post("/signup", response_model=SignupResponse)
 def signup(body: SignupRequest, session: Session = Depends(get_session)):
     if session.exec(select(User).where(User.username == body.username)).first():
@@ -81,10 +142,9 @@ def signup(body: SignupRequest, session: Session = Depends(get_session)):
     session.commit()
     session.refresh(user)
 
-    session.add(
-        EmailVerification(user_id=user.id, code=code, expires_at=datetime.now(UTC) + CODE_TTL)
-    )
-    session.commit()
+    # 방금 만든 유저라 무효화할 기존 코드가 있을 리 없음 — 그래도 _issue_code를 그대로 씀
+    # (resend-code/forgot-password와 동일 헬퍼, "빈 목록이면 그냥 아무것도 안 함"이라 안전함).
+    _issue_code(session, EmailVerification, user.id, code)
 
     return SignupResponse()
 
@@ -97,37 +157,8 @@ def verify_code(body: VerifyCodeRequest, session: Session = Depends(get_session)
     if user.is_verified:
         raise HTTPException(status_code=400, detail="이미 인증된 계정입니다.")
 
-    verification = session.exec(
-        select(EmailVerification)
-        .where(EmailVerification.user_id == user.id, EmailVerification.is_used == False)  # noqa: E712
-        .order_by(EmailVerification.id.desc())
-    ).first()
-    if verification is None:
-        raise HTTPException(status_code=400, detail="인증 코드가 없습니다. 재발송해주세요.")
+    verification = _consume_code(session, EmailVerification, user.id, body.code, "인증 코드")
 
-    now = datetime.now(UTC)
-    expires_at = verification.expires_at
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=UTC)
-    if now > expires_at:
-        verification.is_used = True
-        session.add(verification)
-        session.commit()
-        raise HTTPException(status_code=400, detail="인증 코드가 만료되었습니다. 재발송해주세요.")
-
-    if verification.attempts >= MAX_ATTEMPTS:
-        verification.is_used = True
-        session.add(verification)
-        session.commit()
-        raise HTTPException(status_code=429, detail="시도 횟수를 초과했습니다. 재발송해주세요.")
-
-    if verification.code != body.code:
-        verification.attempts += 1
-        session.add(verification)
-        session.commit()
-        raise HTTPException(status_code=400, detail="인증 코드가 일치하지 않습니다.")
-
-    verification.is_used = True
     user.is_verified = True
     session.add(verification)
     session.add(user)
@@ -147,21 +178,7 @@ def resend_code(body: ResendCodeRequest, session: Session = Depends(get_session)
     # 재시도할 방법이 없어짐 (signup과 같은 이유).
     code = _generate_code()
     _send_code_or_502(user.email, code, "resend-code")
-
-    # 기존에 안 쓴 코드가 남아있으면 무효화 — verify-code가 항상 "최신 코드"만
-    # 보게 해서 예전 코드로 통과되는 일이 없게 함
-    old_codes = session.exec(
-        select(EmailVerification).where(
-            EmailVerification.user_id == user.id, EmailVerification.is_used == False  # noqa: E712
-        )
-    ).all()
-    for old in old_codes:
-        old.is_used = True
-        session.add(old)
-    session.add(
-        EmailVerification(user_id=user.id, code=code, expires_at=datetime.now(UTC) + CODE_TTL)
-    )
-    session.commit()
+    _issue_code(session, EmailVerification, user.id, code)
 
     return SignupResponse()
 
@@ -174,19 +191,7 @@ def forgot_password(body: ForgotPasswordRequest, session: Session = Depends(get_
 
     code = _generate_code()
     _send_code_or_502(user.email, code, "forgot-password", send_fn=send_password_reset_code)
-
-    # 기존에 안 쓴 코드가 남아있으면 무효화 — resend-code와 같은 이유(verify가 항상
-    # "최신 코드"만 보게 함).
-    old_codes = session.exec(
-        select(PasswordReset).where(
-            PasswordReset.user_id == user.id, PasswordReset.is_used == False  # noqa: E712
-        )
-    ).all()
-    for old in old_codes:
-        old.is_used = True
-        session.add(old)
-    session.add(PasswordReset(user_id=user.id, code=code, expires_at=datetime.now(UTC) + CODE_TTL))
-    session.commit()
+    _issue_code(session, PasswordReset, user.id, code)
 
     return ForgotPasswordResponse()
 
@@ -197,39 +202,8 @@ def reset_password(body: ResetPasswordRequest, session: Session = Depends(get_se
     if user is None:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
 
-    reset = session.exec(
-        select(PasswordReset)
-        .where(PasswordReset.user_id == user.id, PasswordReset.is_used == False)  # noqa: E712
-        .order_by(PasswordReset.id.desc())
-    ).first()
-    if reset is None:
-        raise HTTPException(status_code=400, detail="재설정 코드가 없습니다. 다시 요청해주세요.")
+    reset = _consume_code(session, PasswordReset, user.id, body.code, "재설정 코드")
 
-    now = datetime.now(UTC)
-    expires_at = reset.expires_at
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=UTC)
-    if now > expires_at:
-        reset.is_used = True
-        session.add(reset)
-        session.commit()
-        raise HTTPException(
-            status_code=400, detail="재설정 코드가 만료되었습니다. 다시 요청해주세요."
-        )
-
-    if reset.attempts >= MAX_ATTEMPTS:
-        reset.is_used = True
-        session.add(reset)
-        session.commit()
-        raise HTTPException(status_code=429, detail="시도 횟수를 초과했습니다. 다시 요청해주세요.")
-
-    if reset.code != body.code:
-        reset.attempts += 1
-        session.add(reset)
-        session.commit()
-        raise HTTPException(status_code=400, detail="재설정 코드가 일치하지 않습니다.")
-
-    reset.is_used = True
     user.hashed_password = hash_password(body.new_password)
     session.add(reset)
     session.add(user)
