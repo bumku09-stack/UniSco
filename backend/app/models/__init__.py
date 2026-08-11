@@ -22,6 +22,7 @@ from app.models.enums import (
     MilitaryStatus,
     SpecialStatus,
 )
+from app.models.saved_scholarship import SavedScholarship
 from app.models.saved_spec import SavedSpec
 from app.models.scholarship import Scholarship
 from app.models.user import EmailVerification, User
@@ -44,6 +45,7 @@ __all__ = [
     "MilitaryStatus",
     "RefreshRequest",
     "ResendCodeRequest",
+    "SavedScholarship",
     "SavedSpec",
     "Scholarship",
     "SignupRequest",
