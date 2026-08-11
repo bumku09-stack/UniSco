@@ -55,6 +55,17 @@ def similar_scholarships(
     return find_similar(target, eligible, limit=limit, exclude_id=exclude_id)
 
 
+def _find_saved_scholarship(
+    session: Session, user_id: int, scholarship_id: int
+) -> SavedScholarship | None:
+    return session.exec(
+        select(SavedScholarship).where(
+            SavedScholarship.user_id == user_id,
+            SavedScholarship.scholarship_id == scholarship_id,
+        )
+    ).first()
+
+
 @router.post("/scholarships/{scholarship_id}/save", status_code=204)
 def save_scholarship(
     scholarship_id: int,
@@ -65,13 +76,7 @@ def save_scholarship(
     현재 찜 여부를 매번 정확히 추적 안 해도 되게(낙관적 업데이트 후 재클릭 등에도 안전)."""
     if session.get(Scholarship, scholarship_id) is None:
         raise HTTPException(status_code=404, detail="장학금을 찾을 수 없습니다.")
-    existing = session.exec(
-        select(SavedScholarship).where(
-            SavedScholarship.user_id == user.id,
-            SavedScholarship.scholarship_id == scholarship_id,
-        )
-    ).first()
-    if existing is None:
+    if _find_saved_scholarship(session, user.id, scholarship_id) is None:
         session.add(SavedScholarship(user_id=user.id, scholarship_id=scholarship_id))
         session.commit()
 
@@ -82,12 +87,7 @@ def unsave_scholarship(
     user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    existing = session.exec(
-        select(SavedScholarship).where(
-            SavedScholarship.user_id == user.id,
-            SavedScholarship.scholarship_id == scholarship_id,
-        )
-    ).first()
+    existing = _find_saved_scholarship(session, user.id, scholarship_id)
     if existing is not None:
         session.delete(existing)
         session.commit()
