@@ -17,6 +17,7 @@ import psycopg2
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from description_gap_check import (  # noqa: E402
+    find_bracket_label_leak,
     find_gaps,
     find_generic_restriction_flag,
     find_placeholder_values,
@@ -53,6 +54,7 @@ def build_report(rows: list[dict]) -> str:
     placeholder_hits: list[tuple[dict, dict]] = []
     gap_hits: dict[str, list[dict]] = {}
     generic_hits: list[dict] = []
+    bracket_hits: list[dict] = []
 
     for row in rows:
         found = find_placeholder_values(row)
@@ -64,6 +66,9 @@ def build_report(rows: list[dict]) -> str:
 
         if find_generic_restriction_flag(row):
             generic_hits.append(row)
+
+        if find_bracket_label_leak(row):
+            bracket_hits.append(row)
 
     lines: list[str] = []
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -105,6 +110,18 @@ def build_report(rows: list[dict]) -> str:
     if not generic_hits:
         lines.append("(없음)")
     for row in generic_hits:
+        lines.append(
+            f"- id={row['id']} `{row['name']}` ({row.get('provider') or '기관 미상'}): "
+            f"{snippet(row.get('description'))}"
+        )
+    lines.append("")
+
+    # bracket-label leak (spreadsheet column names left raw in description)
+    lines.append(f"## D) description 원시 형태 잔존(스프레드시트 칸 이름 그대로) — {len(bracket_hits)}건")
+    lines.append("")
+    if not bracket_hits:
+        lines.append("(없음)")
+    for row in bracket_hits:
         lines.append(
             f"- id={row['id']} `{row['name']}` ({row.get('provider') or '기관 미상'}): "
             f"{snippet(row.get('description'))}"

@@ -37,7 +37,24 @@ PLACEHOLDER_PATTERNS = [
     "미정", "추후 공지", "추후공지", "추후 확인", "추후확인",
     "별도 공지", "별도공지", "별도 문의", "별도문의",
     "재확인 필요", "재확인필요", "TBD", "tbd",
+    # 2026-08-11 추가 — "조건이 없다"는 사실 자체를 문자열 값으로 그대로 넣은 경우(68+36건
+    # 발견). 조건이 없으면 NULL로 비워야지 이 문구를 값으로 넣으면 안 됨(min_credits.py 배경
+    # 참고). "학점 조건 없음"처럼 실제 문장 안에 자연스럽게 있는 경우까지 걸릴 수 있어 오탐
+    # 위험이 min_credits/GPA류 같은 자유서술 컬럼보다 조금 있음 — audit 결과를 사람이 한 번
+    # 더 훑어볼 것.
+    "해당 없음", "해당없음", "제한 없음", "제한없음",
 ]
+
+# 2026-08-11 추가 — description이 "[지원금액] X / [비고] Y"처럼 예전 스프레드시트 칸 이름이
+# 그대로 남은 원시 형태인지 감지(73건 발견, id 1~71 초기 CNU 배치 등). 대괄호로 감싼 한글
+# 단어로 문장이 시작하면 걸림 — 자연스러운 산문에는 이런 패턴이 거의 안 나와서 오탐 위험 낮음.
+BRACKET_LABEL_PATTERN = re.compile(r"^\s*\[[가-힣]{1,10}\]")
+
+
+def find_bracket_label_leak(row: dict) -> bool:
+    """description이 스프레드시트 칸 이름이 그대로 남은 원시 형태인지 확인."""
+    desc = row.get("description") or ""
+    return bool(BRACKET_LABEL_PATTERN.search(desc))
 
 # 플레이스홀더가 실제 값 자리에 들어갈 위험이 있는 자유 텍스트 컬럼만 검사.
 # (description은 원문 설명 산문이라 이런 문구가 캐주얼하게 섞여 있어도 정상 — 검사 대상 아님.
@@ -85,13 +102,16 @@ FIELD_GAP_RULES: dict[str, tuple[list[str], list[str]]] = {
         ["major"],
         [r"전공", r"학과.{0,4}(만|한정)", r"해당\s*전공", r"전공자\s*외", r"전공.{0,4}지원\s*불가"],
     ),
+    # "차상위"/"기초생활수급자" 등은 소득분위 숫자가 아니라 특수상황 태그로 표현하는 게 맞는
+    # 경우가 많아(2026-08-10, id=232 사례) max_income_bracket 규칙에서 빼고 아래
+    # special_status 규칙으로 옮김. 여기는 "소득분위 N" 형태의 숫자 조건만 남김.
     "min_gpa": (
         ["min_gpa"],
         [r"평점", r"학점\s*[0-9]", r"GPA", r"성적.{0,3}등급\s*이내"],
     ),
     "max_income_bracket": (
         ["max_income_bracket"],
-        [r"소득분위", r"중위소득", r"차상위"],
+        [r"소득분위", r"중위소득"],
     ),
     "disability": (
         ["requires_disability", "required_disability_type"],
@@ -120,6 +140,50 @@ FIELD_GAP_RULES: dict[str, tuple[list[str], list[str]]] = {
     "period_or_deadline": (
         ["application_period", "application_deadline"],
         [r"매년\s*[0-9]+\s*월", r"20[0-9]{2}[-./]\s*[0-9]{1,2}[-./]\s*[0-9]{1,2}", r"20[0-9]{2}년\s*[0-9]+월"],
+    ),
+    # 2026-08-10 추가 — 지금까지 자동검사에 아예 없었던 항목들(data_collection_guide.md
+    # 체크리스트 21개 중 아래 8개는 이번까지 자동검사 커버리지가 0건이었음).
+    "special_status": (
+        ["required_special_status"],
+        [
+            r"다문화가정", r"새터민", r"북한이탈주민", r"한부모가정", r"조손가정",
+            r"다자녀", r"자녀\s*[2-9]\s*(명|인)", r"국가유공자", r"보훈대상자",
+            r"기초생활수급자", r"기초수급", r"차상위", r"중증질병", r"실직가정",
+            r"재난.{0,4}(피해|가정)", r"긴급가계곤란", r"의사상자",
+            r"학생회.{0,4}(임원|회장)", r"학생자치단체.{0,4}임원", r"아동양육시설",
+        ],
+    ),
+    "excluded_major": (
+        ["excluded_major"],
+        [r"전공.{0,6}제외", r"학과.{0,6}제외"],
+    ),
+    "degree_level": (
+        ["required_degree_level"],
+        [r"석사", r"박사", r"석·박사", r"석박사"],
+    ),
+    "region": (
+        ["eligible_region"],
+        [r"거주자", r"거주.{0,4}[0-9]\s*년", r"관내\s*(거주|주민)", r"주민등록", r"전입"],
+    ),
+    "gender": (
+        ["required_gender"],
+        [r"여학생", r"남학생", r"여성\s*(만|한정)", r"남성\s*(만|한정)", r"^사모\b|\s사모\b"],
+    ),
+    "military_status": (
+        ["required_military_status"],
+        [r"군필", r"병역\s*(특례|의무|필)", r"미필자"],
+    ),
+    "age": (
+        ["min_age", "max_age"],
+        [r"만\s*[0-9]{1,2}\s*세", r"[0-9]{1,2}\s*세\s*(이하|미만|이상)"],
+    ),
+    "min_credits": (
+        ["min_credits"],
+        [r"[0-9]+\s*학점\s*(이상|이수)"],
+    ),
+    "admission_score_condition": (
+        ["admission_score_condition"],
+        [r"수능\s*(성적|등급|백분위)", r"내신\s*(성적|등급)", r"학생부.{0,4}(교과|종합)"],
     ),
 }
 

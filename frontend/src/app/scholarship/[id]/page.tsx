@@ -4,10 +4,26 @@ import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import { TopBar } from "@/components/form-ui";
 import { authFetch, isLoggedIn } from "@/lib/auth";
-import { CATEGORY_L2_LABEL, eligibilityList, formatAmount, Scholarship } from "@/lib/scholarship";
+import {
+  CATEGORY_L2_LABEL,
+  eligibilityList,
+  formatAmount,
+  Scholarship,
+  unverifiableConditionParts,
+} from "@/lib/scholarship";
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return <h2 className="text-[15px] font-bold text-gray-900">{children}</h2>;
+}
+
+// description이 문장 하나로 다 이어붙어 있어서(줄바꿈 없음) 읽기 힘들다는 지적(2026-08-11) —
+// 마침표+공백을 문장 경계로 보고 줄 단위로 쪼개서 보여줌. "3.0 이상"처럼 소수점 뒤에 공백이
+// 없는 숫자는 마침표 뒤에 공백이 없어서 안 쪼개짐(의도한 동작).
+function splitSentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?])\s+(?=\S)/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 function StatBox({
@@ -66,13 +82,6 @@ export default function ScholarshipDetailPage({
       .catch(() => setSimilar([]));
   }, [scholarship, from]);
 
-  const hasReferenceInfo =
-    scholarship &&
-    (scholarship.major ||
-      scholarship.min_credits ||
-      scholarship.admission_score_condition ||
-      scholarship.headcount);
-
   return (
     <div className="flex min-h-screen flex-col bg-white">
       <div className="mx-auto w-full max-w-md flex-1 px-6 pb-32 pt-6">
@@ -122,57 +131,64 @@ export default function ScholarshipDetailPage({
               <StatBox label="선발인원" value={scholarship.headcount ?? "정보 없음"} tone="gray" />
             </div>
 
-            {/* 장학금 소개 */}
+            {/* 장학금 소개 — 문장 단위로 줄을 나눠서 표시(2026-08-11, 한 문단으로 다 이어붙어
+                있어서 읽기 힘들다는 지적 반영) */}
             {scholarship.description && (
               <div className="mt-7 border-b border-gray-100 pb-7">
                 <SectionHeading>장학금 소개</SectionHeading>
-                <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-gray-700">
-                  {scholarship.description}
-                </p>
+                <div className="mt-3 flex flex-col gap-2">
+                  {splitSentences(scholarship.description).map((sentence, i) => (
+                    <p key={i} className="whitespace-pre-line text-sm leading-relaxed text-gray-700">
+                      {sentence}
+                    </p>
+                  ))}
+                </div>
               </div>
             )}
 
-            {/* 자격조건 — 한 줄 요약 대신 체크리스트 형태로 */}
-            <div className={`mt-7 ${hasReferenceInfo ? "border-b border-gray-100 pb-7" : ""}`}>
-              <SectionHeading>자격조건</SectionHeading>
+            {/* 지원조건 — 시스템이 실제로 걸러낸 조건(파란 점)과, 원문엔 있지만 아직 필터에는
+                못 쓰는 조건(이수학점·입학성적, 노란 점 — 학생이 직접 확인해야 함)을 한
+                목록 안에서 점 색깔로 구분해서 보여줌(2026-08-11, 사용자 아이디어). */}
+            <div className="mt-7">
+              <SectionHeading>지원조건</SectionHeading>
+              <p className="mt-1 text-xs text-gray-400">
+                <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-blue-400" />
+                시스템이 확인한 조건 · <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
+                직접 확인 필요한 조건
+              </p>
               <ul className="mt-3 flex flex-col gap-2.5">
                 {eligibilityList(scholarship).map((item, i) => (
-                  <li key={i} className="flex items-start gap-2.5 text-sm leading-relaxed text-gray-700">
+                  <li key={`e-${i}`} className="flex items-start gap-2.5 text-sm leading-relaxed text-gray-700">
                     <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400" />
+                    {item}
+                  </li>
+                ))}
+                {scholarship.min_credits && (
+                  <li className="flex items-start gap-2.5 text-sm leading-relaxed text-gray-700">
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
+                    <span>
+                      <span className="font-semibold text-gray-500">이수학점</span> ·{" "}
+                      {scholarship.min_credits}
+                    </span>
+                  </li>
+                )}
+                {scholarship.admission_score_condition && (
+                  <li className="flex items-start gap-2.5 text-sm leading-relaxed text-gray-700">
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
+                    <span>
+                      <span className="font-semibold text-gray-500">입학성적</span> ·{" "}
+                      {scholarship.admission_score_condition}
+                    </span>
+                  </li>
+                )}
+                {unverifiableConditionParts(scholarship).map((item, i) => (
+                  <li key={`u-${i}`} className="flex items-start gap-2.5 text-sm leading-relaxed text-gray-700">
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
                     {item}
                   </li>
                 ))}
               </ul>
             </div>
-
-            {/* 참고 조건 — 매칭 필터엔 아직 안 쓰이는 원문 텍스트 필드 */}
-            {hasReferenceInfo && (
-              <div className="mt-7">
-                <SectionHeading>참고 조건</SectionHeading>
-                <p className="mt-1 text-xs text-gray-400">
-                  매칭 필터에는 아직 반영되지 않음 — 원문 그대로 표시
-                </p>
-                <ul className="mt-3 flex flex-col gap-2.5">
-                  {scholarship.major && (
-                    <li className="text-sm leading-relaxed text-gray-700">
-                      <span className="font-semibold text-gray-500">전공</span> · {scholarship.major}
-                    </li>
-                  )}
-                  {scholarship.min_credits && (
-                    <li className="text-sm leading-relaxed text-gray-700">
-                      <span className="font-semibold text-gray-500">이수학점</span> ·{" "}
-                      {scholarship.min_credits}
-                    </li>
-                  )}
-                  {scholarship.admission_score_condition && (
-                    <li className="text-sm leading-relaxed text-gray-700">
-                      <span className="font-semibold text-gray-500">입학성적</span> ·{" "}
-                      {scholarship.admission_score_condition}
-                    </li>
-                  )}
-                </ul>
-              </div>
-            )}
 
             {/* 추천 장학금 — 지금 보는 장학금과 같은 분류(중분류>대분류)를 우선으로 최대 3개.
                 목록 페이지 카드랑 같은 스타일(흰 배경 + 옅은 테두리)로 맞춰서 통일감 있게. */}

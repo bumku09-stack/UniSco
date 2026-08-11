@@ -70,6 +70,13 @@ class Scholarship(SQLModel, table=True):
     required_special_status_all: list[SpecialStatus] = Field(
         default_factory=list, sa_column=Column(ARRAY(String), nullable=False, server_default="{}")
     )
+    # 2026-08-11 추가(matching_gaps.md "특수상황 제외 조건") — excluded_major와 동일한
+    # 컨벤션("이 태그 있으면 무조건 탈락", required_special_status와 정반대 방향). 예:
+    # 청년밥상(우양재단)이 2026년부터 자립준비청년·북한이탈주민을 지원 대상에서 제외한 것.
+    # 매칭 로직은 core/matching.py의 excluded_special_status_matches() 참고.
+    excluded_special_status: list[SpecialStatus] = Field(
+        default_factory=list, sa_column=Column(ARRAY(String), nullable=False, server_default="{}")
+    )
     # 2026-08-03 추가 — 구조화된 마감일(matching_gaps.md 7번). 대부분의 기존 데이터는
     # "매 학기 초 공지"류 상시/반복 프로그램이라 NULL로 남아있고(마감 자동판정 대상 아님),
     # 실제 확정 마감일이 있는 공고만 이 값을 채워서 자동으로 걸러지게 함(match_scholarships()

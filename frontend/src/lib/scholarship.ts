@@ -72,6 +72,9 @@ function eligibilityParts(s: Scholarship): string[] {
   const parts: string[] = [];
   if (s.eligible_university) parts.push(`대학: ${s.eligible_university}`);
   if (s.eligible_college) parts.push(`단과대: ${s.eligible_college}`);
+  // major_matches()가 실제로 필터링에 쓰는 필드인데(backend/app/core/matching.py) 프론트
+  // 목록에서 빠져있던 버그 — 2026-08-11 발견, 여기로 옮김(예전엔 "참고조건"으로 잘못 표시).
+  if (s.major) parts.push(`전공: ${s.major}`);
   if (s.required_enrollment_status) {
     parts.push(`재학상태: ${ENROLLMENT_STATUS_LABEL[s.required_enrollment_status]}`);
   }
@@ -105,13 +108,41 @@ function eligibilityParts(s: Scholarship): string[] {
       s.language_test_min_score != null ? `어학점수: ${test} ${s.language_test_min_score} 이상` : `어학점수: ${test}`
     );
   }
-  if (s.required_special_status.length > 0) {
-    const labels = s.required_special_status.map(
-      (v) => SPECIAL_STATUS_OPTIONS.find((o) => o.value === v)?.label ?? v
-    );
+  // 학생이 프로필에서 실제로 선택 가능한 태그만 여기 포함 — UNVERIFIABLE_SPECIAL_STATUS_LABELS에
+  // 있는 "확인 불가"(랭킹 전용, 선택 불가) 태그는 여기서 빼고 unverifiableConditionParts()로
+  // 따로 뺌(2026-08-11, "parent_occupation_condition"이라는 원본 값 그대로 노출되던 버그 수정).
+  const selectableSpecialStatus = s.required_special_status.filter((v) => v in SPECIAL_STATUS_LABEL_MAP);
+  if (selectableSpecialStatus.length > 0) {
+    const labels = selectableSpecialStatus.map((v) => SPECIAL_STATUS_LABEL_MAP[v] ?? v);
     parts.push(`특수상황: ${labels.join(" 또는 ")}`);
   }
   return parts;
+}
+
+const SPECIAL_STATUS_LABEL_MAP: Record<string, string> = Object.fromEntries(
+  SPECIAL_STATUS_OPTIONS.map((o) => [o.value, o.label])
+);
+
+// 학생이 프로필에서 고를 방법 자체가 없는 "확인 불가"(랭킹 전용) 특수상황 태그 — 프론트
+// SPECIAL_STATUS_OPTIONS에는 의도적으로 빠져있음(backend/app/models/enums.py의
+// UNVERIFIABLE_CONDITIONS와 동일한 목록). 상세페이지에서 "직접 확인 필요"(노란 점)로
+// 따로 보여주기 위한 한글 라벨.
+const UNVERIFIABLE_SPECIAL_STATUS_LABELS: Record<string, string> = {
+  parent_occupation_condition: "부모님 직업/소속 조건",
+  religious_or_career_intent_condition: "종교기관 소속·직분 또는 진로 지향 조건",
+  hometown_school_region_condition: "출신 학교/출신지 기준 조건",
+  suneung_score_condition: "수능 성적 기준 조건",
+  school_record_condition: "내신 성적 기준 조건",
+  credit_requirement_condition: "이수학점 조건(원문 확인 필요)",
+  extracurricular_program_condition: "학교 자체 비교과 프로그램 이수 조건",
+};
+
+// 상세페이지 "직접 확인 필요"(노란 점) 목록용 — required_special_status 중 학생이 선택할
+// 방법이 없는 태그들을 한글 라벨로 변환.
+export function unverifiableConditionParts(s: Scholarship): string[] {
+  return s.required_special_status
+    .map((v) => UNVERIFIABLE_SPECIAL_STATUS_LABELS[v])
+    .filter((label): label is string => Boolean(label));
 }
 
 // 목록 카드용 — 한 줄 요약

@@ -33,6 +33,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from description_gap_check import (  # noqa: E402
+    find_bracket_label_leak,
     find_gaps,
     find_generic_restriction_flag,
     find_placeholder_values,
@@ -71,6 +72,12 @@ def validate_rows(rows: list[dict]) -> None:
                 f"[포괄 제한문구] {label!r}: description에 강한 배제 문구(~외 지원불가/~만 해당/"
                 f"~에 한함 등)가 있는데 구조화된 자격조건이 전부 비어있음 — 어느 필드에 대한 "
                 f"제한인지 원문을 다시 봐서 채울 것."
+            )
+
+        if find_bracket_label_leak(row):
+            errors.append(
+                f"[원시 형태 잔존] {label!r}: description이 \"[지원금액] X / [비고] Y\"처럼 "
+                f"스프레드시트 칸 이름이 그대로 남은 형태로 보임 — 자연스러운 문장으로 다시 쓸 것."
             )
 
     if errors:
