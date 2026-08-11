@@ -152,6 +152,19 @@ def run_for_university(university: str) -> None:
     new_listings, skipped = dedup.filter_new(all_listings, existing)
     _log(f"[dedup] 신규 {len(new_listings)}건 / 스킵(기존 중복 추정) {len(skipped)}건")
 
+    # 처음 온보딩하는 대학은 게시판 역사 전체가 한 번에 "신규"로 잡힐 수 있어서
+    # config.MAX_NEW_ITEMS_PER_RUN으로 이번 실행분만 자름(2026-08-11, 한밭대 첫 실행이
+    # 1786건을 한 번에 처리하려다 5시간 넘게 걸리고 PR 본문 크기 제한에 걸려 실패한 사고
+    # 이후 추가). 게시판이 최신순으로 나열되므로 앞에서부터 자르면 최근 글이 우선 처리됨 —
+    # 잘려나간 나머지는 여전히 DB에 없으니 다음 나이트런이 자동으로 이어서 처리함.
+    if len(new_listings) > config.MAX_NEW_ITEMS_PER_RUN:
+        _log(
+            f"[dedup] 신규 {len(new_listings)}건이 상한({config.MAX_NEW_ITEMS_PER_RUN})을 "
+            f"넘어 최신 {config.MAX_NEW_ITEMS_PER_RUN}건만 이번 실행에서 처리 — "
+            f"나머지 {len(new_listings) - config.MAX_NEW_ITEMS_PER_RUN}건은 다음 나이트런에서 이어짐"
+        )
+        new_listings = new_listings[: config.MAX_NEW_ITEMS_PER_RUN]
+
     # 1단계: 원문 확보는 대학 사이트로 가는 HTTP 요청이라 계속 순차 + 간격 유지(WAF 대비,
     # config.REQUEST_DELAY_SECONDS 참고). Anthropic API 호출과는 별개 자원이라 여기서 미리
     # 분리해둠 — 이래야 다음 단계(추출)를 이 순차 제약 없이 동시에 돌릴 수 있음(2026-08-11).

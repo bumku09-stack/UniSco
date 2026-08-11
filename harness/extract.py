@@ -173,7 +173,10 @@ def extract_scholarship(
     field_names를 좁혀서 부르면(run.py가 2중 추출 대조용 호출에 씀) 필요한 필드만 채워서
     돌려줌 — 전체 스키마를 다시 추출하는 것보다 출력 토큰이 훨씬 적게 들고 응답도 빠름
     (2026-08-11, 원래는 대조에 쓰지도 않는 필드까지 매번 통째로 두 번 뽑고 있었음)."""
-    client = anthropic.Anthropic()
+    # 명시적 타임아웃 없으면 네트워크가 어딘가서 멈출 때 SDK 기본값(꽤 김)까지 그냥 기다림 —
+    # 여기에 재시도(_MAX_RETRIES)까지 겹치면 호출 하나가 비정상적으로 오래 걸릴 수 있어서
+    # 짧게 잡아둠(2026-08-11, 원인은 아니었던 것으로 확인됐지만 잠재 위험이라 같이 막음).
+    client = anthropic.Anthropic(timeout=120.0)
     tool = {
         "name": "extract_scholarship",
         "description": (

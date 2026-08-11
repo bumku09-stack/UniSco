@@ -208,6 +208,25 @@ def open_pr(branch_name: str, title: str, body: str, *, draft: bool = True) -> s
     return resp.json()["html_url"]
 
 
+# GitHub PR 본문 실제 상한은 65536자 — 근처까지 여유를 두고 자름(2026-08-11, 한밭대
+# 온보딩 첫 실행에서 리뷰 마크다운이 이 상한을 넘겨 PR 오픈 자체가 422로 실패한 사고 이후
+# 추가). run.py의 MAX_NEW_ITEMS_PER_RUN이 애초에 항목 수를 제한해서 이 상황 자체를 막지만,
+# 항목당 설명이 유독 길 경우까지 대비한 이중 안전장치임 — 잘려도 전체 내용은 커밋되는
+# md_path 파일에 그대로 남으므로 데이터 손실은 없음, PR 본문만 요약됨.
+_GITHUB_PR_BODY_MAX_CHARS = 60000
+
+
+def _pr_body(review_md: str, md_path: str) -> str:
+    if len(review_md) <= _GITHUB_PR_BODY_MAX_CHARS:
+        return review_md
+    truncated = review_md[:_GITHUB_PR_BODY_MAX_CHARS]
+    return (
+        f"{truncated}\n\n---\n"
+        f"⚠️ 리뷰 내용이 길어서 PR 본문은 여기서 잘렸습니다 — 전체 내용은 이 PR의 "
+        f"`{md_path}` 파일에서 확인할 것."
+    )
+
+
 def build_and_open_pr(
     university: str,
     verified_list: list[VerifiedScholarship],
@@ -245,7 +264,7 @@ def build_and_open_pr(
     try:
         _create_branch_and_commit(branch_name, files, commit_message)
         pushed = True
-        return open_pr(branch_name, title, review_md)
+        return open_pr(branch_name, title, _pr_body(review_md, md_path))
     except Exception:
         # 여기까지 오는 시점엔 이미 Anthropic API로 수집·추출을 다 끝낸 뒤라(비용 발생 완료),
         # git/PR 단계에서 죽어서 그 결과물을 통째로 날리면 손해가 큼 — 최소한 워크플로 로그에
