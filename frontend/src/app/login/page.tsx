@@ -3,10 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { AuthError, AuthLogo, authInputClass, authPrimaryButtonClass, AuthShell } from "@/components/auth-ui";
 import { postJson, setTokens } from "@/lib/auth";
-
-const inputClass =
-  "w-full rounded-2xl bg-gray-100 px-4 py-4 text-[15px] text-gray-900 placeholder:text-gray-400 outline-none transition focus:bg-blue-50 focus:ring-2 focus:ring-blue-500";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -33,66 +31,53 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-white">
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-16">
-        <Link href="/" className="mb-10 flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500 text-base font-bold text-white">
-            U
-          </div>
-          <span className="text-lg font-bold text-gray-900">UniSco</span>
+    <AuthShell>
+      <AuthLogo href="/" />
+
+      <h1 className="text-2xl font-bold leading-snug text-gray-900">로그인</h1>
+      <p className="mt-2 text-sm text-gray-500">저장해둔 스펙으로 바로 매칭 결과를 볼 수 있어요</p>
+
+      <form onSubmit={handleSubmit} className="mt-10 flex flex-col gap-3">
+        <input
+          type="text"
+          required
+          placeholder="아이디"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          className={authInputClass}
+        />
+        <input
+          type="password"
+          required
+          placeholder="비밀번호"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className={authInputClass}
+        />
+
+        {error && <AuthError>{error}</AuthError>}
+
+        <button type="submit" disabled={loading} className={authPrimaryButtonClass}>
+          {loading ? "로그인 중..." : "로그인"}
+        </button>
+      </form>
+
+      <p className="mt-4 text-center text-xs text-gray-400">
+        <Link href="/forgot-password" className="font-semibold text-blue-500">
+          비밀번호를 잊으셨나요?
         </Link>
+      </p>
 
-        <h1 className="text-2xl font-bold leading-snug text-gray-900">로그인</h1>
-        <p className="mt-2 text-sm text-gray-500">저장해둔 스펙으로 바로 매칭 결과를 볼 수 있어요</p>
-
-        <form onSubmit={handleSubmit} className="mt-10 flex flex-col gap-3">
-          <input
-            type="text"
-            required
-            placeholder="아이디"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className={inputClass}
-          />
-          <input
-            type="password"
-            required
-            placeholder="비밀번호"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className={inputClass}
-          />
-
-          {error && (
-            <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-500">{error}</p>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="mt-4 w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white transition hover:bg-blue-600 active:scale-[0.99] disabled:opacity-50"
-          >
-            {loading ? "로그인 중..." : "로그인"}
-          </button>
-        </form>
-
-        <p className="mt-4 text-center text-xs text-gray-400">
-          <Link href="/forgot-password" className="font-semibold text-blue-500">
-            비밀번호를 잊으셨나요?
-          </Link>
-        </p>
-
-        <p className="mt-2 text-center text-xs text-gray-400">
-          아직 계정이 없으신가요?{" "}
-          <Link href="/signup" className="font-semibold text-blue-500">
-            회원가입
-          </Link>
-          {" · "}
-          <Link href="/" className="font-semibold text-blue-500">
-            로그인 없이 둘러보기
-          </Link>
-        </p>
-      </div>
-    </div>
+      <p className="mt-2 text-center text-xs text-gray-400">
+        아직 계정이 없으신가요?{" "}
+        <Link href="/signup" className="font-semibold text-blue-500">
+          회원가입
+        </Link>
+        {" · "}
+        <Link href="/" className="font-semibold text-blue-500">
+          로그인 없이 둘러보기
+        </Link>
+      </p>
+    </AuthShell>
   );
 }
