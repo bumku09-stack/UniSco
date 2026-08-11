@@ -168,8 +168,8 @@ export default function HomePage() {
           >
             <p className="text-sm font-bold text-gray-900">⚠️ 이 결과, 저장 안 돼있어요</p>
             <p className="mt-1.5 text-xs leading-relaxed text-gray-500">
-              지금 보시는 건 임시 결과라 새로고침하거나 창을 닫으면 사라져요. 계속 보관하고
-              싶으면 회원가입해주세요 — 입력하신 정보 그대로 이어져요.
+              새로고침하거나 창을 닫으면 사라져요. 정보를 저장하고
+              싶으면 회원가입 후 상세 정보를 입력해주세요.
             </p>
             <div className="mt-4 flex gap-2">
               <button
