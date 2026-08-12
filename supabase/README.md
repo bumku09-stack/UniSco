@@ -30,18 +30,25 @@
 | `min_gpa_basis` | 위 `min_gpa`가 **직전학기** 성적 기준이면 `semester`, **전체 재학기간 누적(CGPA)** 기준이면 `cumulative` (2026-08-02 추가 — 같은 대학 안에서도 장학금마다 둘 중 하나를 요구하는 경우가 섞여 있어서 나눔) | 어느 쪽인지 설명에 안 나와 있거나 모르겠으면 비워둠(비워두면 둘 중 하나만 맞아도 통과되는 안전한 기본값으로 처리됨) |
 | `requires_disability` | 장애인만 받는 장학금이면 `true`, 아니면 비워둠 | 비워둠 |
 | `foreigner_eligibility` | 외국인만 되면 `foreigner_only`, 내국인만 되면 `korean_only` | 둘 다 되면 비워둠 |
-| `grade_level` (참고용) | 학년 조건 원문 (예: "학부 3~8학기차") | 텍스트로 자유롭게, 없으면 비워둠 |
-| `major` (참고용) | 전공 조건 원문 | 텍스트로 자유롭게, 없으면 비워둠 |
-| `affiliated_institution` (참고용) | 소속 대학/학과 조건 원문 | 텍스트로 자유롭게, 없으면 비워둠 |
-| `min_credits` | 이수학점 조건 | 텍스트로 자유롭게, 없으면 비워둠 |
-| `admission_score_condition` | 입시(수능/내신) 성적 조건 | 텍스트로 자유롭게, 없으면 비워둠 |
-| `headcount` | 선발 인원 | 텍스트로 자유롭게, 없으면 비워둠 |
-| `application_period` | 신청 기간 | 텍스트로 자유롭게, 없으면 비워둠 |
+| `major` ⭐매칭에 실제로 쓰임 | 전공 조건 — **실제 학과명으로, 여러 개면 콤마로** (예: `스포츠과학과,체육교육과`) | 전공 무관하면 비워둠. **비워두면 전교생에게 노출되니, 원문에 "OO학과 대상"/"OO특기자 전형 입학생 대상" 같은 조건이 있으면 반드시 채울 것**(2026-08-12 체육특기자 장학금이 전교생에게 노출된 사고 원인) |
+| `excluded_major` ⭐매칭에 실제로 쓰임 | "이 학과만 빼고 나머지 전부 됨" 유형일 때만 사용 (예: `한의예과,군사학과`) — `major`와 정반대 방향, 둘을 같이 채우면 안 됨 | 해당 없으면 비워둠 |
+| `grade_level` (참고용, 매칭 안 쓰임) | 학년 조건 원문 (예: "학부 3~8학기차") — `min_grade`/`max_grade`가 실제 필터링 담당, 이 칸은 표시도 안 됨(레거시) | 안 채워도 무방 |
+| `affiliated_institution` (참고용, 매칭 안 쓰임) | 소속 대학/학과 조건 원문 | 안 채워도 무방 |
+| `min_credits` (참고용, 매칭 안 쓰임) | 이수학점 조건 — 상세페이지에 원문 그대로 표시만 됨 | 텍스트로 자유롭게, 없으면 비워둠 |
+| `admission_score_condition` (참고용, 매칭 안 쓰임) | 입시(수능/내신) 성적 조건 — 상세페이지에 원문 그대로 표시만 됨 | 텍스트로 자유롭게, 없으면 비워둠 |
+| `headcount` (참고용, 매칭 안 쓰임) | 선발 인원 — 상세페이지에 원문 그대로 표시만 됨 | 텍스트로 자유롭게, 없으면 비워둠 |
+| `application_period` (참고용, 매칭 안 쓰임) | 신청 기간 원문 | 텍스트로 자유롭게, 없으면 비워둠 |
+| `application_deadline` ⭐매칭에 실제로 쓰임 | 확정 마감일 (날짜, 예: `2026-08-14`) — `application_period` 원문에 날짜가 있으면 여기도 같이 채울 것 | **비워두면 마감이 지나도 계속 노출됨**(2026-08-12 "마감 지난 장학금이 계속 뜬다" UX 리서치 1위 불만의 원인) — 원문에 확정 날짜가 없으면(매년 반복 공고 등) 그냥 비워두는 게 맞음, 추측해서 채우지 말 것 |
 | `eligible_university` ⭐매칭에 실제로 쓰임 | 대상 대학 — **짧은 태그로** (예: `충남대학교`, `KAIST`) | 대학 무관하면 비워둠 |
 | `eligible_college` ⭐매칭에 실제로 쓰임 | 대상 단과대 (예: `공과대학`) — 대학 이름 정확히 일치해야 매칭되니 `eligible_university`도 같이 채워야 의미 있음 | 단과대 무관하면 비워둠 |
 | `required_enrollment_status` ⭐매칭에 실제로 쓰임 | 재학 상태 — `undergrad_enrolled`(학부재학) / `undergrad_transfer`(학부편입) / `undergrad_leave`(학부휴학) / `post_undergrad`(대학원 등) | 무관하면 비워둠 |
 | `min_grade` / `max_grade` ⭐매칭에 실제로 쓰임 | 학부 학년 범위 (숫자, 예: 2학년 이상이면 min_grade=2) — `required_enrollment_status`가 학부 관련일 때만 의미 있음. **"신입생 전용" 장학금은 `min_grade=1, max_grade=1`로 입력** — 편입생은 1학년으로 들어오는 경우가 거의 없어서 이렇게만 해도 편입생이 자동으로 걸러짐 | 학년 제한 없으면 비워둠 |
 | `required_degree_level` ⭐매칭에 실제로 쓰임 | 대학원 과정 구분 — `masters`(석사) / `doctoral`(박사) / `integrated_ms_phd`(석박사통합). `required_enrollment_status`가 `post_undergrad`일 때만 의미 있음 | 무관하면 비워둠 |
+| `required_disability_type` ⭐매칭에 실제로 쓰임 | 장애 세부 유형 — `physical_impairment`/`learning_disability`/`medical_disability`/`mental_impairment`/`muscular_dystrophy`/`developmental_impairment`/`disabled_parent`(부모가 장애인, 본인 아님) 중 하나. `requires_disability`랑 별개 칸이라 자주 빠뜨림 | 세부 유형 무관하면 비워둠(`requires_disability=true`만으로 충분) |
+| `language_test_type` / `language_test_min_score` ⭐매칭에 실제로 쓰임 | 어학 성적 조건 — 타입은 `TOEIC`/`TOEFL`/`IELTS`/`TOPIK`/`기타`, 점수는 숫자만 (예: `TOEIC`, `900`) | 어학 조건 없으면 둘 다 비워둠 |
+| `required_special_status` ⭐매칭에 실제로 쓰임 | 특수상황 조건(여러 개 가능, OR — 이 중 하나라도 해당하면 통과) — 태그 전체 목록은 `data_collection_guide.md`의 "특수상황 태그 전체 목록" 참고 (예: `north_korean_defector`, `single_parent_family`) | 특수상황 조건 없으면 비워둠 |
+| `required_special_status_all` ⭐매칭에 실제로 쓰임 | 특수상황 조건(여러 개면 AND — 전부 다 해당해야 통과, 예: "다문화가정이면서 차상위") — 태그는 `required_special_status`와 동일 목록 | 해당 없으면 비워둠 |
+| `excluded_special_status` ⭐매칭에 실제로 쓰임 | "이 특수상황이면 무조건 탈락" 조건 — 태그는 위와 동일 목록 | 해당 없으면 비워둠 |
 | `category_l1` | 대분류 — `school_internal`(교내장학금) / `school_external`(교외장학금) / `support_fund`(지원금) | 분류 안 정했으면 비워둠 |
 | `category_l2` | 중분류 — 아래 표에서 `category_l1`에 맞는 값 골라서 입력 | 분류 안 정했으면 비워둠 |
 
@@ -57,7 +64,7 @@
 
 **`category_l1`/`category_l2`는 다른 컬럼이랑 성격이 달라요** — "이 장학금 누가 받을 수 있는지"(자격조건)가 아니라 "이 장학금이 어떤 종류인지"(분류)라서, 매칭 필터링에는 안 쓰이고 목록 화면에 표시/그룹핑하는 용도입니다. 애매한 경우(예: 연구메이트 지원사업처럼 연구지도가 아니라 튜터링 활동비 성격이면 `activity_participation_support`) 판단 기준은 계속 상의해서 정하면 됩니다.
 
-**⭐표시된 컬럼이 실제 매칭 필터링에 쓰이는 것들입니다.** `grade_level`/`major`/`affiliated_institution`(참고용 표시)은 지금 화면엔 값이 들어있어도 매칭 로직이 아직 안 읽습니다 — 나중에 정밀 매칭이 더 확장되면 그때 다시 쓰일 수 있어서 지우진 않았지만, 지금 당장 결과에 영향 주고 싶으면 ⭐표시된 새 컬럼들을 채워주셔야 합니다.
+**⭐표시된 컬럼이 실제 매칭 필터링에 쓰이는 것들입니다.** `grade_level`/`affiliated_institution`/`min_credits`/`admission_score_condition`/`headcount`/`application_period`(참고용 표시)은 상세페이지에 원문 그대로 표시되거나(일부는 표시조차 안 됨) 아직 매칭 로직이 안 읽습니다. **`major`는 2026-08-03부터 매칭에 실제로 쓰입니다** — 예전엔 참고용이었지만 지금은 아니니 반드시 채울 것. (이 문서가 실제 매칭 로직과 어긋난 적이 있었음 — 헷갈리면 이 표보다 `backend/app/core/matching.py`의 `is_eligible()`이 최종 기준입니다.)
 
 **`required_enrollment_status`에 `undergrad_enrolled`(학부재학)만 넣어도 편입생은 자동으로 포함됩니다** — "재학생 대상"이라고만 되어있는 장학금이면 편입생도 보통 해당되니, 편입생을 일부러 제외하고 싶은 장학금이 아닌 이상 `undergrad_transfer`를 따로 입력할 필요는 없습니다. 진짜로 "일반 신입생만(편입생 제외)"인 장학금이면 `min_grade=1, max_grade=1`을 같이 입력해주세요.
 

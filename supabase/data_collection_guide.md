@@ -72,7 +72,7 @@ description(원문 요약)과 원문 자체를 대조하면서 아래 항목을 
 | 7 | 소득기준 | `max_income_bracket` | "중위소득 N%" → 학자금지원구간 변환표 있음(`matching_gaps_resolved.md` 참고, 재사용). 근거 없이 숫자 채우면 안 됨(절대규칙 4번) |
 | 8 | 마감일 | `application_deadline` | 원문에 확정 마감일 있는데 안 채워서 이미 지난 공고가 계속 노출되던 사례 15건 이상 |
 | 9 | 전공조건(포함) | `major` | 원문에 있는데 빠뜨리면 전공 무관하게 노출됨 — 이번 사고의 핵심 원인 |
-| 10 | 전공조건(제외) | `excluded_major`(구현 예정, 아직 없음) | "이 학과만 빼고 다 됨" 유형 — 지금은 담을 칸이 없음, 발견하면 `matching_gaps.md`에 기록 |
+| 10 | 전공조건(제외) | `excluded_major` | "이 학과만 빼고 다 됨" 유형(2026-08-10 구현 완료, 예: 대전대 특별장학금 — 한의예과·군사학과 제외) |
 | 11 | 특수상황조건 | `required_special_status` | 이미 있는 태그(학생회임원/국가유공자/다문화 등)를 빠뜨리는 실수 다수 — **입력 전에 태그 전체 목록을 항상 같이 참고할 것**(아래 "특수상황 태그 전체 목록" 참고) |
 | 12 | 장애조건 | `requires_disability`/`required_disability_type` | 특수상황이랑 별개 칸이라는 걸 안 알려줘서 "장애 등록" 조건을 8번 넘게 놓친 사례 — 조사 브리핑할 때 반드시 같이 언급할 것 |
 | 13 | 외국인조건 | `foreigner_eligibility` | 외국인 전용 장학금인데 빠뜨린 사례 있음(숲과나눔 글로벌리더십) |
@@ -98,15 +98,21 @@ description(원문 요약)과 원문 자체를 대조하면서 아래 항목을 
 `multicultural_family`(다문화가정), `child_care_facility`(아동양육시설 생활자/퇴소자),
 `student_council_officer`(학생자치단체 임원), `single_parent_family`(한부모가정),
 `grandparent_family`(조손가정), `multi_child_family`(다자녀가정, 2자녀 이상),
-`national_merit`(국가유공자), `basic_livelihood_recipient`(기초생활수급자),
-`near_poor`(차상위계층), `not_applicable`(해당사항 없음).
+`national_merit`(국가유공자), `righteous_person_family_condition`(의사상자 유족·가족,
+2026-08-10 "확인 불가"에서 승격됨 — national_merit과 근거 법률이 다르니 섞지 말 것),
+`basic_livelihood_recipient`(기초생활수급자), `near_poor`(차상위계층),
+`severe_illness_or_injury`(중증질병 및 상해), `job_loss_or_disaster`(실직가정·재난 및 재해),
+`financial_emergency`(긴급가계곤란, 이상 세 개는 2026-08-03 배재대 희망복지장학금·대전대
+장학사정관장학금류 복합조건 재분류 때 추가됐는데 이 목록에 빠져있었음 — 발견하면 놓치지
+말 것), `not_applicable`(해당사항 없음).
 
 **확인 불가(랭킹 전용, 학생 선택 불가)**: `parent_occupation_condition`(부모 직업/소속),
 `religious_or_career_intent_condition`(종교기관 소속·직분·진로지향),
-`sub_region_residence_condition`(용도 소멸, 14번이 자격 필터링으로 대체),
 `hometown_school_region_condition`(출신 학교/출신지 기준), `suneung_score_condition`(수능성적),
 `school_record_condition`(내신), `credit_requirement_condition`(이수학점 조건),
-`extracurricular_program_condition`(비교과 프로그램), `righteous_person_family_condition`(의사상자 유족·가족).
+`extracurricular_program_condition`(비교과 프로그램).
+(`sub_region_residence_condition`는 2026-08-05 district/parent_district 매칭 도입으로
+완전히 제거됨 — enums.py에 더 이상 없음, 더 이상 쓰지 말 것.)
 
 새로운 유형의 조건을 발견했는데 위 목록 어디에도 안 맞으면 절대규칙 5번대로 처리 — 새 태그를
 바로 만들지 말고 `matching_gaps.md`에 먼저 기록해서 논의.
