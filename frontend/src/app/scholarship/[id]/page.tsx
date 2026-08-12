@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import { TopBar } from "@/components/form-ui";
-import { authFetch, isLoggedIn } from "@/lib/auth";
+import { apiUrl, authFetch, isLoggedIn } from "@/lib/auth";
 import {
   CATEGORY_L2_LABEL,
   eligibilityList,
@@ -62,7 +62,7 @@ export default function ScholarshipDetailPage({
   // 건)을 받아서 그중 하나를 골라 쓰는 방식이라 상세페이지 열 때마다 느렸음. "이런 장학금은
   // 어때요" 추천 섹션만 전체 목록이 필요해서, 본문 렌더링을 막지 않게 따로(병렬로) 받아옴.
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/scholarships/${id}`)
+    fetch(apiUrl(`/scholarships/${id}`))
       .then((res) => (res.ok ? res.json() : null))
       .then(setScholarship)
       .catch(() => setScholarship(null));
@@ -84,7 +84,7 @@ export default function ScholarshipDetailPage({
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
-      <div className="mx-auto w-full max-w-md flex-1 px-6 pb-32 pt-6">
+      <div className="mx-auto w-full max-w-md flex-1 px-6 pb-32 pt-6 sm:max-w-xl md:max-w-2xl">
         <TopBar
           right={
             <Link href="/home" className="text-sm font-semibold text-gray-400">
@@ -229,7 +229,7 @@ export default function ScholarshipDetailPage({
       {/* 스크롤해도 항상 보이는 신청 버튼 */}
       {scholarship?.application_url && (
         <div className="sticky bottom-0 border-t border-gray-100 bg-white/95 px-6 py-4 backdrop-blur">
-          <div className="mx-auto w-full max-w-md">
+          <div className="mx-auto w-full max-w-md sm:max-w-xl md:max-w-2xl">
             <a
               href={scholarship.application_url}
               target="_blank"

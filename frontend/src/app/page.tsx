@@ -20,7 +20,7 @@ export default function LandingPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-16">
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-16 sm:max-w-lg">
         <div className="mb-10 flex items-center gap-2">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500 text-base font-bold text-white">
             U

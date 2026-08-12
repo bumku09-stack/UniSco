@@ -8,6 +8,9 @@ Next.js (App Router) + React + TypeScript + Tailwind CSS. 회원가입/이메일
 src/
 ├── app/
 │   ├── layout.tsx      # 루트 레이아웃 — 모든 페이지를 감싸는 껍데기, 폰트 설정 + <html>/<body>
+│   ├── error.tsx        # 라우트 세그먼트 렌더링 중 예외 발생 시 대체 화면("다시 시도" 버튼) — 2026-08-13 추가, 이전엔 Next.js 기본 에러 화면만 떴음
+│   ├── global-error.tsx # 루트 layout.tsx 자체가 실패하는 극단적 경우용(자체 <html>/<body> 필요) — 2026-08-13 추가
+│   ├── not-found.tsx    # 존재하지 않는 경로 진입 시 대체 화면 — 2026-08-13 추가
 │   ├── page.tsx         # "/" 라우트 — 랜딩/선택 화면(2026-08-10 개편, 예전엔 로그인 폼이었음). "지금 바로 둘러보기" → /spec(게스트), "로그인" → /login
 │   ├── globals.css      # Tailwind 진입점 + 전역 스타일
 │   ├── login/
@@ -31,7 +34,7 @@ src/
 │   ├── spec-fields.tsx       # SchoolFields/CommonFields/OptionalFields — /spec, /mypage가 그대로 공유하는 필드 묶음(2026-08-04 추출, 아래 참고)
 │   └── ScholarshipResults.tsx # 통계·분류필터·정렬·카드·페이지네이션 — /home이 로그인/게스트 두 모드에서 공유(2026-08-10 추출)
 └── lib/
-    ├── auth.ts           # 토큰 저장(localStorage) + authFetch(401이면 refresh 토큰으로 조용히 재시도, 그것도 실패하면 로그아웃) + postJson(로그인 전 페이지용)
+    ├── auth.ts           # 토큰 저장(localStorage) + authFetch(401이면 refresh 토큰으로 조용히 재시도, 그것도 실패하면 로그아웃) + postJson(로그인 전 페이지용) + apiUrl(NEXT_PUBLIC_API_URL 미설정 시 방어, 2026-08-13 추가 — 모든 API 호출이 이걸 거침)
     ├── guest.ts           # 게스트 스펙·매칭 결과 sessionStorage 저장소(2026-08-10 추가) — 서버에 원본이 없는 유일한 사본
     ├── spec.ts            # UserSpec/SpecForm 타입, specFormToUserSpec/userSpecToSpecForm 변환
     ├── scholarship.ts     # Scholarship 타입, 정렬/분류/유사추천 헬퍼
@@ -100,8 +103,21 @@ npm run dev                    # http://localhost:3000
 
 두 페이지가 다른 부분(위저드 단계 구분, 신입생 안내 문구 `showFreshmanHint`, `/mypage`의 draft 자동저장·복원 배너 등)은 각 `page.tsx`에 그대로 남아있음 — 공유되는 건 순수 필드 편집 UI뿐임.
 
-## 남은 것 (2026-08-12 기준)
+## 남은 것 (2026-08-13 기준)
 
-- 브라우저로 직접 클릭해보며 하는 E2E 테스트는 여전히 없음(이 환경엔 브라우저 자동화 도구가 없음) — `next build`/`tsc`/`eslint` 통과, 그리고 curl로 백엔드 API 실제 호출 순서(로그인→스펙저장→추천→수정, 게스트 매칭, 찜하기, 비밀번호 재설정 등)까지는 검증했지만, 실제 브라우저에서 폼 입력/클릭까지 확인한 기능이 아직 많음 — 새 화면 추가할 때마다 실제 브라우저로 한 번씩 눌러보고 확인 권장.
+- 브라우저로 직접 클릭해보며 하는 E2E 테스트는 여전히 없음(이 환경엔 브라우저 자동화 도구가 없음) — `next build`/`tsc`/`eslint` 통과까지는 매번 확인하지만, 실제 브라우저에서 폼 입력/클릭까지 확인한 기능이 아직 많음 — 새 화면 추가할 때마다 실제 브라우저로 한 번씩 눌러보고 확인 권장.
+- **JWT를 `localStorage`에 평문 저장 중** — 배포 전 점검(2026-08-13)에서 나온 가장 큰 보안 갭. 정석 해결책은 백엔드가 `httpOnly` 쿠키로 토큰을 내려주는 방식으로 전환하는 것인데, 프론트(Vercel)와 백엔드(Railway)가 서로 다른 도메인이라 `SameSite=None` 크로스사이트 쿠키가 필요하고, Safari 등 일부 브라우저의 서드파티 쿠키 차단 정책에 걸려 로그인이 깨질 위험이 있음 — 백엔드(`backend/app/api/auth.py`, `backend/app/api/deps.py`) 변경까지 같이 필요한 작업이라 이번엔 손 안 대고 남겨둠. 진행하려면 같은 도메인으로 묶는 Vercel rewrite/프록시 구성까지 같이 설계할 것.
 - 게스트 회원가입 전환 시 로그인까지는 여전히 수동임(자동 로그인 없음) — `/signup` 인증 완료 후 `/login`으로 보내고 직접 로그인해야 `/spec`에 게스트 데이터가 이어짐. 전환 단계를 더 줄이고 싶으면 인증 성공 시 자동 로그인을 추가하는 걸 고려할 것(지금은 로그인/회원가입 로직을 분리해두려고 일부러 그대로 둠).
 - 실사용자 UX 리서치(5~6명)에서 나온 피드백 기반 개선이 진행형 — 매칭 정확도 이슈(마감일·전공 조건 등)가 우선순위. 루트 `README.md`의 "개발 방향 / 예정" 참고.
+
+## 배포 전 프론트 하드닝 (2026-08-13)
+
+첫 실사용자 배포를 앞두고 프론트 코드를 감사해서 나온 블로커 5개를 고침 — 상세 내역은 커밋 메시지 참고, 요약만 남김:
+
+- 에러 바운더리 부재 → `error.tsx`/`global-error.tsx`/`not-found.tsx` 신설
+- `home`/`saved`/`mypage` 진입 시 네트워크 자체가 끊기면(서버 다운 등) `authFetch`가 reject하는데 try/catch가 없어서 로딩 스피너가 무한정 안 멈췄음 → 세 곳 다 try/catch 추가
+- `<html lang="en">`(전체가 한국어 서비스인데) → `lang="ko"`
+- `NEXT_PUBLIC_API_URL` 미설정 시 방어 없이 `undefined/...` 요청이 조용히 나가던 것 → `lib/auth.ts`의 `apiUrl()`로 통일, 없으면 즉시 에러
+- 모든 페이지가 `max-w-md`(448px) 고정 폭이라 PC 화면에서 좌우 여백만 큰 좁은 카드로 보이던 것 → 브레이크포인트별 폭 확장(`sm/md/lg`), 장학금 카드 목록(`home`/`saved`)은 `md` 이상에서 2열 그리드로 전환
+
+남은 블로커는 위 "JWT를 localStorage에 평문 저장 중" 항목 하나뿐.

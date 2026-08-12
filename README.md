@@ -62,6 +62,7 @@ cd frontend && npm run dev                                                # http
 5. ~~**실제 로그인 연동**~~ — 완료. 회원가입(이메일 인증)/로그인/비밀번호 재설정/회원탈퇴/스펙 저장·수정(마이페이지)까지 프론트-백엔드 전체 연결됨. access token 만료 시 조용한 refresh, 인증 관련 엔드포인트(재발송/비밀번호 찾기) rate limit 적용됨.
 6. ~~**장학금 상세 페이지 + 찜하기**~~ — 완료. `/scholarship/[id]` — 자격조건 체크리스트, 비슷한 장학금 추천, 신청 링크, 저장("찜")/`/saved`에서 모아보기.
 7. **마이그레이션 도구화** — 아직 안 함. 스키마가 계속 바뀌는 중이라 지금은 `SQLModel.metadata.create_all()` + 수동 `ALTER TABLE`로 운영, 변경 빈도가 줄어들면 Alembic 등 도입 검토.
+8. ~~**배포 전 프론트 하드닝**~~ — 완료(2026-08-13). 에러 바운더리 부재, 네트워크 실패 시 무한로딩(`home`/`saved`/`mypage`), `<html lang="en">` 오류, `NEXT_PUBLIC_API_URL` 미설정 방어 없음, PC 화면 반응형 레이아웃 부재 — 5개 블로커 수정. 상세는 `frontend/README.md`의 "배포 전 프론트 하드닝" 참고. JWT `localStorage` 평문 저장 문제만 백엔드 동반 작업 필요해서 남겨둠(아래 "개발 방향" 참고).
 
 ## 개발 방향 / 예정 (2026-08-12 기준)
 
@@ -73,3 +74,4 @@ cd frontend && npm run dev                                                # http
 - **하네스 성능/비용 튜닝**: 추출 모델 선택(Sonnet/Haiku 2중 추출), 동시성(4), 나이트런당 처리량(대학 1~2곳, 신규 40건 상한) 전부 초기 판단값이고 실측 벤치마크는 아직 안 함(`harness/config.py` 참고) — 트래픽/비용이 늘면 재검토 대상.
 - **마이그레이션 도구 도입**: 스키마 변경 빈도가 줄어들면 `SQLModel.metadata.create_all()` + 수동 `ALTER TABLE` 대신 Alembic 등으로 전환 검토.
 - **회귀 방지 자동화 부족**: 브라우저 E2E 테스트가 아직 없음(`frontend/README.md` "남은 것" 참고) — 프론트 변경 시 수동 확인에 의존 중.
+- **JWT `localStorage` 저장 → `httpOnly` 쿠키 전환**: 배포 전 점검(2026-08-13)에서 나온 가장 큰 보안 갭. 프론트(Vercel)·백엔드(Railway)가 다른 도메인이라 크로스사이트 쿠키(`SameSite=None`) 필요 — Safari 등 서드파티 쿠키 차단 정책과 충돌 위험이 있어 Vercel rewrite/프록시로 같은 도메인처럼 묶는 설계까지 같이 필요함. 프론트(`frontend/src/lib/auth.ts`)·백엔드(`backend/app/api/auth.py`, `backend/app/api/deps.py`) 동반 작업. 상세는 `frontend/README.md` "남은 것" 참고.

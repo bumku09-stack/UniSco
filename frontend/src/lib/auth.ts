@@ -3,6 +3,18 @@ import { clearCachedRecommendations } from "@/lib/recommendations-cache";
 const ACCESS_TOKEN_KEY = "unisco_access_token";
 const REFRESH_TOKEN_KEY = "unisco_refresh_token";
 
+// NEXT_PUBLIC_API_URL이 배포 환경(Vercel)에 빠지면 이 전엔 그냥 "undefined/auth/login" 같은
+// URL로 조용히 요청이 나가서 원인 파악이 어려웠음(2026-08-13 발견) — 여기서 한 번에 막고
+// 콘솔에 원인이 바로 보이는 에러를 던짐. 모든 API 호출이 이 함수를 거치게 해서 누락되는
+// 곳이 없게 함.
+export function apiUrl(path: string): string {
+  const base = process.env.NEXT_PUBLIC_API_URL;
+  if (!base) {
+    throw new Error("NEXT_PUBLIC_API_URL이 설정되지 않았습니다. 배포 환경변수를 확인해주세요.");
+  }
+  return `${base}${path}`;
+}
+
 // mypage/page.tsx가 "작성하다 만 내용" 임시저장에 씀 — 여기서 export하는 이유는 clearTokens가
 // 이것도 같이 지워야 해서(유저 구분 없이 sessionStorage에 저장되는 건 전부 로그아웃/탈퇴 시
 // 같이 지워야 다음 사람한테 안 새어나감, 위 recommendations-cache와 같은 이유).
@@ -66,7 +78,7 @@ export async function postJson(
   networkErrorFallback: string
 ): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; error: string }> {
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${path}`, {
+    const res = await fetch(apiUrl(path), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -93,7 +105,7 @@ async function refreshAccessToken(): Promise<boolean> {
       const refreshToken = getRefreshToken();
       if (!refreshToken) return false;
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, {
+        const res = await fetch(apiUrl("/auth/refresh"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ refresh_token: refreshToken }),
@@ -126,7 +138,7 @@ async function refreshAccessToken(): Promise<boolean> {
 // 화면으로 강제 이동시키면 안 됨 — "로그인된 적 없는데 로그아웃"은 애초에 성립 안 하는
 // 상태라, 이런 요청은 그냥 실패로 두고 호출한 쪽이 조용히 처리하게 함.
 export async function authFetch(path: string, options: RequestInit = {}): Promise<Response> {
-  const url = `${process.env.NEXT_PUBLIC_API_URL}${path}`;
+  const url = apiUrl(path);
   const tokenAtRequestTime = getAccessToken();
   const res = await fetch(url, { ...options, headers: authHeaders(tokenAtRequestTime, options.headers) });
   if (res.status !== 401) return res;

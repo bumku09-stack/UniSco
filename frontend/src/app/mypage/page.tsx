@@ -49,28 +49,35 @@ export default function MyPage() {
     }
 
     (async () => {
-      const res = await authFetch("/users/me/spec");
-      if (res.status === 404) {
-        router.replace("/spec");
-        return;
-      }
-      if (!res.ok) {
-        setError("스펙을 불러오지 못했습니다.");
-        setLoading(false);
-        return;
-      }
-      const data: UserSpec = await res.json();
-      setSpec(userSpecToSpecForm(data));
-      setOptionalInfo(userSpecToOptionalInfo(data));
-      setLoading(false);
-
-      const draftRaw = sessionStorage.getItem(DRAFT_KEY);
-      if (draftRaw) {
-        try {
-          setDraft(JSON.parse(draftRaw));
-        } catch {
-          sessionStorage.removeItem(DRAFT_KEY);
+      // authFetch가 network 자체 실패에는 reject하므로, try/catch 없이 두면 "불러오는 중..."
+      // 스피너가 안 멈췄음 — home/saved page와 동일한 이유(2026-08-13).
+      try {
+        const res = await authFetch("/users/me/spec");
+        if (res.status === 404) {
+          router.replace("/spec");
+          return;
         }
+        if (!res.ok) {
+          setError("스펙을 불러오지 못했습니다.");
+          setLoading(false);
+          return;
+        }
+        const data: UserSpec = await res.json();
+        setSpec(userSpecToSpecForm(data));
+        setOptionalInfo(userSpecToOptionalInfo(data));
+        setLoading(false);
+
+        const draftRaw = sessionStorage.getItem(DRAFT_KEY);
+        if (draftRaw) {
+          try {
+            setDraft(JSON.parse(draftRaw));
+          } catch {
+            sessionStorage.removeItem(DRAFT_KEY);
+          }
+        }
+      } catch {
+        setError("서버에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.");
+        setLoading(false);
       }
     })();
   }, [router]);
@@ -125,7 +132,7 @@ export default function MyPage() {
   if (loading || spec === null) {
     return (
       <div className="min-h-screen bg-white">
-        <div className="mx-auto w-full max-w-md px-6 py-6">
+        <div className="mx-auto w-full max-w-md px-6 py-6 sm:max-w-xl md:max-w-2xl">
           <TopBar />
           {!error && <p className="mt-8 text-center text-sm text-gray-400">불러오는 중...</p>}
           {error && (

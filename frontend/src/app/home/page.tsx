@@ -60,34 +60,44 @@ export default function HomePage() {
       // 걸 막기 위함.
       const hadCache = cached !== null;
 
-      const statusRes = await authFetch("/users/me/spec-status");
-      if (!statusRes.ok) {
-        if (!hadCache) {
-          setError("정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
-          setLoading(false);
+      // authFetch는 network 자체가 끊기면(서버 다운, DNS 실패 등) reject하지 그냥 !ok로
+      // 돌아오지 않음 — try/catch 없이 두면 이 IIFE가 그대로 중단돼서 setLoading(false)를
+      // 못 타고 "매칭 중..." 스피너가 영원히 안 멈췄음(2026-08-13 발견).
+      try {
+        const statusRes = await authFetch("/users/me/spec-status");
+        if (!statusRes.ok) {
+          if (!hadCache) {
+            setError("정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
+            setLoading(false);
+          }
+          return;
         }
-        return;
-      }
-      const status = await statusRes.json();
-      if (!status.spec_completed) {
-        router.replace("/spec");
-        return;
-      }
+        const status = await statusRes.json();
+        if (!status.spec_completed) {
+          router.replace("/spec");
+          return;
+        }
 
-      const recRes = await authFetch("/scholarships/recommendations");
-      if (!recRes.ok) {
-        // 캐시된 이전 결과가 이미 화면에 떠 있으면 그거 그대로 두고 조용히 넘어감 —
-        // 캐시가 없을 때만(최초 진입) 에러를 실제로 보여줌.
+        const recRes = await authFetch("/scholarships/recommendations");
+        if (!recRes.ok) {
+          // 캐시된 이전 결과가 이미 화면에 떠 있으면 그거 그대로 두고 조용히 넘어감 —
+          // 캐시가 없을 때만(최초 진입) 에러를 실제로 보여줌.
+          if (!hadCache) {
+            setError("매칭에 실패했습니다. 백엔드 서버가 켜져 있는지 확인해주세요.");
+            setLoading(false);
+          }
+          return;
+        }
+        const data: Scholarship[] = await recRes.json();
+        setResults(data);
+        setCachedRecommendations(data);
+        setLoading(false);
+      } catch {
         if (!hadCache) {
-          setError("매칭에 실패했습니다. 백엔드 서버가 켜져 있는지 확인해주세요.");
+          setError("서버에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.");
           setLoading(false);
         }
-        return;
       }
-      const data: Scholarship[] = await recRes.json();
-      setResults(data);
-      setCachedRecommendations(data);
-      setLoading(false);
     })();
   }, [router]);
 
@@ -103,7 +113,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-white pb-16">
-      <div className="mx-auto w-full max-w-md px-6 py-6">
+      <div className="mx-auto w-full max-w-md px-6 py-6 sm:max-w-xl md:max-w-2xl lg:max-w-3xl lg:px-10">
         <TopBar
           right={
             loading ? undefined : guestMode ? (

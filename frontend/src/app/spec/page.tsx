@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { TopBar } from "@/components/form-ui";
 import { CommonFields, OptionalFields, SchoolFields, deriveSpecFields } from "@/components/spec-fields";
-import { authFetch, isLoggedIn } from "@/lib/auth";
+import { apiUrl, authFetch, isLoggedIn } from "@/lib/auth";
 import { clearGuestData, getGuestSpec, saveGuestResults, saveGuestSpec } from "@/lib/guest";
 import { SIDO_LIST } from "@/lib/regions";
 import { initialOptionalInfo, OptionalInfo, specFormToUserSpec, SpecForm, UserSpec } from "@/lib/spec";
@@ -93,7 +93,7 @@ export default function SpecWizard() {
     setError(null);
     try {
       const body: UserSpec = specFormToUserSpec(spec, initialOptionalInfo);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/match`, {
+      const res = await fetch(apiUrl("/match"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -140,7 +140,7 @@ export default function SpecWizard() {
   if (mode === "loading") {
     return (
       <div className="min-h-screen bg-white">
-        <div className="mx-auto w-full max-w-md px-6 py-6">
+        <div className="mx-auto w-full max-w-md px-6 py-6 sm:max-w-xl md:max-w-2xl">
           <TopBar />
         </div>
       </div>
