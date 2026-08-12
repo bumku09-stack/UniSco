@@ -37,6 +37,7 @@ UniSco/
 - [harness/README.md](./harness/README.md) — 자동 수집 파이프라인 구조, 대학 온보딩 방법, 알려진 한계
 - [supabase/README.md](./supabase/README.md) — 호스팅 DB가 뭔지, 친구가 Studio로 데이터 입력하는 방법
 - [supabase/data_collection_guide.md](./supabase/data_collection_guide.md) — 조사/입력할 때 자주 놓치는 항목 체크리스트, 특수상황 태그 전체 목록
+- [supabase/handoff_2026-08-12.md](./supabase/handoff_2026-08-12.md) — 데이터 작업 인수인계: 지금 이어서 할 것, 보류된 것, 정기적으로 돌려야 하는 감사 스크립트 목록
 
 ## 빠른 시작
 
