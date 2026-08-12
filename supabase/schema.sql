@@ -35,7 +35,9 @@ CREATE TYPE specialstatus AS ENUM (
     'multi_child_family', 'national_merit',
     -- 2026-08-03 추가 — 희망복지장학금·장학사정관장학금 등 복합조건 장학금 재분류하며 필요해짐
     'basic_livelihood_recipient', 'near_poor', 'severe_illness_or_injury',
-    'job_loss_or_disaster', 'financial_emergency'
+    'job_loss_or_disaster', 'financial_emergency',
+    -- 2026-08-12 추가 — 경쟁 서비스(이루리) 회원가입 폼 검토 중 발견, 실제 DB 재검토로 확인.
+    'rural_student', 'parent_university_staff', 'parent_university_alumni'
 );
 -- undergrad_transfer(편입)는 2026-07-31 ALTER TYPE으로 추가됨. 매칭 시 undergrad_enrolled
 -- 요구조건은 undergrad_transfer도 만족시키는 것으로 취급함(둘 다 "현재 재학중") —
@@ -89,6 +91,9 @@ CREATE TABLE scholarship (
     excluded_major VARCHAR,
     affiliated_institution VARCHAR,
     min_credits VARCHAR,
+    -- 2026-08-12 추가 — min_credits 원문 중 "직전학기 N학점 이상"으로 안전하게 환산되는
+    -- 경우만 구조화해서 실제 매칭에 씀(GPA와 동일한 패턴).
+    min_credits_last_semester INTEGER,
     admission_score_condition VARCHAR,
     headcount VARCHAR,
     application_period VARCHAR,
@@ -150,6 +155,7 @@ CREATE TABLE savedspec (
     department VARCHAR,  -- 2026-08-03 추가(matching_gaps.md 2번), 선택 입력
     semester_gpa FLOAT NOT NULL,  -- 2026-08-02: 기존 gpa 컬럼을 semester_gpa로 개명
     cumulative_gpa FLOAT NOT NULL,  -- 2026-08-02 신규 추가
+    credits_last_semester INTEGER,  -- 2026-08-12 추가, 선택 입력(null=모름)
     age INTEGER NOT NULL,
     gender gender NOT NULL,
     region VARCHAR NOT NULL,

@@ -135,6 +135,20 @@ class SpecialStatus(str, Enum):
     SEVERE_ILLNESS_OR_INJURY = "severe_illness_or_injury"  # 중증질병 및 상해
     JOB_LOSS_OR_DISASTER = "job_loss_or_disaster"  # 실직가정·재난 및 재해
     FINANCIAL_EMERGENCY = "financial_emergency"  # 긴급가계곤란
+    # 2026-08-12 추가 — 경쟁 서비스(이루리) 회원가입 폼 검토 중 발견. 학생 본인이 "농어촌(읍·면)
+    # 출신"이라는 명확한 자기신고 가능 사실이라 선택 가능 항목으로 바로 추가함(확인 불가로
+    # 거칠 필요 없음). "농업인 자녀"(부모 직업)와는 다른 개념이니 섞지 말 것 — 그건
+    # parent_occupation_condition(확인 불가) 영역.
+    RURAL_STUDENT = "rural_student"  # 농어촌(읍·면) 출신 학생
+    # 2026-08-12 추가 — 34건의 parent_occupation_condition(확인 불가) 태그를 전수 재검토하다
+    # 발견: 그중 10건은 "아무 직업"이 아니라 정확히 "본인이 재학 중인 그 대학의 교직원/동문
+    # 자녀"라는, eligible_university와 엮이는 훨씬 구체적이고 검증 가능한 조건이었음(예:
+    # "배재학당 소속 교직원의 자녀"). 이건 학생이 "우리 학교 교직원/동문 자녀인가요"에 예/
+    # 아니오로 답할 수 있는 성격이라 확인 불가로 둘 이유가 없음. staff/alumni를 분리한 이유는
+    # 실제 데이터에 "교직원만 해당"과 "동문만 해당"이 조건이 다른 채로 섞여 있어서(둘 다
+    # 해당하는 경우는 required_special_status에 둘 다 넣으면 됨).
+    PARENT_UNIVERSITY_STAFF = "parent_university_staff"  # 부모가 재학 대학(원) 교직원
+    PARENT_UNIVERSITY_ALUMNI = "parent_university_alumni"  # 부모가 재학 대학(원) 동문(졸업생)
     # 2026-08-07 추가 — "해당사항 없음". 지금까지 특수상황 칸을 하나도 안 누른 학생은 "아직
     # 대답 안 함"으로 취급돼서(special_status_matches()의 leniency) 특수상황 조건이 걸린
     # 장학금도 계속 노출됐는데, "나는 이 중 어디에도 해당 안 함"을 확정하고 싶은 학생에게는

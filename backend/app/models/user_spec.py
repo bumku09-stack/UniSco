@@ -26,6 +26,10 @@ class UserSpec(SQLModel):
     department: str | None = None  # 학과 (예: 컴퓨터공학과) — 2026-08-03 추가, matching_gaps.md 2번
     semester_gpa: float  # 직전 학기 평점평균 (해당 대학 만점 기준 원점수, 정규화는 matching.py에서)
     cumulative_gpa: float  # 전체 재학기간 누적 평점평균(CGPA) — 마찬가지로 원점수
+    # 2026-08-12 추가 — GPA와 동일한 방식(학생 자기입력)으로 이수학점 조건도 실제 매칭에
+    # 쓰기 위해 추가. None="입력 안 함/모름" — 이수학점 조건이 있는 장학금도 안 거름(GPA와
+    # 달리 이 필드는 선택 입력, credits_matches() 참고).
+    credits_last_semester: int | None = None
     age: int
     gender: Gender
     region: str

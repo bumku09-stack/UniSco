@@ -97,7 +97,14 @@ class Scholarship(SQLModel, table=True):
     # None=제외 학과 없음(기존과 동일). core/matching.py의 major_matches() 참고.
     excluded_major: str | None = None
     affiliated_institution: str | None = None  # (레거시, 구조화 전 원문) 소속 대학/학과 텍스트
-    min_credits: str | None = None  # 이수학점 조건 (형식이 제각각이라 텍스트)
+    min_credits: str | None = None  # 이수학점 조건 원문 (형식이 제각각이라 텍스트, 참고용)
+    # 2026-08-12 추가 — min_credits 원문 중 "직전학기 N학점 이상" 형태로 안전하게 파싱되는
+    # 경우만 구조화해서 실제 매칭에 씀(GPA와 동일한 패턴 — 학생이 자기 이수학점을 직접
+    # 입력). "졸업학기는 N학점만 돼도 됨" 같은 예외가 있는 경우 더 낮은(관대한) 쪽 숫자를
+    # 씀(과다매칭이 과소매칭보다 낫다는 원칙). 특정 전공 교과목 학점처럼 "직전학기 총
+    # 이수학점"과 다른 개념이면 이 필드를 안 채우고 min_credits 원문 + credit_requirement_
+    # condition 태그로만 남김(core/matching.py의 credits_matches() 참고).
+    min_credits_last_semester: int | None = None
     admission_score_condition: str | None = None  # 내신/입학성적 조건
     headcount: str | None = None  # 선발 인원
     application_period: str | None = None  # 신청 기간

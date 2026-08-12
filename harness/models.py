@@ -41,6 +41,7 @@ SCHOLARSHIP_FIELD_NAMES: tuple[str, ...] = (
     "admission_track",
     "affiliated_institution",
     "min_credits",
+    "min_credits_last_semester",
     "admission_score_condition",
     "headcount",
     "application_period",

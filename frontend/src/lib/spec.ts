@@ -44,6 +44,9 @@ export type UserSpec = {
   language_test_score: number | null;
   disability_type: string | null;
   special_status: string[];
+  // 2026-08-12 추가 — GPA와 동일한 방식(학생 자기입력)으로 이수학점 조건도 실제 매칭에 씀.
+  // null="입력 안 함/모름" — 이수학점 조건이 있는 장학금도 안 거름. 아래 OptionalInfo 참고.
+  credits_last_semester: number | null;
 };
 
 // 의예과·수의예과·한의예과(2년제 예과) — 여기 1학년은 진짜 신입생.
@@ -108,6 +111,7 @@ export type SpecForm = Omit<
   | "disability_type"
   | "special_status"
   | "admission_track"
+  | "credits_last_semester"
 > & {
   age: string;
   semester_gpa: string;
@@ -153,6 +157,10 @@ export function specFormToUserSpec(spec: SpecForm, optionalInfo: OptionalInfo): 
         : null,
     disability_type: spec.has_disability ? optionalInfo.disabilityType : null,
     special_status: optionalInfo.specialStatusEnabled ? optionalInfo.specialStatus : [],
+    credits_last_semester:
+      optionalInfo.creditsEnabled && optionalInfo.creditsLastSemester !== ""
+        ? Number(optionalInfo.creditsLastSemester)
+        : null,
   };
 }
 
@@ -209,6 +217,10 @@ export const SPECIAL_STATUS_OPTIONS = [
   { value: "severe_illness_or_injury", label: "중증질병 및 상해" },
   { value: "job_loss_or_disaster", label: "실직가정·재난 및 재해" },
   { value: "financial_emergency", label: "긴급가계곤란" },
+  // 2026-08-12 추가 — 경쟁 서비스(이루리) 회원가입 폼 검토 중 발견, 실제 DB 재검토로 확인.
+  { value: "rural_student", label: "농어촌(읍·면) 출신" },
+  { value: "parent_university_staff", label: "부모가 재학 대학 교직원" },
+  { value: "parent_university_alumni", label: "부모가 재학 대학 동문(졸업생)" },
   // 2026-08-07 추가 — "해당사항 없음" 명시적 선택지. 지금까지는 특수상황을 하나도 안 고르면
   // "아직 대답 안 함(모름)"으로 취급돼서 leniency로 관련 장학금이 계속 보였는데, "나는 이
   // 중 어디에도 해당 안 함"을 확정하고 싶은 학생을 위한 선택지(사용자 지적으로 추가). 다른
@@ -239,6 +251,9 @@ export type OptionalInfo = {
   disabilityType: string;
   specialStatusEnabled: boolean;
   specialStatus: string[];
+  // 2026-08-12 추가 — credits_last_semester 참고.
+  creditsEnabled: boolean;
+  creditsLastSemester: string;
   // 2026-08-05 추가 (matching_gaps.md 19번·14번). "본인과 동일/다름" 토글 — 다름을 고르면
   // 본인 거주지 폼과 똑같은 시/도+구/군 캐스케이딩 드롭다운으로 부모님 거주지를 따로 입력함
   // (스펙 입력/마이페이지 페이지 쪽에서 SIDO_LIST로 렌더링).
@@ -254,6 +269,8 @@ export const initialOptionalInfo: OptionalInfo = {
   disabilityType: DISABILITY_TYPES[0].value,
   specialStatusEnabled: false,
   specialStatus: [],
+  creditsEnabled: false,
+  creditsLastSemester: "",
   parentRegionEnabled: false,
   parentSido: SIDO_LIST[0].name,
   parentDistrict: SIDO_LIST[0].districts[0] ?? "",
@@ -297,6 +314,8 @@ export function userSpecToOptionalInfo(spec: UserSpec): OptionalInfo {
     disabilityType: spec.disability_type ?? DISABILITY_TYPES[0].value,
     specialStatusEnabled: spec.special_status.length > 0,
     specialStatus: spec.special_status,
+    creditsEnabled: spec.credits_last_semester != null,
+    creditsLastSemester: spec.credits_last_semester != null ? String(spec.credits_last_semester) : "",
     parentRegionEnabled: spec.parent_region != null,
     parentSido: spec.parent_region != null ? sidoNameFromRegion(spec.parent_region) : SIDO_LIST[0].name,
     parentDistrict:

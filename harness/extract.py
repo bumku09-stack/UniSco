@@ -61,6 +61,11 @@ _SPECIAL_STATUS = [
     # 2026-08-10 승격 — national_merit과 같은 명확한 법적 지위라 일반 선택 항목으로 옮김
     # (예전엔 UNVERIFIABLE_CONDITIONS였음, backend/app/models/enums.py 참고).
     "righteous_person_family_condition",
+    # 2026-08-12 추가 — 경쟁 서비스 조사 중 발견한 3종. rural_student/parent_university_*는
+    # 학생이 예/아니오로 답할 수 있는 명확한 사실이라 확인 불가가 아니라 여기(선택 가능)에 있음.
+    "rural_student",
+    "parent_university_staff",
+    "parent_university_alumni",
     # UNVERIFIABLE_CONDITIONS (매칭 필드는 없지만 표시·랭킹용으로 태그만 하는 것들 — 2026-08-10
     # 기준 sub_region_residence_condition은 district 매칭으로 실제 해결돼서 여기서 빠짐)
     "parent_occupation_condition",
@@ -135,6 +140,11 @@ _FIELD_VALUE_SCHEMAS: dict[str, dict] = {
     "admission_track": {"type": ["string", "null"], "enum": [*_ADMISSION_TRACK, None]},
     "affiliated_institution": {"type": ["string", "null"]},
     "min_credits": {"type": ["string", "null"]},
+    "min_credits_last_semester": {
+        "type": ["integer", "null"],
+        "description": "'직전학기 N학점 이상' 형태로 안전하게 환산되는 경우만. 특정 전공 "
+        "교과목 학점처럼 다른 개념이거나 복잡한 조건이면 비우고 min_credits 원문만 채울 것",
+    },
     "admission_score_condition": {"type": ["string", "null"]},
     "headcount": {"type": ["string", "null"]},
     "application_period": {"type": ["string", "null"]},

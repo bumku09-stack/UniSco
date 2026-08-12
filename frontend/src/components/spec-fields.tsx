@@ -397,6 +397,22 @@ export function OptionalFields({
       </CollapsibleToggle>
 
       <CollapsibleToggle
+        checked={optionalInfo.creditsEnabled}
+        onChange={(v) => setOptionalInfo({ ...optionalInfo, creditsEnabled: v })}
+        label="직전학기 이수학점"
+      >
+        <Field label="이수학점">
+          <input
+            type="number"
+            min={0}
+            value={optionalInfo.creditsLastSemester}
+            onChange={(e) => setOptionalInfo({ ...optionalInfo, creditsLastSemester: e.target.value })}
+            className={inputClass}
+          />
+        </Field>
+      </CollapsibleToggle>
+
+      <CollapsibleToggle
         checked={spec.has_disability}
         onChange={(v) => setSpec({ ...spec, has_disability: v })}
         label="장애인"

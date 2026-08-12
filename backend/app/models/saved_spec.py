@@ -27,6 +27,8 @@ class SavedSpec(SQLModel, table=True):
     department: str | None = None  # 2026-08-03 추가, matching_gaps.md 2번
     semester_gpa: float
     cumulative_gpa: float
+    # 2026-08-12 추가 — UserSpec 참고.
+    credits_last_semester: int | None = None
     age: int
     gender: Gender = Field(sa_type=enum_column(Gender))
     region: str

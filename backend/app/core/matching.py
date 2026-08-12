@@ -71,6 +71,17 @@ def gpa_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
     )
 
 
+def credits_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
+    """이수학점 조건 (2026-08-12 추가). GPA와 동일한 패턴 — 학생이 자기 직전학기 이수학점을
+    직접 입력하면 그 숫자로 비교하고, 안 넣었으면(모름) 소득분위·어학점수와 동일하게
+    관대한 기본값으로 통과시킴(leniency)."""
+    if scholarship.min_credits_last_semester is None:
+        return True
+    if spec.credits_last_semester is None:
+        return True
+    return spec.credits_last_semester >= scholarship.min_credits_last_semester
+
+
 def language_test_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
     """어학점수 조건 (matching_gaps.md 10번). 3페이지의 다른 "선택 입력" 항목들(소득분위·
     특수상황)과 같은 원칙으로 통일함(2026-08-04) — 학생이 어학점수를 아예 안 넣었으면
@@ -353,6 +364,8 @@ def is_eligible(scholarship: Scholarship, spec: UserSpec) -> bool:
         return False
     if not gpa_matches(scholarship, spec):
         return False
+    if not credits_matches(scholarship, spec):
+        return False
     if not disability_or_special_status_matches(scholarship, spec):
         return False
     if not special_status_all_matches(scholarship, spec):
@@ -423,6 +436,8 @@ def confirmed_match_count(scholarship: Scholarship, spec: UserSpec) -> int:
         score += 1
     if scholarship.min_gpa is not None:
         score += 1
+    if scholarship.min_credits_last_semester is not None and spec.credits_last_semester is not None:
+        score += 1
     if scholarship.requires_disability:
         score += 1
     if scholarship.required_disability_type is not None:
@@ -471,6 +486,8 @@ def unverifiable_condition_count(scholarship: Scholarship, spec: UserSpec) -> in
     if scholarship.max_income_bracket is not None and spec.income_bracket is None:
         count += 1
     if scholarship.language_test_type is not None and spec.language_test_type is None:
+        count += 1
+    if scholarship.min_credits_last_semester is not None and spec.credits_last_semester is None:
         count += 1
     return count
 
