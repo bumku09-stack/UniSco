@@ -10,6 +10,10 @@ import { getGuestResults } from "@/lib/guest";
 import { getCachedRecommendations, setCachedRecommendations } from "@/lib/recommendations-cache";
 import { Scholarship } from "@/lib/scholarship";
 
+// 게스트 결과가 sessionStorage에만 있어서(2026-08-11 확인된 허점) 탭을 닫거나 새로고침하면
+// 경고 없이 그냥 사라졌음 — 한 번 닫으면 같은 세션 안에서는 다시 안 뜨게 이 키로 기억함.
+const GUEST_WARNING_DISMISSED_KEY = "unisco_guest_warning_dismissed";
+
 export default function HomePage() {
   const router = useRouter();
   // sessionStorage는 서버(SSR)에서 항상 null이라, 초기 state를 캐시값으로 바로 잡으면
@@ -22,6 +26,7 @@ export default function HomePage() {
   // 로그인 없이 게스트 모드로 들어온 건지 — 마찬가지로 서버/클라이언트 첫 렌더 모두 false로
   // 시작하고 useEffect 안에서만 판단함(같은 hydration 이유).
   const [guestMode, setGuestMode] = useState(false);
+  const [showGuestWarning, setShowGuestWarning] = useState(false);
 
   useEffect(() => {
     // 전체를 async IIFE 하나로 감쌈 — effect 본문에 setState를 직접 두면
@@ -39,6 +44,9 @@ export default function HomePage() {
         setGuestMode(true);
         setResults(guestResults);
         setLoading(false);
+        if (!sessionStorage.getItem(GUEST_WARNING_DISMISSED_KEY)) {
+          setShowGuestWarning(true);
+        }
         return;
       }
 
@@ -88,6 +96,11 @@ export default function HomePage() {
     router.push("/");
   }
 
+  function dismissGuestWarning() {
+    sessionStorage.setItem(GUEST_WARNING_DISMISSED_KEY, "1");
+    setShowGuestWarning(false);
+  }
+
   return (
     <div className="min-h-screen bg-white pb-16">
       <div className="mx-auto w-full max-w-md px-6 py-6">
@@ -99,6 +112,9 @@ export default function HomePage() {
               </Link>
             ) : (
               <div className="flex items-center gap-3">
+                <Link href="/saved" className="text-sm font-semibold text-blue-500">
+                  찜한 장학금
+                </Link>
                 <Link href="/mypage" className="text-sm font-semibold text-blue-500">
                   마이페이지
                 </Link>
@@ -126,8 +142,8 @@ export default function HomePage() {
           <div className="mt-4 rounded-2xl bg-blue-50 px-4 py-4">
             <p className="text-sm font-bold text-blue-700">더 정확한 매칭을 원하시나요?</p>
             <p className="mt-1 text-xs leading-relaxed text-blue-600">
-              어학점수·장애·특수상황·부모님 거주지역 같은 상세 정보까지 입력하면 순위가 더
-              정확해지고, 다음에 다시 안 찾아도 되게 저장도 돼요.
+              상세 정보를 입력해주시면 결과가 더 정확해지고, 
+              저장을 통해 언제든 불러오실 수 있습니다.
             </p>
             <Link
               href="/signup"
@@ -140,6 +156,39 @@ export default function HomePage() {
 
         {!loading && !error && results !== null && <ScholarshipResults results={results} />}
       </div>
+
+      {showGuestWarning && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-6 pb-8 sm:items-center"
+          onClick={dismissGuestWarning}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm font-bold text-gray-900">⚠️ 이 결과, 저장 안 돼있어요</p>
+            <p className="mt-1.5 text-xs leading-relaxed text-gray-500">
+              새로고침하거나 창을 닫으면 사라져요. 정보를 저장하고
+              싶으면 회원가입 후 상세 정보를 입력해주세요.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={dismissGuestWarning}
+                className="w-full rounded-xl border border-gray-200 py-2.5 text-xs font-bold text-gray-600"
+              >
+                알겠어요
+              </button>
+              <Link
+                href="/signup"
+                className="w-full rounded-xl bg-blue-500 py-2.5 text-center text-xs font-bold text-white"
+              >
+                회원가입하기
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

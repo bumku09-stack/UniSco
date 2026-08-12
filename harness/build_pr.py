@@ -25,6 +25,17 @@ from harness.models import (
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
+
+def _log(msg: str) -> None:
+    print(f"[harness] {msg}", flush=True)
+
+
+def _github_headers() -> dict[str, str] | None:
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if not token:
+        return None
+    return {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
+
 # 기존 supabase/data_*.sql 파일명 관례(로마자 축약)와 맞춤 — 여기 없는 대학은 한글 그대로
 # 파일명 세이프하게 치환해서 씀(신규 대학 온보딩 시 여기 추가하면 됨).
 UNIVERSITY_SLUGS: dict[str, str] = {
@@ -128,7 +139,10 @@ def _run_git(*args: str) -> None:
 
 
 def _create_branch_and_commit(branch_name: str, files: dict[str, str], commit_message: str) -> None:
-    _run_git("checkout", "-b", branch_name)
+    # -B(대문자)로 이미 같은 이름의 로컬 브랜치가 있어도 강제로 새로 만듦 — 브랜치명에
+    # 초 단위 타임스탬프가 들어가서(아래 build_and_open_pr) 실무상 거의 안 일어나지만,
+    # 로컬 재실행 등 예외 상황에서 "이미 존재함" 에러로 죽는 것보다 안전함.
+    _run_git("checkout", "-B", branch_name)
     for rel_path, content in files.items():
         full_path = REPO_ROOT / rel_path
         full_path.parent.mkdir(parents=True, exist_ok=True)
@@ -138,21 +152,79 @@ def _create_branch_and_commit(branch_name: str, files: dict[str, str], commit_me
     _run_git("push", "-u", "origin", branch_name)
 
 
+def _delete_remote_branch(branch_name: str) -> None:
+    """push는 성공했는데 그 다음 단계(PR 오픈)가 실패했을 때 뒷정리용. 실패해도(예: 권한
+    부족) 무시함 — 뒷정리 실패가 원래 에러를 가리면 안 되므로 여기서 예외를 삼킴."""
+    try:
+        subprocess.run(
+            ["git", "push", "origin", "--delete", branch_name],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+        )
+        _log(f"뒷정리: 실패한 브랜치 {branch_name} 삭제함")
+    except Exception as e:  # noqa: BLE001 — 뒷정리 실패는 무시하고 원래 에러를 그대로 전파
+        _log(f"뒷정리 실패(무시하고 계속): {branch_name} 삭제 안 됨 — {e}")
+
+
+def find_existing_open_pr(university: str) -> str | None:
+    """오늘 날짜로 이 대학의 하네스 PR이 이미 열려있으면 그 URL을 반환, 없으면 None.
+
+    재실행(수동 workflow_dispatch로 같은 대학을 같은 날 다시 돌리는 경우 등)이 이미 성공한
+    작업을 또 하면서 Anthropic API 토큰을 이중으로 쓰는 걸 막기 위함 — run.py가 수집·추출
+    (비용 발생 구간) 시작 전에 이 함수로 먼저 확인함."""
+    headers = _github_headers()
+    if headers is None:
+        return None
+    date_str = datetime.date.today().isoformat()
+    prefix = f"harness/{_slug(university)}-{date_str}"
+    resp = requests.get(
+        f"https://api.github.com/repos/{config.GITHUB_REPO}/pulls",
+        headers=headers,
+        params={"state": "open", "per_page": 100},
+        timeout=config.REQUEST_TIMEOUT_SECONDS,
+    )
+    resp.raise_for_status()
+    for pr in resp.json():
+        if pr["head"]["ref"].startswith(prefix):
+            return pr["html_url"]
+    return None
+
+
 def open_pr(branch_name: str, title: str, body: str, *, draft: bool = True) -> str:
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-    if not token:
+    headers = _github_headers()
+    if headers is None:
         raise RuntimeError(
             "GITHUB_TOKEN이 없음 — PR을 열 수 없음. GitHub Actions에서는 자동 제공되지만 "
             "로컬 실행 시엔 브랜치 푸시까지만 확인하고 PR은 웹에서 직접 열 것."
         )
     resp = requests.post(
         f"https://api.github.com/repos/{config.GITHUB_REPO}/pulls",
-        headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+        headers=headers,
         json={"title": title, "head": branch_name, "base": config.PR_BASE_BRANCH, "body": body, "draft": draft},
         timeout=config.REQUEST_TIMEOUT_SECONDS,
     )
     resp.raise_for_status()
     return resp.json()["html_url"]
+
+
+# GitHub PR 본문 실제 상한은 65536자 — 근처까지 여유를 두고 자름(2026-08-11, 한밭대
+# 온보딩 첫 실행에서 리뷰 마크다운이 이 상한을 넘겨 PR 오픈 자체가 422로 실패한 사고 이후
+# 추가). run.py의 MAX_NEW_ITEMS_PER_RUN이 애초에 항목 수를 제한해서 이 상황 자체를 막지만,
+# 항목당 설명이 유독 길 경우까지 대비한 이중 안전장치임 — 잘려도 전체 내용은 커밋되는
+# md_path 파일에 그대로 남으므로 데이터 손실은 없음, PR 본문만 요약됨.
+_GITHUB_PR_BODY_MAX_CHARS = 60000
+
+
+def _pr_body(review_md: str, md_path: str) -> str:
+    if len(review_md) <= _GITHUB_PR_BODY_MAX_CHARS:
+        return review_md
+    truncated = review_md[:_GITHUB_PR_BODY_MAX_CHARS]
+    return (
+        f"{truncated}\n\n---\n"
+        f"⚠️ 리뷰 내용이 길어서 PR 본문은 여기서 잘렸습니다 — 전체 내용은 이 PR의 "
+        f"`{md_path}` 파일에서 확인할 것."
+    )
 
 
 def build_and_open_pr(
@@ -166,21 +238,40 @@ def build_and_open_pr(
         return None
 
     date_str = datetime.date.today().isoformat()
+    time_str = datetime.datetime.now().strftime("%H%M%S")
     slug = _slug(university)
-    branch_name = f"harness/{slug}-{date_str}"
+    # 날짜만 쓰면 같은 날 재실행(예: 이전 실행이 실패해서 다시 돌리는 경우) 시 브랜치명이
+    # 겹쳐서 push가 non-fast-forward로 거부됨(2026-08-10 실제 발생) — 초 단위 시각까지
+    # 붙여서 실행마다 항상 고유하게 만듦. find_existing_open_pr()이 날짜 프리픽스로 대조하는
+    # 것과는 별개(그쪽은 "오늘 이미 PR 있나" 판단용, 이건 "브랜치명이 겹치나" 방지용).
+    branch_name = f"harness/{slug}-{date_str}-{time_str}"
 
     sql_path = f"supabase/data_{slug}_harness_draft_{date_str}.sql"
     md_path = f"supabase/harness_review_{slug}_{date_str}.md"
     review_md = render_review_markdown(university, verified_list, collection_results, skipped_duplicate_count)
+    sql_draft = render_sql_insert(university, verified_list)
 
     files = {
-        sql_path: render_sql_insert(university, verified_list),
+        sql_path: sql_draft,
         md_path: review_md,
     }
 
     flagged_total = sum(len(v.flagged_fields) for v in verified_list)
     commit_message = f"[harness] {university} 장학금 신규 {len(verified_list)}건 초안 ({date_str})"
-    _create_branch_and_commit(branch_name, files, commit_message)
-
     title = f"[하네스 초안] {university} 신규 {len(verified_list)}건 · 확인 필요 {flagged_total}건"
-    return open_pr(branch_name, title, review_md)
+
+    pushed = False
+    try:
+        _create_branch_and_commit(branch_name, files, commit_message)
+        pushed = True
+        return open_pr(branch_name, title, _pr_body(review_md, md_path))
+    except Exception:
+        # 여기까지 오는 시점엔 이미 Anthropic API로 수집·추출을 다 끝낸 뒤라(비용 발생 완료),
+        # git/PR 단계에서 죽어서 그 결과물을 통째로 날리면 손해가 큼 — 최소한 워크플로 로그에
+        # 원문 그대로 남겨서 사람이 수동으로 복구할 수 있게 함.
+        _log("git/PR 단계 실패 — 아래 산출물을 워크플로 로그에서 복구할 것:")
+        _log(f"=== {sql_path} ===\n{sql_draft}")
+        _log(f"=== {md_path} ===\n{review_md}")
+        if pushed:
+            _delete_remote_branch(branch_name)
+        raise

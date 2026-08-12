@@ -10,6 +10,7 @@ Anthropic API를 직접 호출함(LangChain 없음). 출력은 tool-use로 스�
 """
 from __future__ import annotations
 
+import time
 from functools import lru_cache
 from pathlib import Path
 
@@ -17,6 +18,12 @@ import anthropic
 
 from harness import config
 from harness.models import SCHOLARSHIP_FIELD_NAMES, ExtractedField, ExtractedScholarship
+
+# 레이트리밋(429)/서버 과부하(5xx)처럼 지나가는 오류는 재시도할 가치가 있지만, 스키마 위반
+# 같은 4xx는 몇 번을 다시 불러도 똑같이 실패하므로 재시도하지 않음 — status_code로 구분함
+# (anthropic SDK 버전마다 예외 클래스 이름이 달라질 수 있어 이름 대신 상태 코드로 판단).
+_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 529}
+_MAX_RETRIES = 2
 
 _PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
@@ -137,9 +144,9 @@ def load_extraction_spec() -> str:
     return (_PROMPTS_DIR / "extraction_spec.md").read_text(encoding="utf-8")
 
 
-def _build_input_schema() -> dict:
+def _build_input_schema(field_names: tuple[str, ...]) -> dict:
     properties = {}
-    for name in SCHOLARSHIP_FIELD_NAMES:
+    for name in field_names:
         properties[name] = {
             "type": "object",
             "properties": {
@@ -151,39 +158,71 @@ def _build_input_schema() -> dict:
             },
             "required": ["field_value", "source_quote"],
         }
-    return {"type": "object", "properties": properties, "required": list(SCHOLARSHIP_FIELD_NAMES)}
+    return {"type": "object", "properties": properties, "required": list(field_names)}
 
 
-def extract_scholarship(source_text: str, source_url: str) -> ExtractedScholarship:
-    """공고문 원문 1건을 구조화된 필드로 변환. 상태 없음 — 이전 호출 결과를 참조하지 않음."""
-    client = anthropic.Anthropic()
+def extract_scholarship(
+    source_text: str,
+    source_url: str,
+    *,
+    field_names: tuple[str, ...] = SCHOLARSHIP_FIELD_NAMES,
+    model: str | None = None,
+) -> ExtractedScholarship:
+    """공고문 원문 1건을 구조화된 필드로 변환. 상태 없음 — 이전 호출 결과를 참조하지 않음.
+
+    field_names를 좁혀서 부르면(run.py가 2중 추출 대조용 호출에 씀) 필요한 필드만 채워서
+    돌려줌 — 전체 스키마를 다시 추출하는 것보다 출력 토큰이 훨씬 적게 들고 응답도 빠름
+    (2026-08-11, 원래는 대조에 쓰지도 않는 필드까지 매번 통째로 두 번 뽑고 있었음)."""
+    # 명시적 타임아웃 없으면 네트워크가 어딘가서 멈출 때 SDK 기본값(꽤 김)까지 그냥 기다림 —
+    # 여기에 재시도(_MAX_RETRIES)까지 겹치면 호출 하나가 비정상적으로 오래 걸릴 수 있어서
+    # 짧게 잡아둠(2026-08-11, 원인은 아니었던 것으로 확인됐지만 잠재 위험이라 같이 막음).
+    client = anthropic.Anthropic(timeout=120.0)
     tool = {
         "name": "extract_scholarship",
         "description": (
             "장학금 공고문 원문에서 구조화된 필드를 추출한다. "
             "각 필드는 값(field_value)과 그 근거가 된 원문 인용(source_quote)을 함께 반환해야 한다."
         ),
-        "input_schema": _build_input_schema(),
+        "input_schema": _build_input_schema(field_names),
     }
-    response = client.messages.create(
-        model=config.EXTRACTION_MODEL,
-        max_tokens=config.EXTRACTION_MAX_TOKENS,
-        system=load_extraction_spec(),
-        tools=[tool],
-        tool_choice={"type": "tool", "name": "extract_scholarship"},
-        messages=[
-            {
-                "role": "user",
-                "content": f"공고문 원문 (출처: {source_url}):\n\n{source_text}",
-            }
-        ],
-    )
+    response = None
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            response = client.messages.create(
+                model=model or config.EXTRACTION_MODEL,
+                max_tokens=config.EXTRACTION_MAX_TOKENS,
+                # 시스템 프롬프트(추출 지침서, ~1500토큰)가 항목마다 그대로 반복 전송되는데
+                # (31건 기준 62회 호출) 매번 같은 내용이라 캐싱 대상으로 표시함 — 첫 호출만
+                # 전체 가격, 이후 호출은 캐시 히트로 입력 토큰 비용이 크게 줄어듦
+                # (2026-08-11, Anthropic 프롬프트 캐싱).
+                system=[
+                    {
+                        "type": "text",
+                        "text": load_extraction_spec(),
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ],
+                tools=[tool],
+                tool_choice={"type": "tool", "name": "extract_scholarship"},
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"공고문 원문 (출처: {source_url}):\n\n{source_text}",
+                    }
+                ],
+            )
+            break
+        except anthropic.APIStatusError as e:
+            if e.status_code not in _RETRYABLE_STATUS_CODES or attempt == _MAX_RETRIES:
+                raise
+            wait = 5 * (2**attempt)  # 5s, 10s
+            time.sleep(wait)
 
     tool_use_block = next(b for b in response.content if b.type == "tool_use")
     raw: dict = tool_use_block.input  # type: ignore[assignment]
 
     fields: dict[str, ExtractedField] = {}
-    for name in SCHOLARSHIP_FIELD_NAMES:
+    for name in field_names:
         entry = raw.get(name) or {}
         is_list_field = _FIELD_VALUE_SCHEMAS[name].get("type") == "array"
         value = entry.get("field_value")

@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
-from app.api.deps import get_saved_spec
+from app.api.deps import get_current_user, get_saved_spec
 from app.core.matching import find_similar, match_scholarships, to_user_spec
 from app.db.session import get_session
-from app.models import SavedSpec, Scholarship
+from app.models import SavedScholarship, SavedSpec, Scholarship, User
 
 router = APIRouter()
 
@@ -53,3 +53,41 @@ def similar_scholarships(
     scholarships = session.exec(select(Scholarship)).all()
     eligible = match_scholarships(scholarships, spec)
     return find_similar(target, eligible, limit=limit, exclude_id=exclude_id)
+
+
+def _find_saved_scholarship(
+    session: Session, user_id: int, scholarship_id: int
+) -> SavedScholarship | None:
+    return session.exec(
+        select(SavedScholarship).where(
+            SavedScholarship.user_id == user_id,
+            SavedScholarship.scholarship_id == scholarship_id,
+        )
+    ).first()
+
+
+@router.post("/scholarships/{scholarship_id}/save", status_code=204)
+def save_scholarship(
+    scholarship_id: int,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """찜하기. 이미 찜한 상태에서 또 눌러도 에러 없이 그냥 넘어감(idempotent) — 프론트가
+    현재 찜 여부를 매번 정확히 추적 안 해도 되게(낙관적 업데이트 후 재클릭 등에도 안전)."""
+    if session.get(Scholarship, scholarship_id) is None:
+        raise HTTPException(status_code=404, detail="장학금을 찾을 수 없습니다.")
+    if _find_saved_scholarship(session, user.id, scholarship_id) is None:
+        session.add(SavedScholarship(user_id=user.id, scholarship_id=scholarship_id))
+        session.commit()
+
+
+@router.delete("/scholarships/{scholarship_id}/save", status_code=204)
+def unsave_scholarship(
+    scholarship_id: int,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    existing = _find_saved_scholarship(session, user.id, scholarship_id)
+    if existing is not None:
+        session.delete(existing)
+        session.commit()

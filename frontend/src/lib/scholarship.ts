@@ -68,6 +68,17 @@ const DEGREE_LEVEL_LABEL: Record<string, string> = {
   integrated_ms_phd: "석박사통합",
 };
 
+// min/max 둘 다 있는데 값이 같으면(예: 신입생 전용 장학금이 min_grade=max_grade=1로 저장됨)
+// "1~1학년"처럼 범위 표기가 무의미하게 중복돼서 보이던 문제(2026-08-11 발견) — 케이스별로
+// 자연스러운 문구를 고름. 학년/나이 둘 다 이 함수를 씀.
+function formatRange(min: number | null, max: number | null, unit: string): string {
+  if (min != null && max != null) {
+    return min === max ? `${min}${unit}` : `${min}~${max}${unit}`;
+  }
+  if (min != null) return `${min}${unit} 이상`;
+  return `${max}${unit} 이하`;
+}
+
 function eligibilityParts(s: Scholarship): string[] {
   const parts: string[] = [];
   if (s.eligible_university) parts.push(`대학: ${s.eligible_university}`);
@@ -80,11 +91,11 @@ function eligibilityParts(s: Scholarship): string[] {
   }
   if (s.required_degree_level) parts.push(`과정: ${DEGREE_LEVEL_LABEL[s.required_degree_level]}`);
   if (s.min_grade != null || s.max_grade != null) {
-    parts.push(`학년: ${s.min_grade ?? ""}~${s.max_grade ?? ""}학년`);
+    parts.push(`학년: ${formatRange(s.min_grade, s.max_grade, "학년")}`);
   }
   if (s.eligible_region) parts.push(`거주지역: ${s.eligible_region}`);
   if (s.min_age != null || s.max_age != null) {
-    parts.push(`나이: ${s.min_age ?? ""}~${s.max_age ?? ""}세`);
+    parts.push(`나이: ${formatRange(s.min_age, s.max_age, "세")}`);
   }
   if (s.max_income_bracket != null) parts.push(`소득분위 ${s.max_income_bracket} 이하`);
   if (s.min_gpa != null) {

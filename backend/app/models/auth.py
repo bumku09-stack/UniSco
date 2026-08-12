@@ -36,3 +36,24 @@ class TokenResponse(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    identifier: str  # username 또는 email
+
+
+class ForgotPasswordResponse(BaseModel):
+    message: str = "비밀번호 재설정 코드를 이메일로 보냈습니다."
+
+
+class ResetPasswordRequest(BaseModel):
+    identifier: str
+    code: str = Field(min_length=6, max_length=6)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class DeleteAccountRequest(BaseModel):
+    # 세션이 탈취됐거나 다른 사람이 로그인된 기기를 만졌을 때 실수로/악의적으로 계정을
+    # 지우는 걸 막기 위해 비밀번호 재확인을 받음 — 되돌릴 수 없는 작업이라 로그인
+    # 상태(토큰)만으로는 부족하다고 판단함.
+    password: str

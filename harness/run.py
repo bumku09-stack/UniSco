@@ -13,6 +13,8 @@ import json
 import subprocess
 import sys
 import tempfile
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -122,6 +124,18 @@ def run_for_university(university: str) -> None:
         _log(f"{university}: sites.py에 등록된 게시판이 없음 — 스킵")
         return
 
+    # 수집·추출(Anthropic API 비용 발생 구간)을 시작하기 전에, 오늘 이 대학으로 이미 열려있는
+    # PR이 있는지 먼저 확인함 — 같은 날 재실행(예: 이전 실행이 도중에 실패해서 다시 돌리는
+    # 경우) 때 이미 끝난 작업을 또 돌려서 토큰을 이중으로 쓰는 걸 막기 위함(2026-08-10).
+    try:
+        existing_pr = build_pr.find_existing_open_pr(university)
+    except Exception as e:  # noqa: BLE001 — 확인 자체가 실패해도(네트워크 등) 원래 하려던 작업은 계속 진행
+        _log(f"{university}: 기존 PR 확인 실패(무시하고 계속) — {e}")
+        existing_pr = None
+    if existing_pr:
+        _log(f"{university}: 오늘자 PR이 이미 열려있어 스킵 — {existing_pr}")
+        return
+
     _log(f"[collect] {university} — 게시판 {len(boards)}개 순회 시작")
     collection_results: list[CollectionResult] = collect_links.collect_all(boards)
     for r in collection_results:
@@ -138,21 +152,64 @@ def run_for_university(university: str) -> None:
     new_listings, skipped = dedup.filter_new(all_listings, existing)
     _log(f"[dedup] 신규 {len(new_listings)}건 / 스킵(기존 중복 추정) {len(skipped)}건")
 
-    verified_list: list[VerifiedScholarship] = []
-    for listing in new_listings:
+    # 처음 온보딩하는 대학은 게시판 역사 전체가 한 번에 "신규"로 잡힐 수 있어서
+    # config.MAX_NEW_ITEMS_PER_RUN으로 이번 실행분만 자름(2026-08-11, 한밭대 첫 실행이
+    # 1786건을 한 번에 처리하려다 5시간 넘게 걸리고 PR 본문 크기 제한에 걸려 실패한 사고
+    # 이후 추가). 게시판이 최신순으로 나열되므로 앞에서부터 자르면 최근 글이 우선 처리됨 —
+    # 잘려나간 나머지는 여전히 DB에 없으니 다음 나이트런이 자동으로 이어서 처리함.
+    if len(new_listings) > config.MAX_NEW_ITEMS_PER_RUN:
+        _log(
+            f"[dedup] 신규 {len(new_listings)}건이 상한({config.MAX_NEW_ITEMS_PER_RUN})을 "
+            f"넘어 최신 {config.MAX_NEW_ITEMS_PER_RUN}건만 이번 실행에서 처리 — "
+            f"나머지 {len(new_listings) - config.MAX_NEW_ITEMS_PER_RUN}건은 다음 나이트런에서 이어짐"
+        )
+        new_listings = new_listings[: config.MAX_NEW_ITEMS_PER_RUN]
+
+    # 1단계: 원문 확보는 대학 사이트로 가는 HTTP 요청이라 계속 순차 + 간격 유지(WAF 대비,
+    # config.REQUEST_DELAY_SECONDS 참고). Anthropic API 호출과는 별개 자원이라 여기서 미리
+    # 분리해둠 — 이래야 다음 단계(추출)를 이 순차 제약 없이 동시에 돌릴 수 있음(2026-08-11).
+    fetched: list[tuple[Listing, str]] = []
+    for i, listing in enumerate(new_listings):
+        if i > 0:
+            time.sleep(config.REQUEST_DELAY_SECONDS)
         source_text = fetch_source_text(listing)
         if not source_text or not source_text.strip():
             _log(f"[extract] 원문 확보 실패로 스킵: {listing.url}")
             continue
+        fetched.append((listing, source_text))
 
-        _log(f"[extract] {(listing.title[:40] or listing.url)}")
-        # 숫자 핵심 필드 대조용 2중 추출 — 매번 동일 함수를 상태 없이 두 번 호출함
-        # (설계안 "동일 함수를 파라미터만 바꿔 2회 독립 호출할 수 있게 구성").
-        primary = extract.extract_scholarship(source_text, listing.url)
-        secondary = extract.extract_scholarship(source_text, listing.url)
+    # 2단계: 구조화 추출은 항목마다 상태를 공유하지 않는 독립 호출이라(설계안 원칙) 동시에
+    # 여러 개를 돌려도 결과가 달라지지 않음 — 나이트런 소요시간을 줄이려고 병렬화함
+    # (config.EXTRACTION_CONCURRENCY, 기본 4개 동시).
+    def _extract_one(listing: Listing, source_text: str) -> VerifiedScholarship | None:
+        try:
+            primary = extract.extract_scholarship(source_text, listing.url)
+            # 숫자 핵심 필드만 대조하면 되므로 전체를 다시 뽑지 않고 그 필드들만, 더 싸고
+            # 빠른 모델로 뽑음(2026-08-11 — 예전엔 대조에 안 쓰는 필드까지 통째로 두 번 뽑았음).
+            secondary = extract.extract_scholarship(
+                source_text,
+                listing.url,
+                field_names=tuple(config.DUAL_EXTRACT_FIELDS),
+                model=config.DUAL_EXTRACT_MODEL,
+            )
+            return verify.verify_scholarship(primary, source_text, listing.title, secondary)
+        except Exception as e:  # noqa: BLE001
+            # 항목 하나가 API 에러(레이트리밋 등, extract.py가 자체 재시도 후에도 실패한 경우)로
+            # 죽어도 배치 전체를 죽이면 이미 이 항목들보다 앞서 처리된 나머지 항목에 쓴 토큰이
+            # 통째로 날아감 — 이 항목만 로그 남기고 건너뜀(2026-08-10).
+            _log(f"[extract] 추출 실패로 스킵({listing.url}): {e}")
+            return None
 
-        verified = verify.verify_scholarship(primary, source_text, listing.title, secondary)
-        verified_list.append(verified)
+    verified_list: list[VerifiedScholarship] = []
+    _log(f"[extract] {len(fetched)}건 추출 시작 (동시 {config.EXTRACTION_CONCURRENCY}개)")
+    with ThreadPoolExecutor(max_workers=config.EXTRACTION_CONCURRENCY) as executor:
+        futures = {executor.submit(_extract_one, listing, text): listing for listing, text in fetched}
+        for future in as_completed(futures):
+            listing = futures[future]
+            verified = future.result()
+            if verified is not None:
+                _log(f"[extract] 완료: {(listing.title[:40] or listing.url)}")
+                verified_list.append(verified)
 
     flagged = sum(1 for v in verified_list if v.has_flags)
     _log(f"[verify] 총 {len(verified_list)}건 중 플래그 있는 항목 {flagged}건")
@@ -179,8 +236,20 @@ def main() -> None:
         _log("처리할 대학이 없음 — harness/sites.py의 SITES 레지스트리를 먼저 채울 것.")
         return
 
+    failures: list[str] = []
     for university in universities:
-        run_for_university(university)
+        try:
+            run_for_university(university)
+        except Exception as e:  # noqa: BLE001
+            # 한 대학에서 git/PR 단계가 실패해도(build_pr.build_and_open_pr가 재전파) 같은
+            # 나이트런에 묶인 다른 대학까지 통째로 스킵되면 안 됨 — 나머지는 계속 진행하고,
+            # 실패한 대학만 모아뒀다가 마지막에 명시적으로 실패로 표시함(2026-08-10).
+            _log(f"{university}: 처리 중 실패 — {e}")
+            failures.append(university)
+
+    if failures:
+        _log(f"실패한 대학: {', '.join(failures)} — 워크플로 로그에서 산출물 복구 후 재실행할 것")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

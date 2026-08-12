@@ -4,19 +4,36 @@
 """
 from __future__ import annotations
 
+import time
+
 import requests
 
 from harness import config
 
+# 연결 타임아웃/일시적 연결 끊김은 재시도하면 성공하는 경우가 많음(2026-08-10, GitHub Actions
+# 러너에서 plus.cnu.ac.kr 접속이 순간적으로 timeout=20으로 실패했지만 같은 URL을 그 직후
+# 로컬에서 호출하면 1초 만에 정상 응답 — 사이트 문제가 아니라 일시적 네트워크 블립이었음).
+# 이 함수가 목록 수집(collect_links.py)과 원문 확보(run.py) 양쪽의 공통 진입점이라 여기
+# 한 곳만 고치면 됨. HTTP 에러 상태코드(404/500 등, raise_for_status가 던지는 것)는 재시도
+# 대상이 아님 — 같은 URL을 다시 불러도 똑같이 실패할 뿐이므로 여기서 바로 전파함.
+_MAX_RETRIES = 2
+
 
 def get(url: str) -> requests.Response:
-    resp = requests.get(
-        url,
-        timeout=config.REQUEST_TIMEOUT_SECONDS,
-        headers={"User-Agent": config.REQUEST_USER_AGENT},
-    )
-    resp.raise_for_status()
-    return resp
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            resp = requests.get(
+                url,
+                timeout=config.REQUEST_TIMEOUT_SECONDS,
+                headers={"User-Agent": config.REQUEST_USER_AGENT},
+            )
+            resp.raise_for_status()
+            return resp
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+            if attempt == _MAX_RETRIES:
+                raise
+            time.sleep(3 * (attempt + 1))  # 3s, 6s
+    raise AssertionError("unreachable")  # for 문이 항상 return/raise로 끝나 mypy 안심용
 
 
 def get_text(url: str) -> str:

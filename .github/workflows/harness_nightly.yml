@@ -17,6 +17,13 @@ permissions:
   contents: write # harness/state/rotation.json 커밋 + 초안 브랜치 push
   pull-requests: write # PR 오픈
 
+# 나이트 크론과 수동 재실행(workflow_dispatch)이 겹치면 rotation.json 커밋이 서로 충돌하거나
+# 같은 대학을 동시에 두 번 처리해서 API 비용이 이중으로 나갈 수 있음 — 동시 실행 자체를
+# 막고 큐에 세워서 순서대로 돌게 함(2026-08-10, 브랜치명 충돌 사고 이후 추가).
+concurrency:
+  group: harness-nightly
+  cancel-in-progress: false
+
 jobs:
   run-harness:
     runs-on: ubuntu-latest

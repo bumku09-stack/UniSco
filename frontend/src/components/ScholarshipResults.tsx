@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { authFetch, isLoggedIn } from "@/lib/auth";
 import {
   CATEGORY_L1_LABEL,
   CATEGORY_L2_BY_L1,
@@ -48,16 +49,56 @@ function Pagination({
   );
 }
 
-function ScholarshipCard({ s }: { s: Scholarship }) {
+// 찜 하트 아이콘 — 별도 아이콘 라이브러리 없이 인라인 SVG로(이 프로젝트 다른 곳도 동일 패턴).
+function HeartIcon({ filled }: { filled: boolean }) {
   return (
-    <li className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={filled ? 0 : 1.8}
+    >
+      <path d="M12 20.5s-7.5-4.6-10-9.2C.5 8 2 4.5 5.5 4c2-.3 3.8.7 6.5 3.2C14.7 4.7 16.5 3.7 18.5 4c3.5.5 5 4 3.5 7.3-2.5 4.6-10 9.2-10 9.2z" />
+    </svg>
+  );
+}
+
+// 카드 전체가 이미 Link(내용) + Link("자세히 보기") 두 개로 채워져 있어서(둘 다 li의
+// 형제, 서로 안에 안 들어감), 하트 버튼도 그 둘의 형제로 li 맨 위에 절대위치로 얹음 —
+// 이러면 Link 안에 또 클릭 가능한 요소를 넣는 게 아니라서 stopPropagation 같은 이벤트
+// 버블링 처리가 아예 필요 없음(2026-08-11).
+function ScholarshipCard({
+  s,
+  saved,
+  onToggleSave,
+}: {
+  s: Scholarship;
+  saved: boolean | null; // null = 로그인 안 함(하트 자체를 안 보여줌)
+  onToggleSave: (id: number) => void;
+}) {
+  return (
+    <li className="relative rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
+      {saved !== null && (
+        <button
+          type="button"
+          onClick={() => onToggleSave(s.id)}
+          aria-label={saved ? "찜 취소" : "찜하기"}
+          className={`absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full transition ${
+            saved ? "text-red-500" : "text-gray-300 hover:text-gray-400"
+          }`}
+        >
+          <HeartIcon filled={saved} />
+        </button>
+      )}
+
       <Link href={`/scholarship/${s.id}`} className="block">
         {s.category_l2 && (
           <span className="mb-1.5 inline-block rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-600">
             {CATEGORY_L2_LABEL[s.category_l2] ?? s.category_l2}
           </span>
         )}
-        <h2 className="font-bold text-gray-900">{s.name}</h2>
+        <h2 className="pr-8 font-bold text-gray-900">{s.name}</h2>
         {s.provider && <p className="mt-0.5 text-sm text-gray-400">{s.provider}</p>}
 
         {formatAmount(s.amount) && (
@@ -82,11 +123,64 @@ function ScholarshipCard({ s }: { s: Scholarship }) {
   );
 }
 
-export function ScholarshipResults({ results }: { results: Scholarship[] }) {
+export function ScholarshipResults({
+  results,
+  onSaveChange,
+}: {
+  results: Scholarship[];
+  // "내 찜 목록" 페이지처럼 찜 취소 즉시 목록에서 빠져야 하는 화면용 — results 배열 자체는
+  // 이 컴포넌트가 아니라 부모가 들고 있어서(props로 받음), 부모한테 알려줘야 뺄 수 있음.
+  // /home처럼 그럴 필요 없는 화면은 그냥 안 넘기면 됨(옵션이라 기본 동작 그대로).
+  onSaveChange?: (id: number, saved: boolean) => void;
+}) {
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState<SortBy>("relevance");
   const [categoryL1, setCategoryL1] = useState<CategoryL1 | "all">("all");
   const [categoryL2, setCategoryL2] = useState<string | null>(null);
+  // null = 로그인 안 함(하트 자체를 숨김). 로그인 상태면 처음엔 빈 Set으로 시작했다가
+  // useEffect에서 실제 찜 목록으로 채움 — 게스트/로그인 여부 판단이 localStorage를 읽어야
+  // 해서 SSR에선 못 하므로, 여기도 home 화면과 같은 이유로 useEffect 안에서만 판단함
+  // (hydration mismatch 회피 패턴, frontend/src/app/home/page.tsx 참고).
+  const [savedIds, setSavedIds] = useState<Set<number> | null>(null);
+
+  useEffect(() => {
+    if (!isLoggedIn()) return;
+    (async () => {
+      try {
+        const res = await authFetch("/users/me/saved-scholarships");
+        if (!res.ok) return;
+        const data: Scholarship[] = await res.json();
+        setSavedIds(new Set(data.map((s) => s.id)));
+      } catch {
+        // 실패해도 조용히 넘어감 — 하트가 그냥 전부 안 찜 상태로 보일 뿐, 페이지 자체는 정상 동작.
+      }
+    })();
+  }, []);
+
+  function handleToggleSave(id: number) {
+    setSavedIds((prev) => {
+      const next = new Set(prev ?? []);
+      const wasSaved = next.has(id);
+      if (wasSaved) next.delete(id);
+      else next.add(id);
+      onSaveChange?.(id, !wasSaved);
+
+      // 낙관적 업데이트 먼저 반영, 실패하면 되돌림 — API 자체는 idempotent라 재시도/중복
+      // 클릭에도 안전함(app/api/scholarships.py의 save/unsave 참고).
+      authFetch(`/scholarships/${id}/save`, { method: wasSaved ? "DELETE" : "POST" }).then((res) => {
+        if (!res.ok) {
+          setSavedIds((cur) => {
+            const reverted = new Set(cur ?? []);
+            if (wasSaved) reverted.add(id);
+            else reverted.delete(id);
+            return reverted;
+          });
+        }
+      });
+
+      return next;
+    });
+  }
 
   const categoryFiltered = results.filter((s) => {
     if (categoryL1 === "all") return true;
@@ -187,7 +281,12 @@ export function ScholarshipResults({ results }: { results: Scholarship[] }) {
         <>
           <ul className="mt-4 flex flex-col gap-3">
             {filteredSorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((s) => (
-              <ScholarshipCard key={s.id} s={s} />
+              <ScholarshipCard
+                key={s.id}
+                s={s}
+                saved={savedIds === null ? null : savedIds.has(s.id)}
+                onToggleSave={handleToggleSave}
+              />
             ))}
           </ul>
           {filteredSorted.length > PAGE_SIZE && (

@@ -19,3 +19,18 @@ def send_verification_code(to_email: str, code: str) -> None:
             ),
         }
     )
+
+
+def send_password_reset_code(to_email: str, code: str) -> None:
+    resend.Emails.send(
+        {
+            "from": settings.email_from,
+            "to": to_email,
+            "subject": "UniSco 비밀번호 재설정 코드",
+            "html": (
+                f"<p>비밀번호 재설정 코드: <strong style='font-size:20px'>{code}</strong></p>"
+                "<p>5분 안에 입력해주세요. 요청하지 않으셨다면 이 메일을 무시하셔도 됩니다 — "
+                "비밀번호는 바뀌지 않습니다.</p>"
+            ),
+        }
+    )
