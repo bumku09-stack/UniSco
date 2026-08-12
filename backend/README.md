@@ -16,10 +16,10 @@ app/
 │   └── session.py      # SQLAlchemy/SQLModel 엔진 + DB 접근용 get_session() 디펜던시
 ├── api/
 │   ├── health.py        # GET /health, {"status": "ok"} 반환
-│   ├── scholarships.py  # GET /scholarships (전체 목록), GET /scholarships/{id} (단건), GET /scholarships/recommendations (로그인 유저 스펙 기준 추천), GET /scholarships/{id}/similar (상세페이지 추천, 2026-08-03 추가)
+│   ├── scholarships.py  # GET /scholarships (전체 목록), GET /scholarships/{id} (단건), GET /scholarships/recommendations (로그인 유저 스펙 기준 추천), GET /scholarships/{id}/similar (상세페이지 추천), POST·DELETE /scholarships/{id}/save (찜하기/찜해제)
 │   ├── match.py           # POST /match — 로그인 없이 요청 바디의 스펙으로 즉석 매칭(게스트 플로우 전용, 2026-08-10 재도입)
-│   ├── auth.py            # 회원가입/이메일인증/로그인/토큰재발급 (POST /auth/*)
-│   ├── users.py            # 로그인 유저 스펙 저장/조회/수정 (GET·POST·PUT /users/me/spec*)
+│   ├── auth.py            # 회원가입/이메일인증/로그인/토큰재발급/비밀번호찾기·재설정 (POST /auth/*) — resend-code·forgot-password는 사용자당 60초 재요청 쿨다운 있음(2026-08-12, 이메일 폭탄 방지)
+│   ├── users.py            # 로그인 유저 스펙 저장/조회/수정(GET·POST·PUT /users/me/spec*), 찜한 장학금 목록(GET /users/me/saved-scholarships), 회원탈퇴(DELETE /users/me)
 │   └── deps.py              # get_current_user — Authorization 헤더의 JWT로 User 로드하는 공용 디펜던시
 └── models/
     ├── enums.py         # Gender, MilitaryStatus, EnrollmentStatus, CategoryL1/L2 등 자격조건·분류 enum
@@ -129,6 +129,8 @@ FastAPI가 자동 생성해주는 API 문서: http://localhost:8000/docs
 - **JWT**: `pyjwt`. access token(`ACCESS_TOKEN_EXPIRE_MINUTES`, 기본 30분)은 매 요청에 실어 보내는 용도, refresh token(`REFRESH_TOKEN_EXPIRE_DAYS`, 기본 30일)은 `POST /auth/refresh`로 새 토큰 발급받을 때만 씀. 둘 다 페이로드에 `type`(`access`/`refresh`)을 넣어서 access token으로 refresh를 시도하는 걸 막음. 리프레시 토큰 회전/블랙리스트(탈취 시 무효화)는 아직 없음 — 필요해지면 추가.
 - **이메일 인증 코드**: 6자리 숫자, 5분 유효, 계정당 시도 5회 실패하면 그 코드는 잠기고 재발송 필요(`POST /auth/resend-code`). `identifier`(username 또는 email) 아무거나로 조회 가능.
 - **로그인 실패 메시지 통일**: 아이디가 없거나 비밀번호가 틀리거나 항상 "아이디 또는 비밀번호가 일치하지 않습니다"만 반환 — 아이디 존재 여부가 새지 않게. 단, "이메일 인증 안 됨"은 이미 로그인 자체는 맞게 한 사용자에게 알려줘야 하는 정보라 별도 403으로 분리함.
+- **비밀번호 재설정**: `forgot-password`(이메일로 재설정 코드 발송) → `reset-password`(코드+새 비밀번호). 회원가입과 같은 6자리 코드 메커니즘 재사용.
+- **인증코드 재요청 rate limit**(2026-08-12 추가): `resend-code`/`forgot-password`는 로그인 없이 이메일만으로 호출 가능해서 이메일 폭탄(스팸)에 취약함 — 사용자당 60초 쿨다운(`auth.py`의 `_check_not_rate_limited`)을 걸어서 막음. `signup`은 이메일 유니크 제약이 이미 사실상 같은 역할을 해서 별도 제한 없음.
 
 ### 이메일 발송: Resend를 쓰는 이유
 

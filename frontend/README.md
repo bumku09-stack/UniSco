@@ -14,14 +14,18 @@ src/
 │   │   └── page.tsx     # "/login" — 로그인 폼(예전 "/" 내용 그대로 이동). POST /auth/login → 토큰 저장 → 스펙 있으면 /home, 없으면 /spec
 │   ├── signup/
 │   │   └── page.tsx     # "/signup" — 회원가입 폼 → 이메일 인증 코드 입력 (내부 2단계), 완료되면 "/login"으로 이동
+│   ├── forgot-password/
+│   │   └── page.tsx     # "/forgot-password" — 이메일로 재설정 코드 받기 → 새 비밀번호 설정 (내부 2단계)
 │   ├── spec/
 │   │   └── page.tsx     # "/spec" — 듀얼 모드(2026-08-10). 비로그인=게스트 2단계(학교+공통 정보) → POST /match, 로그인=기존 3단계 → POST /users/me/spec. 아래 "게스트 플로우" 참고
 │   ├── home/
 │   │   └── page.tsx     # "/home" — 듀얼 모드. 로그인=GET /scholarships/recommendations, 게스트=세션에 저장된 POST /match 결과. 목록 UI 자체는 components/ScholarshipResults.tsx 공유
 │   ├── mypage/
-│   │   └── page.tsx     # "/mypage" — 저장된 스펙 조회(GET)·수정(PUT). 단일 폼(위저드 아님). 로그인 전용(게스트 모드 없음)
+│   │   └── page.tsx     # "/mypage" — 저장된 스펙 조회(GET)·수정(PUT), 회원탈퇴(DELETE). 단일 폼(위저드 아님). 로그인 전용(게스트 모드 없음)
+│   ├── saved/
+│   │   └── page.tsx     # "/saved" — 찜한 장학금 목록(GET /users/me/saved-scholarships). 로그인 전용
 │   └── scholarship/[id]/
-│       └── page.tsx     # 상세 페이지 — 자격조건 체크리스트, 비슷한 장학금 추천(로그인 전용, 게스트는 스킵), 신청 링크. 본문 자체는 게스트도 열람 가능
+│       └── page.tsx     # 상세 페이지 — 자격조건 체크리스트, 비슷한 장학금 추천(로그인 전용, 게스트는 스킵), 찜하기(로그인 전용), 신청 링크. 본문 자체는 게스트도 열람 가능
 ├── components/
 │   ├── form-ui.tsx           # Field/SelectField/PillToggle/ToggleChip/CollapsibleToggle/MultiPillSelect/TopBar — 기본 입력 UI 조각
 │   ├── spec-fields.tsx       # SchoolFields/CommonFields/OptionalFields — /spec, /mypage가 그대로 공유하는 필드 묶음(2026-08-04 추출, 아래 참고)
@@ -96,8 +100,8 @@ npm run dev                    # http://localhost:3000
 
 두 페이지가 다른 부분(위저드 단계 구분, 신입생 안내 문구 `showFreshmanHint`, `/mypage`의 draft 자동저장·복원 배너 등)은 각 `page.tsx`에 그대로 남아있음 — 공유되는 건 순수 필드 편집 UI뿐임.
 
-## 남은 것 (2026-08-10 기준)
+## 남은 것 (2026-08-12 기준)
 
-- 회원가입 시 이메일 인증 코드 발송은 백엔드가 Resend를 통해 보내는데, Railway `RESEND_API_KEY`가 아직 실제 값으로 안 채워져 있으면 회원가입 자체가 이메일 발송 단계(502)에서 막힘 — `backend/README.md` "이메일 발송" 참고.
-- 브라우저로 직접 클릭해보며 하는 E2E 테스트는 아직 안 함(이 환경엔 브라우저 자동화 도구가 없음) — `next build`/`tsc`/`eslint` 통과, 그리고 curl로 백엔드 API 실제 호출 순서(로그인→스펙저장→추천→수정, 게스트 매칭 등)까지는 검증했지만, 실제 브라우저에서 폼 입력/클릭까지 확인한 건 아님 — 특히 이번 게스트 플로우(랜딩→게스트 스펙→결과→회원가입 전환)는 실제 브라우저로 한 번 눌러보고 확인 권장.
+- 브라우저로 직접 클릭해보며 하는 E2E 테스트는 여전히 없음(이 환경엔 브라우저 자동화 도구가 없음) — `next build`/`tsc`/`eslint` 통과, 그리고 curl로 백엔드 API 실제 호출 순서(로그인→스펙저장→추천→수정, 게스트 매칭, 찜하기, 비밀번호 재설정 등)까지는 검증했지만, 실제 브라우저에서 폼 입력/클릭까지 확인한 기능이 아직 많음 — 새 화면 추가할 때마다 실제 브라우저로 한 번씩 눌러보고 확인 권장.
 - 게스트 회원가입 전환 시 로그인까지는 여전히 수동임(자동 로그인 없음) — `/signup` 인증 완료 후 `/login`으로 보내고 직접 로그인해야 `/spec`에 게스트 데이터가 이어짐. 전환 단계를 더 줄이고 싶으면 인증 성공 시 자동 로그인을 추가하는 걸 고려할 것(지금은 로그인/회원가입 로직을 분리해두려고 일부러 그대로 둠).
+- 실사용자 UX 리서치(5~6명)에서 나온 피드백 기반 개선이 진행형 — 매칭 정확도 이슈(마감일·전공 조건 등)가 우선순위. 루트 `README.md`의 "개발 방향 / 예정" 참고.
