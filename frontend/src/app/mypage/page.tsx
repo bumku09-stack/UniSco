@@ -183,7 +183,7 @@ export default function MyPage() {
 
   return (
     <div className="min-h-screen bg-white pb-16">
-      <div className="mx-auto w-full max-w-md px-6 py-6">
+      <div className="mx-auto w-full max-w-md px-6 py-6 sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
         <TopBar right={<Link href="/home" className="text-sm font-semibold text-gray-400">← 홈으로</Link>} />
 
         <h1 className="mt-6 text-xl font-bold leading-snug text-gray-900">마이페이지</h1>

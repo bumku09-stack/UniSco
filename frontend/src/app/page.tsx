@@ -20,7 +20,7 @@ export default function LandingPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-16 sm:max-w-lg">
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-16 sm:max-w-lg md:max-w-xl">
         <div className="mb-10 flex items-center gap-2">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500 text-base font-bold text-white">
             U
@@ -52,7 +52,7 @@ export default function LandingPage() {
           <Link href="/login" className="font-semibold text-blue-500">
             로그인
           </Link>
-          {" · "}
+          {" 또는 "}
           <Link href="/signup" className="font-semibold text-blue-500">
             회원가입
           </Link>

@@ -18,7 +18,7 @@ export const authSecondaryButtonClass =
 export function AuthShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-white">
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-16 sm:max-w-lg">
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-16 sm:max-w-lg md:max-w-xl">
         {children}
       </div>
     </div>
