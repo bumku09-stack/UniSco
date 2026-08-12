@@ -30,6 +30,7 @@ const initialSpec: SpecForm = {
   enrollment_status: "undergrad_enrolled",
   grade: "1",
   degree_level: null,
+  admission_track: "general",
 };
 
 function ProgressBar({ step, totalSteps }: { step: number; totalSteps: number }) {

@@ -61,13 +61,17 @@
 | `required_enrollment_status` | enum | `undergrad_enrolled`(학부재학) \| `undergrad_transfer`(학부편입) \| `undergrad_leave`(학부휴학) \| `post_undergrad`(대학원 등). "재학생 대상"이라고만 돼 있으면 `undergrad_enrolled`만 넣으면 됨(편입생은 매칭 로직이 자동으로 포함시킴) |
 | `min_grade` / `max_grade` | 정수 | 학부 학년 범위. **"신입생 전용"이면 둘 다 1**로 넣을 것(편입생은 1학년으로 안 들어오므로 이렇게만 해도 자동으로 걸러짐) |
 | `required_degree_level` | enum | `masters`(석사) \| `doctoral`(박사) \| `integrated_ms_phd`(석박사통합). `required_enrollment_status`가 `post_undergrad`일 때만 의미 있음 |
+| `major` | 문자열 | 전공 조건 — **실제 학과명으로, 콤마로 여러 학과 나열 가능**(예: "스포츠과학과,체육교육과"). 매칭에 실제로 쓰임 — 비워두면 전교생에게 노출되니, 원문에 "OO학과 대상"/"OO특기자 전형 입학생 대상" 조건이 있으면 반드시 채울 것(2026-08-12 체육특기자 장학금이 무관한 전공 학생에게 노출된 사고의 원인이 이 필드를 안 채운 것이었음) |
+| `excluded_major` | 문자열 | "이 학과만 빼고 나머지 전부 됨" 유형일 때만 사용(예: "한의예과,군사학과"). `major`와 정반대 방향 — 둘을 같이 채우지 말 것 |
+| `admission_track` | enum | `general`(일반전형, 특별한 언급 없으면 이 값) \| `athletic_specialty`(체육특기자 전형) \| `other_specialty`(기타 특기자·특별전형 — 예능특기자·농어촌전형·정원외특별전형 등). **"OO학과 대상"이 아니라 "OO전형 입학생 대상"이라고 적혀 있으면 이 필드를 쓸 것 — `major`에 우회해서 넣지 말 것**(전공이 아니라 입학경로 조건이라 다른 축) |
+| `required_special_status_all` | enum 리스트 | `required_special_status`(OR, 하나만 맞아도 통과)와 별개로 "이 조건들이 전부 다 있어야 통과"인 경우. 값 목록은 아래 "특수상황" 참고. 대부분 비워둠(빈 리스트) |
+| `excluded_special_status` | enum 리스트 | "이 특수상황이면 무조건 탈락" 조건(드묾). 값 목록은 아래 "특수상황" 참고 |
 
 ### 참고용 필드 (매칭에는 아직 안 쓰임 — 원문 그대로, 자유 텍스트)
 
 | 필드 | 설명 |
 |---|---|
-| `grade_level` | 학년 조건 원문 (예: "학부 3~8학기차") |
-| `major` | 전공 조건 — 콤마로 여러 학과 나열 가능 (예: "융합디자인전공,회화전공,미술교육과") |
+| `grade_level` | (레거시) 학년 조건 원문 — `min_grade`/`max_grade`가 실제 매칭 담당 |
 | `affiliated_institution` | 소속 대학/학과 조건 원문 |
 | `min_credits` | 이수학점 조건 |
 | `admission_score_condition` | 입시(수능/내신) 성적 조건 |

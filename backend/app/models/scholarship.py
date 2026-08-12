@@ -4,6 +4,7 @@ from sqlalchemy import ARRAY, Column, String
 from sqlmodel import Field, SQLModel
 
 from app.models.enums import (
+    AdmissionTrack,
     CategoryL1,
     CategoryL2,
     DegreeLevel,
@@ -112,6 +113,12 @@ class Scholarship(SQLModel, table=True):
     required_degree_level: DegreeLevel | None = Field(
         default=None, sa_type=enum_column(DegreeLevel)
     )  # 재학상태가 학부이후과정일 때만 의미
+    # 2026-08-12 추가 — "무슨 학과인지"(major)와 별개로 "어떻게 입학했는지" 축. 전에는 이런
+    # 조건("체육특기자 전형 입학생 대상")을 담을 필드가 없어서 major에 억지로 우회 매핑하다가
+    # 무관한 전공 학생에게 노출되는 사고로 이어짐 — AdmissionTrack 참고.
+    admission_track: AdmissionTrack | None = Field(
+        default=None, sa_type=enum_column(AdmissionTrack)
+    )  # None=전형 무관(제한 없음)
 
     # 분류 체계 (자격조건 아님 — 매칭 필터링에 안 쓰고, 목록 표시/그룹핑용).
     # category_l2가 어느 category_l1에 속하는지는 app.models.enums.CATEGORY_L2_BY_L1 참고.

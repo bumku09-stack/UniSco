@@ -42,6 +42,10 @@ CREATE TYPE specialstatus AS ENUM (
 -- backend/app/core/matching.py의 enrollment_status_matches() 참고.
 CREATE TYPE enrollmentstatus AS ENUM ('undergrad_enrolled', 'undergrad_transfer', 'undergrad_leave', 'post_undergrad');
 CREATE TYPE degreelevel AS ENUM ('masters', 'doctoral', 'integrated_ms_phd');
+-- admissiontrack (2026-08-12 추가): major(전공)와 별개인 "어떻게 입학했는지" 축. 지금까지
+-- 확인된 실제 사례는 체육특기자 전형뿐이라 그것만 전용 값, 나머지(예능특기자·농어촌전형 등)는
+-- other_specialty로 뭉뚱그려 둠 — backend/app/models/enums.py의 AdmissionTrack 참고.
+CREATE TYPE admissiontrack AS ENUM ('general', 'athletic_specialty', 'other_specialty');
 CREATE TYPE categoryl1 AS ENUM ('school_internal', 'school_external', 'support_fund');
 CREATE TYPE categoryl2 AS ENUM (
     'academic_merit', 'welfare_living', 'special_target', 'activity_merit', 'research',
@@ -71,12 +75,18 @@ CREATE TABLE scholarship (
     language_test_type languagetesttype,  -- 2026-08-03 추가
     language_test_min_score FLOAT,  -- 2026-08-03 추가
     required_special_status TEXT[] NOT NULL DEFAULT '{}',  -- 2026-08-03 추가, 같은날 단일->리스트 변경
+    -- 2026-08-10 추가 — required_special_status(OR)와 별개로 "이 태그들 전부 다 있어야 함".
+    required_special_status_all TEXT[] NOT NULL DEFAULT '{}',
+    -- 2026-08-11 추가 — "이 태그 있으면 무조건 탈락"(excluded_major와 동일 컨벤션).
+    excluded_special_status TEXT[] NOT NULL DEFAULT '{}',
     application_deadline DATE,  -- 2026-08-03 추가(matching_gaps.md 7번). NULL=상시/마감정보 없음
     -- (레거시) 구조화 전 원문 텍스트 — 매칭에는 안 쓰고 참고용/미래 정밀매칭 재료로 남겨둠
     grade_level VARCHAR,
     -- major: 2026-08-03부터 UserSpec.department와 실제 매칭에 씀(matching_gaps.md 2번) —
     -- 더는 순수 레거시가 아님, 위 목록에서 뺌
     major VARCHAR,
+    -- 2026-08-10 추가 — "이 학과만 빼고 나머지 전부 됨"(major와 반대 방향).
+    excluded_major VARCHAR,
     affiliated_institution VARCHAR,
     min_credits VARCHAR,
     admission_score_condition VARCHAR,
@@ -89,6 +99,8 @@ CREATE TABLE scholarship (
     min_grade INTEGER,
     max_grade INTEGER,
     required_degree_level degreelevel,
+    -- 2026-08-12 추가 — major와 별개인 "어떻게 입학했는지" 축(admissiontrack 참고).
+    admission_track admissiontrack,
     -- 분류 체계 (자격조건 아님, 목록 표시/그룹핑용) (2026-07-28 추가)
     category_l1 categoryl1,
     category_l2 categoryl2,
@@ -151,6 +163,8 @@ CREATE TABLE savedspec (
     enrollment_status enrollmentstatus NOT NULL,
     grade INTEGER,
     degree_level degreelevel,
+    -- 2026-08-12 추가 — NULL이면 매칭 시 general로 간주(admission_track_matches() 참고).
+    admission_track admissiontrack,
     -- 2026-08-03 추가 (matching_gaps.md 9·10·12번, 전부 선택 입력)
     language_test_type languagetesttype,
     language_test_score FLOAT,

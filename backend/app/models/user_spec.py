@@ -1,6 +1,7 @@
 from sqlmodel import SQLModel
 
 from app.models.enums import (
+    AdmissionTrack,
     DegreeLevel,
     DisabilityType,
     EnrollmentStatus,
@@ -46,6 +47,11 @@ class UserSpec(SQLModel):
     enrollment_status: EnrollmentStatus
     grade: int | None = None  # enrollment_status가 학부재학/학부휴학일 때만 사용
     degree_level: DegreeLevel | None = None  # enrollment_status가 학부이후과정일 때만 사용
+    # 2026-08-12 추가 — "무슨 학과인지"(department)와 별개인 "어떻게 입학했는지" 축. 프론트
+    # 폼에서 기본값 "일반전형"으로 항상 채워서 보내지만, 혹시 None으로 오면(레거시 유저 등)
+    # matching.py에서 GENERAL로 간주함(AdmissionTrack 참고, 대다수가 일반전형이라 과소매칭
+    # 방지가 목적).
+    admission_track: AdmissionTrack | None = None
 
     # 2026-08-02 추가 (matching_gaps.md 9·10·12번, 전부 선택 입력).
     language_test_type: LanguageTestType | None = None

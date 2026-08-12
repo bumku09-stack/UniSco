@@ -3,6 +3,7 @@ import re
 
 from app.models import (
     UNVERIFIABLE_CONDITIONS,
+    AdmissionTrack,
     EnrollmentStatus,
     ForeignerEligibility,
     GpaBasis,
@@ -232,6 +233,23 @@ def major_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
     return spec.department in candidates
 
 
+def admission_track_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
+    """입학전형 조건 (2026-08-12 구현). major_matches()와 별개 축 — "이 학과 대상"이 아니라
+    "이 전형으로 입학한 사람 대상"이라, 관련 학과 학생이어도 그 전형으로 안 들어왔으면
+    해당 안 되고(반대로 그 전형 출신이 항상 관련 학과인 것도 아님, 예: 우송대는 체육 관련
+    학과가 없어서 major로는 표현 자체가 불가능했음 — 이 조건이 생기기 전엔 major에 억지로
+    우회 매핑하다가 국어국문학과 학생에게 체육특기자 장학금이 노출되는 사고로 이어짐).
+
+    spec.admission_track이 None(유저가 아직 이 필드를 안 채운 레거시 스펙 등)이면 GENERAL로
+    간주함 — 다른 선택 필드들(특수상황 등)의 "모르면 안 거름" leniency와 반대 방향인데,
+    여기선 대다수 학생이 실제로 일반전형이라 "모르니 다 보여줌"이 오히려 오노출(이번 사고
+    재현)로 이어지기 때문. AdmissionTrack 참고."""
+    if scholarship.admission_track is None:
+        return True
+    effective_track = spec.admission_track or AdmissionTrack.GENERAL
+    return scholarship.admission_track == effective_track
+
+
 def deadline_matches(scholarship: Scholarship, today: datetime.date | None = None) -> bool:
     """마감일 자동 정리 (matching_gaps.md 7번, 2026-08-03 구현). application_deadline이
     구조화된 값으로 채워진 장학금만 자동으로 걸러짐 — 대부분의 기존 데이터는 "매 학기 초
@@ -345,6 +363,8 @@ def is_eligible(scholarship: Scholarship, spec: UserSpec) -> bool:
         return False
     if not major_matches(scholarship, spec):
         return False
+    if not admission_track_matches(scholarship, spec):
+        return False
     if not deadline_matches(scholarship):
         return False
     if (
@@ -424,6 +444,8 @@ def confirmed_match_count(scholarship: Scholarship, spec: UserSpec) -> int:
     if scholarship.min_grade is not None or scholarship.max_grade is not None:
         score += 1
     if scholarship.required_degree_level is not None:
+        score += 1
+    if scholarship.admission_track is not None:
         score += 1
     return score
 

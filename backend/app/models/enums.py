@@ -53,6 +53,28 @@ class DegreeLevel(str, Enum):
     INTEGRATED_MS_PHD = "integrated_ms_phd"  # 석박사통합
 
 
+class AdmissionTrack(str, Enum):
+    """입학전형 유형 (2026-08-12 추가). `major`(전공)와는 완전히 다른 축 — "무슨 학과인지"가
+    아니라 "어떻게 입학했는지"라서, 관련 학과 학생이어도 해당 전형으로 입학한 게 아니면
+    조건을 못 채우고(반대로 그 전형으로 입학한 학생이 항상 관련 학과인 것도 아님, 예:
+    우송대는 체육 관련 학과 자체가 없어서 major로는 표현 불가능했음). 이 필드가 생기기
+    전에는 "체육특기자 전형 입학생 대상"류 조건을 `major`에 억지로 우회 매핑했다가, 국어국문
+    학과 학생에게 체육특기자 장학금이 노출되는 사고로 이어짐(실사용자 UX 리서치에서 발견).
+
+    지금까지 실제 DB에서 확인된 유형은 체육특기자 전형뿐이라 그것만 전용 값으로 두고,
+    나머지(예능특기자 전형, 농어촌전형, 정원외특별전형 등— 실재하는 개념이지만 아직 이
+    프로젝트 데이터에서 확인된 사례가 없음)는 `OTHER_SPECIALTY`로 뭉뚱그려 둠. 확인된 사례가
+    2~3건 쌓이면 그때 전용 값으로 분리할 것(SpecialStatus가 커온 방식과 동일).
+    `Scholarship.admission_track`이 None이면 전형 무관(제한 없음), 학생이 이 필드를 아직
+    선택하지 않았으면(SavedSpec에 None) 매칭 시 `GENERAL`로 취급함 — 실제로 대다수 학생이
+    일반전형이라(과소매칭 방지), "모르니 다 보여줌"이 아니라 "일반전형으로 간주"가 맞는
+    기본값. core/matching.py의 admission_track_matches() 참고."""
+
+    GENERAL = "general"  # 일반전형 (수시/정시 등 일반 입학) — 기본값
+    ATHLETIC_SPECIALTY = "athletic_specialty"  # 체육특기자 전형
+    OTHER_SPECIALTY = "other_specialty"  # 기타 특기자/특별전형 (예능특기·농어촌·정원외 등)
+
+
 class LanguageTestType(str, Enum):
     """어학점수 조건 (matching_gaps.md 10번, 2026-08-02 구현). frontend/src/lib/spec.ts의
     LANGUAGE_TESTS와 값을 정확히 맞춰야 함 — 프론트가 이 문자열 그대로 보냄."""

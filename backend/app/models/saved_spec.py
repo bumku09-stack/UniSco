@@ -2,6 +2,7 @@ from sqlalchemy import ARRAY, Column, String
 from sqlmodel import Field, SQLModel
 
 from app.models.enums import (
+    AdmissionTrack,
     DegreeLevel,
     DisabilityType,
     EnrollmentStatus,
@@ -44,6 +45,10 @@ class SavedSpec(SQLModel, table=True):
     enrollment_status: EnrollmentStatus = Field(sa_type=enum_column(EnrollmentStatus))
     grade: int | None = None
     degree_level: DegreeLevel | None = Field(default=None, sa_type=enum_column(DegreeLevel))
+    # 2026-08-12 추가 — UserSpec 참고. None이면 매칭 시 GENERAL로 간주(admission_track_matches()).
+    admission_track: AdmissionTrack | None = Field(
+        default=None, sa_type=enum_column(AdmissionTrack)
+    )
 
     # 2026-08-02 추가 (matching_gaps.md 9·10·12번).
     language_test_type: LanguageTestType | None = Field(

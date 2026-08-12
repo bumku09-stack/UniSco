@@ -32,9 +32,13 @@ SCHOLARSHIP_FIELD_NAMES: tuple[str, ...] = (
     "language_test_type",
     "language_test_min_score",
     "required_special_status",
+    "required_special_status_all",
+    "excluded_special_status",
     "application_deadline",
     "grade_level",
     "major",
+    "excluded_major",
+    "admission_track",
     "affiliated_institution",
     "min_credits",
     "admission_score_condition",
@@ -50,9 +54,11 @@ SCHOLARSHIP_FIELD_NAMES: tuple[str, ...] = (
     "category_l2",
 )
 
-# 값을 안 채워도(=원문 근거 없음) 정상인 필드 — required_special_status는 "빈 리스트=조건 없음"이
+# 값을 안 채워도(=원문 근거 없음) 정상인 필드 — 리스트 필드들은 "빈 리스트=조건 없음"이
 # 정상값이라 not_applicable 판정 시 빈 문자열이 아니라 빈 리스트가 "값 없음"의 기준이 됨.
-LIST_VALUED_FIELDS: frozenset[str] = frozenset({"required_special_status"})
+LIST_VALUED_FIELDS: frozenset[str] = frozenset(
+    {"required_special_status", "required_special_status_all", "excluded_special_status"}
+)
 
 
 @dataclass

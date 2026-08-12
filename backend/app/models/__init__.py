@@ -14,6 +14,7 @@ from app.models.auth import (
 from app.models.enums import (
     CATEGORY_L2_BY_L1,
     UNVERIFIABLE_CONDITIONS,
+    AdmissionTrack,
     CategoryL1,
     CategoryL2,
     DegreeLevel,
@@ -35,6 +36,7 @@ from app.models.user_spec import SpecStatusResponse, UserSpec
 __all__ = [
     "CATEGORY_L2_BY_L1",
     "UNVERIFIABLE_CONDITIONS",
+    "AdmissionTrack",
     "CategoryL1",
     "CategoryL2",
     "DegreeLevel",

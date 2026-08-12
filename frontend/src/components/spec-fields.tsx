@@ -10,6 +10,8 @@ import {
 } from "@/components/form-ui";
 import { SIDO_LIST } from "@/lib/regions";
 import {
+  ADMISSION_TRACK_OPTIONS,
+  AdmissionTrack,
   applySpecialStatusExclusivity,
   DegreeLevel,
   DISABILITY_TYPES,
@@ -119,6 +121,13 @@ export function SchoolFields({
           />
         </Field>
       )}
+
+      <SelectField
+        label="입학전형"
+        value={spec.admission_track}
+        onChange={(v) => setSpec({ ...spec, admission_track: v as AdmissionTrack })}
+        options={ADMISSION_TRACK_OPTIONS}
+      />
 
       <Field label="재학 상태">
         <PillToggle

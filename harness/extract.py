@@ -73,6 +73,9 @@ _SPECIAL_STATUS = [
 ]
 _ENROLLMENT_STATUS = ["undergrad_enrolled", "undergrad_transfer", "undergrad_leave", "post_undergrad"]
 _DEGREE_LEVEL = ["masters", "doctoral", "integrated_ms_phd"]
+# 2026-08-12 추가 — major(전공)와 별개인 "어떻게 입학했는지" 축(backend/app/models/enums.py의
+# AdmissionTrack 참고).
+_ADMISSION_TRACK = ["general", "athletic_specialty", "other_specialty"]
 _CATEGORY_L1 = ["school_internal", "school_external", "support_fund"]
 _CATEGORY_L2 = [
     "academic_merit",
@@ -115,9 +118,21 @@ _FIELD_VALUE_SCHEMAS: dict[str, dict] = {
         "items": {"type": "string", "enum": _SPECIAL_STATUS},
         "description": "빈 배열 = 특수상황 조건 없음",
     },
+    "required_special_status_all": {
+        "type": "array",
+        "items": {"type": "string", "enum": _SPECIAL_STATUS},
+        "description": "빈 배열 = AND 조건 없음(대부분 이 값). required_special_status(OR)와 별개",
+    },
+    "excluded_special_status": {
+        "type": "array",
+        "items": {"type": "string", "enum": _SPECIAL_STATUS},
+        "description": "빈 배열 = 제외 조건 없음(대부분 이 값)",
+    },
     "application_deadline": {"type": ["string", "null"], "description": "YYYY-MM-DD, 확정 마감일이 있을 때만"},
     "grade_level": {"type": ["string", "null"]},
     "major": {"type": ["string", "null"]},
+    "excluded_major": {"type": ["string", "null"], "description": "'이 학과만 빼고 다 됨' 유형일 때만, major와 반대 방향"},
+    "admission_track": {"type": ["string", "null"], "enum": [*_ADMISSION_TRACK, None]},
     "affiliated_institution": {"type": ["string", "null"]},
     "min_credits": {"type": ["string", "null"]},
     "admission_score_condition": {"type": ["string", "null"]},

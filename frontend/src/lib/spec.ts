@@ -6,6 +6,12 @@ export type EnrollmentStatus =
   | "undergrad_leave"
   | "post_undergrad";
 export type DegreeLevel = "masters" | "doctoral" | "integrated_ms_phd";
+// 2026-08-12 추가 — "무슨 학과인지"(department)와 별개인 "어떻게 입학했는지" 축. major(전공)
+// 기반 필터로는 "체육특기자 전형 입학생 대상" 같은 조건을 정확히 표현할 수 없어서(우송대처럼
+// 관련 학과 자체가 없는 대학도 있음) 전용 필드로 분리함. 실제 DB에서 확인된 유형은 체육특기자
+// 전형뿐이라 나머지(예능특기자·농어촌전형 등)는 OTHER_SPECIALTY로 뭉뚱그려 둠 — 확인된 사례가
+// 쌓이면 전용 값으로 분리할 것(backend/app/models/enums.py의 AdmissionTrack 참고).
+export type AdmissionTrack = "general" | "athletic_specialty" | "other_specialty";
 
 export type UserSpec = {
   university: string;
@@ -30,6 +36,9 @@ export type UserSpec = {
   enrollment_status: EnrollmentStatus;
   grade: number | null;
   degree_level: DegreeLevel | null;
+  // null = 아직 이 필드를 안 채운 레거시 스펙 — 매칭 시 서버가 "general"로 간주함(과소매칭
+  // 방지, 대다수 학생이 일반전형). 폼에서는 항상 기본값 "general"이 선택된 채로 제출됨.
+  admission_track: AdmissionTrack | null;
   // 2026-08-02 추가 (matching_gaps.md 9·10·12번) — 전부 선택 입력, 아래 OptionalInfo 참고.
   language_test_type: string | null;
   language_test_score: number | null;
@@ -98,6 +107,7 @@ export type SpecForm = Omit<
   | "language_test_score"
   | "disability_type"
   | "special_status"
+  | "admission_track"
 > & {
   age: string;
   semester_gpa: string;
@@ -107,6 +117,7 @@ export type SpecForm = Omit<
   district: string;
   grade: string;
   department: string; // 빈 문자열 = 학과 선택 안 함(단과대에 학과 목록이 없거나 미선택)
+  admission_track: AdmissionTrack; // 폼에서는 항상 정해진 값(기본 "general")
 };
 
 export function specFormToUserSpec(spec: SpecForm, optionalInfo: OptionalInfo): UserSpec {
@@ -131,6 +142,7 @@ export function specFormToUserSpec(spec: SpecForm, optionalInfo: OptionalInfo): 
     enrollment_status: spec.enrollment_status,
     grade: spec.enrollment_status === "post_undergrad" ? null : Number(spec.grade),
     degree_level: spec.enrollment_status === "post_undergrad" ? spec.degree_level : null,
+    admission_track: spec.admission_track,
     language_test_type:
       optionalInfo.languageTestEnabled && optionalInfo.languageTestScore !== ""
         ? optionalInfo.languageTestType
@@ -166,6 +178,13 @@ export const DISABILITY_TYPES = [
   { value: "muscular_dystrophy", label: "근이영양증" },
   { value: "developmental_impairment", label: "발달장애" },
   { value: "disabled_parent", label: "장애가 있는 부모(자녀 대상)" },
+];
+
+// 2026-08-12 추가 — AdmissionTrack 참고. 기본값은 항상 "일반전형"(첫 옵션).
+export const ADMISSION_TRACK_OPTIONS: { value: AdmissionTrack; label: string }[] = [
+  { value: "general", label: "일반전형(수시/정시 등 일반 입학)" },
+  { value: "athletic_specialty", label: "체육특기자 전형" },
+  { value: "other_specialty", label: "기타 특기자·특별전형(농어촌·정원외 등)" },
 ];
 
 export const SPECIAL_STATUS_NOT_APPLICABLE = "not_applicable";
@@ -264,6 +283,7 @@ export function userSpecToSpecForm(spec: UserSpec): SpecForm {
     enrollment_status: spec.enrollment_status,
     grade: spec.grade != null ? String(spec.grade) : "1",
     degree_level: spec.degree_level,
+    admission_track: spec.admission_track ?? "general",
   };
 }
 
