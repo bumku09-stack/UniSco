@@ -113,7 +113,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-white pb-16">
-      <div className="mx-auto w-full max-w-md px-6 py-6 sm:max-w-xl md:max-w-2xl lg:max-w-3xl lg:px-10">
+      <div className="mx-auto w-full max-w-md px-6 py-6 sm:max-w-2xl md:max-w-4xl lg:max-w-6xl lg:px-10">
         <TopBar
           right={
             loading ? undefined : guestMode ? (

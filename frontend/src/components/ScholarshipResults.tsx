@@ -279,7 +279,7 @@ export function ScholarshipResults({
         <p className="mt-8 text-center text-sm text-gray-400">조건에 맞는 장학금이 없습니다.</p>
       ) : (
         <>
-          <ul className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <ul className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
             {filteredSorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((s) => (
               <ScholarshipCard
                 key={s.id}

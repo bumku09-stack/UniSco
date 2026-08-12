@@ -140,7 +140,7 @@ export default function SpecWizard() {
   if (mode === "loading") {
     return (
       <div className="min-h-screen bg-white">
-        <div className="mx-auto w-full max-w-md px-6 py-6 sm:max-w-xl md:max-w-2xl">
+        <div className="mx-auto w-full max-w-md px-6 py-6 sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
           <TopBar />
         </div>
       </div>

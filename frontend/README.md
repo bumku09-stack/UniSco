@@ -118,6 +118,10 @@ npm run dev                    # http://localhost:3000
 - `home`/`saved`/`mypage` 진입 시 네트워크 자체가 끊기면(서버 다운 등) `authFetch`가 reject하는데 try/catch가 없어서 로딩 스피너가 무한정 안 멈췄음 → 세 곳 다 try/catch 추가
 - `<html lang="en">`(전체가 한국어 서비스인데) → `lang="ko"`
 - `NEXT_PUBLIC_API_URL` 미설정 시 방어 없이 `undefined/...` 요청이 조용히 나가던 것 → `lib/auth.ts`의 `apiUrl()`로 통일, 없으면 즉시 에러
-- 모든 페이지가 `max-w-md`(448px) 고정 폭이라 PC 화면에서 좌우 여백만 큰 좁은 카드로 보이던 것 → 브레이크포인트별 폭 확장(`sm/md/lg`), 장학금 카드 목록(`home`/`saved`)은 `md` 이상에서 2열 그리드로 전환
+- 모든 페이지가 `max-w-md`(448px) 고정 폭이라 PC 화면에서 좌우 여백만 큰 좁은 카드로 보이던 것 → 페이지 성격별로 두 단계로 나눠 확장:
+  - 목록 페이지(`home`/`saved`): `lg:max-w-6xl`(1152px)까지 넓히고, 장학금 카드는 `md`에서 2열, `lg`에서 3열 그리드로 전환 — PC 화면에서 실제로 넓어 보이는 효과는 대부분 여기서 나옴
+  - 폼/상세 페이지(`mypage`/`spec`/`scholarship/[id]`): `lg:max-w-3xl`(768px)까지만 — 단일 컬럼 폼·본문 텍스트는 너무 넓어지면 입력창이 비정상적으로 길어지거나 가독성이 떨어져서 의도적으로 상한을 낮게 잡음
+  - 로그인/회원가입/랜딩(`auth-ui.tsx`, `page.tsx`)·`error.tsx`/`not-found.tsx`: `sm:max-w-lg`(512px) 정도로만, 의도적으로 거의 그대로 유지 — 로그인 폼 자체가 PC에서 넓어질 이유가 없음(1차로 전체를 동일하게 살짝만 넓혔더니 "여전히 모바일 비율 같다"는 피드백을 받고, 목록 페이지 위주로 훨씬 크게 재조정함 — 2026-08-13)
+  - Playwright(headless Chromium)로 1440px 뷰포트 스크린샷을 직접 찍어서 확인함(이 환경엔 브라우저 자동화 도구가 기본 설치돼 있지 않아 그때그때 `npm install -g playwright && npx playwright install chromium`으로 설치) — `home`을 로그인 없이 확인하려고 `sessionStorage`에 게스트 결과를 직접 심어서(`unisco_guest_results`) 3열 그리드 렌더링을 검증함
 
 남은 블로커는 위 "JWT를 localStorage에 평문 저장 중" 항목 하나뿐.

@@ -132,7 +132,7 @@ export default function MyPage() {
   if (loading || spec === null) {
     return (
       <div className="min-h-screen bg-white">
-        <div className="mx-auto w-full max-w-md px-6 py-6 sm:max-w-xl md:max-w-2xl">
+        <div className="mx-auto w-full max-w-md px-6 py-6 sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
           <TopBar />
           {!error && <p className="mt-8 text-center text-sm text-gray-400">불러오는 중...</p>}
           {error && (

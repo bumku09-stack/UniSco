@@ -84,7 +84,7 @@ export default function ScholarshipDetailPage({
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
-      <div className="mx-auto w-full max-w-md flex-1 px-6 pb-32 pt-6 sm:max-w-xl md:max-w-2xl">
+      <div className="mx-auto w-full max-w-md flex-1 px-6 pb-32 pt-6 sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
         <TopBar
           right={
             <Link href="/home" className="text-sm font-semibold text-gray-400">
@@ -229,7 +229,7 @@ export default function ScholarshipDetailPage({
       {/* 스크롤해도 항상 보이는 신청 버튼 */}
       {scholarship?.application_url && (
         <div className="sticky bottom-0 border-t border-gray-100 bg-white/95 px-6 py-4 backdrop-blur">
-          <div className="mx-auto w-full max-w-md sm:max-w-xl md:max-w-2xl">
+          <div className="mx-auto w-full max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
             <a
               href={scholarship.application_url}
               target="_blank"
