@@ -232,6 +232,19 @@ def major_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
     return spec.department in candidates
 
 
+def university_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
+    """소속 대학 조건 (2026-08-12, `/돌아봐` 첫 실행에서 발견). eligible_university도 major와
+    똑같이 크롤링 원문이 콤마로 여러 대학을 나열하는 경우가 있는데("경기과학기술대학교,
+    신안산대학교,안산대학교,장안대학교,한국공학대학교" 등, 협약 대학 여러 곳을 하나의
+    레코드로 묶은 경우), 기존엔 `scholarship.eligible_university != spec.university` 완전
+    일치 비교만 해서 콤마로 묶인 순간 그 목록 안 어떤 대학 학생도 절대 매칭이 안 됐음(16건
+    영향, matching_gaps.md 참고). major_matches()와 동일한 방식으로 콤마 분리 비교로 수정."""
+    if scholarship.eligible_university is None:
+        return True
+    candidates = {chunk.strip() for chunk in scholarship.eligible_university.split(",")}
+    return spec.university in candidates
+
+
 def deadline_matches(scholarship: Scholarship, today: datetime.date | None = None) -> bool:
     """마감일 자동 정리 (matching_gaps.md 7번, 2026-08-03 구현). application_deadline이
     구조화된 값으로 채워진 장학금만 자동으로 걸러짐 — 대부분의 기존 데이터는 "매 학기 초
@@ -245,6 +258,20 @@ _SIDO_NAMES = [
     "서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종",
     "경기", "강원", "충북", "충남", "전북", "전남", "경북", "경남", "제주",
 ]
+
+_DISTRICT_SUFFIXES = ("구", "군", "시")
+
+
+def _has_district_detail(region: str, named_sido: list[str]) -> bool:
+    """eligible_region에서 시/도 이름을 다 떼어내고 남은 조각 중에, 구/군/시로 끝나는
+    (=특정 구/군을 가리키는) 토큰이 있는지 확인 (2026-08-12, id=1048에서 발견). 있으면 그
+    레코드는 시/도 전체가 아니라 그 안의 특정 구/군만 한정하는 것 — region_matches()가
+    "본인/부모 시/도만 같아도 통과"를 막고 구/군까지 요구하도록 신호를 줌."""
+    stripped = region
+    for sido in named_sido:
+        stripped = stripped.replace(sido, " ")
+    tokens = re.split(r"[,\s·]+", stripped)
+    return any(len(t) >= 2 and t[-1] in _DISTRICT_SUFFIXES for t in tokens if t)
 
 
 def region_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
@@ -267,11 +294,23 @@ def region_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
     구/군 후보가 매칭되더라도 그 구/군에 대응하는 사용자 시/도(spec.region 또는
     spec.parent_region)가 그 시/도 이름과 같은지까지 추가로 확인함. eligible_region에
     시/도 이름이 없으면(기존 컨벤션 — 구/군 이름만 넣는 게 정상, 예: "정읍시") 이 추가
-    확인 없이 기존 방식 그대로 동작 — 대다수 케이스는 영향 없음."""
+    확인 없이 기존 방식 그대로 동작 — 대다수 케이스는 영향 없음.
+
+    2026-08-12 추가 — 위 "중구" 수정 이후에도 남아있던 구멍 발견(`/돌아봐` 점검, id=1048
+    "인천대교 희망 장학생"): eligible_region이 "인천 중구,인천 미추홀구,인천 연수구"처럼
+    시/도 이름 + 특정 구/군을 같이 적어서 그 시/도 **전체가 아니라 특정 구만** 한정하는
+    레코드인데도, "본인 시/도" 후보(spec.region)는 구/군 조건과 무관하게 항상 통과 처리돼
+    있어서, 인천에 살기만 하면 중구·미추홀구·연수구가 아닌 다른 구(예: 남동구) 주민한테도
+    떠버렸음. eligible_region에 시/도 이름과 함께 실제 구/군 이름까지 나열돼 있는지
+    (`_has_district_detail`) 확인해서, 그런 "시/도 한정이 아니라 그 안의 특정 구/군 한정"
+    레코드에서는 본인/부모 시/도 후보만으로는 통과 못 시키고 반드시 구/군까지 일치해야
+    통과하게 함. 시/도 이름 없이 구/군만 있는 기존 다수 케이스(예: "정읍시")는 이 판단
+    대상이 아니라 영향 없음."""
     if scholarship.eligible_region is None:
         return True
     region = scholarship.eligible_region
     named_sido = [s for s in _SIDO_NAMES if s in region]
+    district_detail = bool(named_sido) and _has_district_detail(region, named_sido)
 
     def district_ok(sido: str | None) -> bool:
         if not named_sido:
@@ -283,9 +322,9 @@ def region_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
     # 후보에 넣으면 지역 조건이 있는 장학금이 전부 통과해버리는 심각한 버그가 됨 — 빈
     # 문자열은 "값 없음"과 동일하게 취급해서 제외함.
     candidates = [
-        (spec.region, True),
+        (spec.region, not district_detail),
         (spec.district, district_ok(spec.region)),
-        (spec.parent_region, True),
+        (spec.parent_region, not district_detail),
         (spec.parent_district, district_ok(spec.parent_region)),
     ]
     return any(c and ok and c in region for c, ok in candidates)
@@ -354,10 +393,7 @@ def is_eligible(scholarship: Scholarship, spec: UserSpec) -> bool:
         return False
     if scholarship.foreigner_eligibility == ForeignerEligibility.KOREAN_ONLY and spec.is_foreigner:
         return False
-    if (
-        scholarship.eligible_university is not None
-        and scholarship.eligible_university != spec.university
-    ):
+    if not university_matches(scholarship, spec):
         return False
     if scholarship.eligible_college is not None and scholarship.eligible_college != spec.college:
         return False
