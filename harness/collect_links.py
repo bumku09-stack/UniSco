@@ -50,8 +50,12 @@ def fetch_page(url: str, board: BoardConfig) -> str:
     return _fetch_js(url) if board.requires_js else http.get_text(url)
 
 
-def _parse_expected_count(html: str, board: BoardConfig) -> tuple[int | None, int | None]:
-    """(총 게시물 수 또는 None, 총 페이지 수 또는 None). 총 페이지 수가 None이면 파싱 실패로 취급."""
+def parse_expected_count(html: str, board: BoardConfig) -> tuple[int | None, int | None]:
+    """(총 게시물 수 또는 None, 총 페이지 수 또는 None). 총 페이지 수가 None이면 파싱 실패로 취급.
+
+    원래 collect_board_links() 전용 내부 함수였는데, 2026-08-14 onboard.py가 에이전트가
+    제안한 설정을 기계적으로 재검증할 때 두 번째 호출자로 생겨서 public으로 바꿈(extract_links도
+    동일한 이유)."""
     if board.total_pages_pattern:
         m = re.search(board.total_pages_pattern, html)
         if m:
@@ -68,7 +72,7 @@ def _parse_expected_count(html: str, board: BoardConfig) -> tuple[int | None, in
 _JS_HREF_PLACEHOLDERS = {"#", "#view", "javascript:void(0)", "javascript:void(0);", ""}
 
 
-def _extract_links(html: str, board: BoardConfig) -> list[tuple[str, str]]:
+def extract_links(html: str, board: BoardConfig) -> list[tuple[str, str]]:
     """[(절대 URL, 게시글 제목)] — 제목은 dedup.py가 이름 대용으로 씀(harness/dedup.py 참고).
 
     일부 대학 게시판(전자정부프레임워크 스킨 등)은 제목 링크의 href가 "#"/"javascript:" 같은
@@ -113,7 +117,7 @@ def collect_board_links(board: BoardConfig) -> CollectionResult:
     for attempt in range(1, max_attempts + 1):
         first_url = board.list_url_template.format(page=board.first_page_index)
         first_html = fetch_page(first_url, board)
-        expected_count, total_pages = _parse_expected_count(first_html, board)
+        expected_count, total_pages = parse_expected_count(first_html, board)
 
         if total_pages is None:
             # 재시도해도 안 바뀔 문제(정규식이 그 사이트 문구와 안 맞음) — 바로 실패 처리.
@@ -140,7 +144,7 @@ def collect_board_links(board: BoardConfig) -> CollectionResult:
                 if page_num == board.first_page_index
                 else fetch_page(board.list_url_template.format(page=page_num), board)
             )
-            for url, title in _extract_links(html, board):
+            for url, title in extract_links(html, board):
                 if url in seen:
                     continue
                 seen.add(url)

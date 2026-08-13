@@ -87,6 +87,17 @@ DEDUP_SIMILARITY_THRESHOLD = int(os.environ.get("HARNESS_DEDUP_THRESHOLD", "90")
 # 요청 사이에 짧게 쉬어서 이런 버스트 패턴 자체를 피함.
 REQUEST_DELAY_SECONDS = float(os.environ.get("HARNESS_REQUEST_DELAY_SECONDS", "0.7"))
 
+# ── 7.7 온보딩 에이전트 (harness/onboard.py, prompts/onboarding_spec.md) ─
+# 새 대학 게시판을 조사해서 BoardConfig 초안을 제안하는 에이전트용 설정 — extract.py의
+# "문서 1건=호출 1건, 상태 없음" 단일 호출과 달리 이건 도구를 여러 턴 호출하며 스스로 조사를
+# 이어가는 에이전틱 루프라 모델/토큰/턴 수를 별도로 관리함(2026-08-14).
+ONBOARD_MODEL = os.environ.get("HARNESS_ONBOARD_MODEL", EXTRACTION_MODEL)
+ONBOARD_MAX_TOKENS = 8192
+# 도구 호출 한 번 + 결과 확인이 1턴 — 조사 절차가 7단계(3-1~3-7)라 여유 있게 잡되, 무한 루프로
+# 비용이 새는 걸 막기 위해 상한을 둠. 다 못 끝내면 조용히 아무거나 내지 않고 실패로 보고함
+# (onboard.py의 run_onboarding_agent 참고 — 원칙 1과 같은 이유).
+ONBOARD_MAX_TURNS = int(os.environ.get("HARNESS_ONBOARD_MAX_TURNS", "20"))
+
 # ── 기타 ────────────────────────────────────────────────────────────────
 GITHUB_REPO = os.environ.get("HARNESS_GITHUB_REPO", "hoseongdev/UniSco")
 PR_BASE_BRANCH = "main"
