@@ -3,8 +3,15 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { AuthError, AuthLogo, authInputClass, authPrimaryButtonClass, AuthShell } from "@/components/auth-ui";
-import { postJson, setTokens } from "@/lib/auth";
+import {
+  AuthError,
+  AuthLogo,
+  authInputClass,
+  authPrimaryButtonClass,
+  AuthShell,
+  KakaoLoginButton,
+} from "@/components/auth-ui";
+import { kakaoAuthorizeUrl, postJson, setTokens } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -61,6 +68,8 @@ export default function LoginPage() {
           {loading ? "로그인 중..." : "로그인"}
         </button>
       </form>
+
+      <KakaoLoginButton onClick={() => (window.location.href = kakaoAuthorizeUrl())} />
 
       <p className="mt-4 text-center text-xs text-gray-400">
         <Link href="/forgot-password" className="font-semibold text-blue-500">

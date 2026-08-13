@@ -14,7 +14,9 @@ src/
 │   ├── page.tsx         # "/" 라우트 — 랜딩/선택 화면(2026-08-10 개편, 예전엔 로그인 폼이었음). "지금 바로 둘러보기" → /spec(게스트), "로그인" → /login
 │   ├── globals.css      # Tailwind 진입점 + 전역 스타일
 │   ├── login/
-│   │   └── page.tsx     # "/login" — 로그인 폼(예전 "/" 내용 그대로 이동). POST /auth/login → 토큰 저장 → 스펙 있으면 /home, 없으면 /spec
+│   │   ├── page.tsx     # "/login" — 로그인 폼(예전 "/" 내용 그대로 이동). POST /auth/login → 토큰 저장 → 스펙 있으면 /home, 없으면 /spec. "카카오로 로그인" 버튼도 여기(2026-08-13 추가, 아래 참고)
+│   │   └── kakao/callback/
+│   │       └── page.tsx # "/login/kakao/callback" — 카카오 인가 후 돌아오는 페이지. ?code를 POST /auth/kakao로 넘기고 결과는 /login과 동일하게 처리(토큰 저장 + 라우팅)
 │   ├── signup/
 │   │   └── page.tsx     # "/signup" — 회원가입 폼 → 이메일 인증 코드 입력 (내부 2단계), 완료되면 "/login"으로 이동
 │   ├── forgot-password/
@@ -57,7 +59,13 @@ cp .env.example .env.local
 npm run dev                    # http://localhost:3000
 ```
 
-`.env.local`의 `NEXT_PUBLIC_API_URL`은 백엔드를 가리켜야 함 (로컬에서는 `http://localhost:8000`) — `NEXT_PUBLIC_` 접두사가 붙은 건 브라우저 코드에 노출되는데, 프론트가 호출할 API 주소는 노출돼야 하니 딱 맞음.
+`.env.local`의 `NEXT_PUBLIC_API_URL`은 백엔드를 가리켜야 함 (로컬에서는 `http://localhost:8000`) — `NEXT_PUBLIC_` 접두사가 붙은 건 브라우저 코드에 노출되는데, 프론트가 호출할 API 주소는 노출돼야 하니 딱 맞음. `NEXT_PUBLIC_KAKAO_CLIENT_ID`(카카오 로그인용)도 같은 이유로 노출돼도 되는 값 — 카카오 디벨로퍼스의 REST API 키를 그대로 씀(client secret과 다름, 그건 백엔드에만 있음).
+
+## 카카오 로그인은 어디에 (2026-08-13 추가)
+
+`/login`의 "카카오로 로그인" 버튼 → `lib/auth.ts`의 `kakaoAuthorizeUrl()`이 만든 카카오 인가 URL로 `window.location.href` 이동(리다이렉트라 새 탭 안 씀) → 카카오가 `/login/kakao/callback?code=...`로 돌려보냄 → 그 `code`를 `POST /auth/kakao`로 넘기고, 응답(`access_token`/`refresh_token`/`spec_completed`)은 일반 로그인과 완전히 같은 모양이라 `/login`의 후처리 로직을 그대로 재사용(`setTokens()` + `spec_completed`로 `/home` 또는 `/spec` 분기). 계정 생성/연결 판단은 전부 백엔드(`backend/app/api/auth.py`의 `kakao_login()`)가 함 — 프론트는 토큰만 저장.
+
+`kakaoAuthorizeUrl()`이 `window.location.origin`을 읽어야 해서(콜백 URL을 카카오 디벨로퍼스에 등록해둔 값과 정확히 맞추기 위함) 서버 렌더링 시점엔 호출 불가 — 그래서 버튼 `onClick` 안에서만 호출함(렌더 시점에 미리 계산 안 함).
 
 ## 로그인 후 플로우는 어디에
 

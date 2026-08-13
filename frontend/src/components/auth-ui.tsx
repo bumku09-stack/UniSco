@@ -58,3 +58,22 @@ export function AuthError({ children }: { children: React.ReactNode }) {
     <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-500">{children}</p>
   );
 }
+
+// 카카오 공식 로그인 버튼 가이드 색상(#FEE500 배경 + #191919 텍스트) — 브랜드 가이드라인상
+// 이 조합은 임의로 바꾸면 안 됨. onClick에서 window.location.href를 직접 바꾸는 이유 —
+// kakaoAuthorizeUrl()이 window.location.origin을 읽어야 해서 서버 렌더링 시점엔 못 부름
+// (lib/auth.ts 참고); 클릭 핸들러 안에서만 부르면 이미 클라이언트에서 실행 중이라 안전함.
+export function KakaoLoginButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FEE500] py-4 text-[15px] font-semibold text-[#191919] transition hover:brightness-95 active:scale-[0.99]"
+    >
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+        <path d="M12 3C6.48 3 2 6.48 2 10.8c0 2.76 1.85 5.19 4.63 6.58-.2.75-.73 2.73-.84 3.15-.13.53.19.52.4.38.17-.11 2.66-1.81 3.74-2.55.68.1 1.38.15 2.07.15 5.52 0 10-3.48 10-7.71C22 6.48 17.52 3 12 3z" />
+      </svg>
+      카카오로 로그인
+    </button>
+  );
+}

@@ -7,9 +7,22 @@ class User(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
 
     username: str = Field(unique=True, index=True)
-    email: str = Field(unique=True, index=True)  # 인증용 — 로그인 ID로는 안 씀
-    hashed_password: str
-    is_verified: bool = Field(default=False)  # 이메일 인증 전에는 로그인 불가
+    # 2026-08-13 카카오 로그인 추가 전까지는 NOT NULL이었음 — 소셜 전용 계정은 카카오가
+    # 이메일 동의를 안 줬을 수 있어서 nullable로 변경. Postgres UNIQUE 컬럼은 NULL을
+    # 여러 개 허용하므로(NULL끼리는 서로 다른 값으로 취급) 소셜 유저 여럿이 email=None이어도
+    # 유니크 제약과 충돌 안 함.
+    email: str | None = Field(default=None, unique=True, index=True)  # 인증용 — 로그인 ID로는 안 씀
+    # 2026-08-13 — 카카오 등 소셜 전용 계정은 비밀번호 자체가 없음(None). core/security.py의
+    # verify_password()를 그런 계정에 쓰면 안 되므로, api/auth.py의 login()에서 반드시
+    # None 체크를 먼저 함.
+    hashed_password: str | None = None
+    # 이메일 인증 전에는 로그인 불가. 소셜 로그인(카카오 등)은 가입 시 바로 True로 채워짐 —
+    # 카카오가 이미 신원을 확인한 셈이라 우리 쪽 이메일 OTP가 별도로 필요 없음.
+    is_verified: bool = Field(default=False)
+    # 2026-08-13 카카오 로그인 추가 — 카카오의 회원번호(문자열로 저장, 카카오 응답 자체가
+    # 문자열이 아니라 숫자지만 향후 다른 소셜 제공자 id와 타입을 맞추기 위해 str로 통일).
+    # None=이 계정은 카카오로 로그인한 적 없음(또는 아직 연결 안 됨).
+    kakao_id: str | None = Field(default=None, unique=True, index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 

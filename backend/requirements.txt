@@ -7,4 +7,5 @@ pydantic[email]
 bcrypt
 pyjwt
 resend
+requests
 ruff

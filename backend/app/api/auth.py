@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
 from app.core.email import send_password_reset_code, send_verification_code
+from app.core.kakao import KakaoAuthError, exchange_code_for_token, fetch_kakao_user
 from app.core.security import (
     InvalidTokenError,
     create_access_token,
@@ -18,6 +19,7 @@ from app.models import (
     EmailVerification,
     ForgotPasswordRequest,
     ForgotPasswordResponse,
+    KakaoLoginRequest,
     LoginRequest,
     PasswordReset,
     RefreshRequest,
@@ -213,7 +215,10 @@ def resend_code(body: ResendCodeRequest, session: Session = Depends(get_session)
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
 def forgot_password(body: ForgotPasswordRequest, session: Session = Depends(get_session)):
     user = _find_user_by_identifier(session, body.identifier)
-    if user is None:
+    # email이 없는 계정(카카오 로그인으로 가입해서 이메일 동의를 안 받은 경우)은 코드를 보낼
+    # 주소가 없음 — "계정을 찾을 수 없습니다"와 동일한 메시지로 처리해서 계정 존재 여부가
+    # 새지 않게 함(다른 404 케이스와 동일한 원칙).
+    if user is None or user.email is None:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
     _check_not_rate_limited(session, PasswordReset, user.id)
 
@@ -241,6 +246,15 @@ def reset_password(body: ResetPasswordRequest, session: Session = Depends(get_se
     )
 
 
+def _build_token_response(session: Session, user: User) -> TokenResponse:
+    saved_spec = session.exec(select(SavedSpec).where(SavedSpec.user_id == user.id)).first()
+    return TokenResponse(
+        access_token=create_access_token(user.id),
+        refresh_token=create_refresh_token(user.id),
+        spec_completed=saved_spec is not None,
+    )
+
+
 @router.post("/login", response_model=TokenResponse)
 def login(body: LoginRequest, session: Session = Depends(get_session)):
     invalid_credentials = HTTPException(
@@ -248,18 +262,63 @@ def login(body: LoginRequest, session: Session = Depends(get_session)):
     )
 
     user = session.exec(select(User).where(User.username == body.username)).first()
+    # hashed_password가 None인 계정은 카카오 등 소셜 전용 계정 — verify_password()에 None을
+    # 넘기면 bcrypt가 그대로 터지므로 여기서 먼저 안내 메시지로 막음(사용자 입장에서
+    # "아이디/비밀번호가 틀렸다"보다 훨씬 명확한 안내).
+    if user is not None and user.hashed_password is None:
+        raise HTTPException(
+            status_code=401,
+            detail="이 계정은 카카오 로그인으로 가입됐습니다. 카카오 로그인을 이용해주세요.",
+        )
     if user is None or not verify_password(body.password, user.hashed_password):
         raise invalid_credentials
     if not user.is_verified:
         raise HTTPException(status_code=403, detail="이메일 인증이 완료되지 않았습니다.")
 
-    saved_spec = session.exec(select(SavedSpec).where(SavedSpec.user_id == user.id)).first()
+    return _build_token_response(session, user)
 
-    return TokenResponse(
-        access_token=create_access_token(user.id),
-        refresh_token=create_refresh_token(user.id),
-        spec_completed=saved_spec is not None,
-    )
+
+@router.post("/kakao", response_model=TokenResponse)
+def kakao_login(body: KakaoLoginRequest, session: Session = Depends(get_session)):
+    """카카오 OAuth2 인가 코드를 받아 로그인/가입을 한 번에 처리함(핸드셰이크는
+    core/kakao.py, 계정 생성/연결 판단은 여기). 세 가지 경로:
+    1. 이미 이 kakao_id로 가입된 계정이 있으면 그대로 로그인.
+    2. 카카오가 검증된 이메일을 줬고 그 이메일로 이미(비밀번호로) 가입된 계정이 있으면
+       kakao_id만 그 계정에 연결 — 비밀번호 로그인도 계속 가능, 두 방식 다 열어둠.
+    3. 둘 다 아니면 새 계정 생성. username은 카카오가 nickname 중복 방지를 보장 안 해서
+       kakao_id 기반으로 만듦(예: "kakao_123456789"), 비밀번호는 없음(None), 이메일 인증도
+       카카오가 이미 신원을 확인한 셈이라 곧바로 is_verified=True.
+    """
+    try:
+        kakao_access_token = exchange_code_for_token(body.code)
+        kakao_user = fetch_kakao_user(kakao_access_token)
+    except KakaoAuthError as e:
+        raise HTTPException(status_code=502, detail=f"카카오 로그인에 실패했습니다: {e}") from e
+
+    user = session.exec(select(User).where(User.kakao_id == kakao_user.kakao_id)).first()
+
+    if user is None and kakao_user.email is not None:
+        existing = session.exec(select(User).where(User.email == kakao_user.email)).first()
+        if existing is not None:
+            existing.kakao_id = kakao_user.kakao_id
+            session.add(existing)
+            session.commit()
+            session.refresh(existing)
+            user = existing
+
+    if user is None:
+        user = User(
+            username=f"kakao_{kakao_user.kakao_id}",
+            email=kakao_user.email,
+            hashed_password=None,
+            is_verified=True,
+            kakao_id=kakao_user.kakao_id,
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+    return _build_token_response(session, user)
 
 
 @router.post("/refresh", response_model=TokenResponse)

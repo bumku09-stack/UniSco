@@ -25,6 +25,10 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class KakaoLoginRequest(BaseModel):
+    code: str  # 카카오가 콜백 URL에 붙여준 인가 코드(one-time, 짧은 유효시간)
+
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str

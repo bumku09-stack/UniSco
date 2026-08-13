@@ -49,6 +49,20 @@ export function isLoggedIn(): boolean {
   return getAccessToken() !== null;
 }
 
+// 카카오 인가(로그인 동의) 화면으로 보낼 URL. redirect_uri는 카카오 디벨로퍼스에 등록해둔
+// 값과 정확히 일치해야 하며, 그 URI로 카카오가 ?code=...를 붙여서 되돌려보내면
+// app/login/kakao/callback/page.tsx가 받아서 POST /auth/kakao로 넘김.
+export function kakaoAuthorizeUrl(): string {
+  const clientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
+  const redirectUri = `${window.location.origin}/login/kakao/callback`;
+  const params = new URLSearchParams({
+    client_id: clientId ?? "",
+    redirect_uri: redirectUri,
+    response_type: "code",
+  });
+  return `https://kauth.kakao.com/oauth/authorize?${params.toString()}`;
+}
+
 // JWT의 payload(가운데 조각)만 디코드해서 만료 시각을 읽음 — 서명 검증은 안 함(그건
 // 백엔드가 매 요청마다 함), 순전히 "몇 분 남았는지" 화면에 보여주기 위한 용도라 그걸로 충분함.
 function decodeJwtExpiry(token: string): number | null {

@@ -21,5 +21,14 @@ class Settings(BaseSettings):
     resend_api_key: str = ""
     email_from: str = "UniSco <onboarding@resend.dev>"
 
+    # 카카오 로그인 (2026-08-13 추가). client_id는 카카오 디벨로퍼스의 REST API 키 — 프론트에도
+    # 노출되는 값(NEXT_PUBLIC_KAKAO_CLIENT_ID)이라 비밀값 아님. client_secret은 카카오 앱
+    # 설정에서 "Client Secret" 기능을 켰을 때만 필요(안 켰으면 빈 문자열로 둬도 됨, 코드 교환
+    # 요청에서 그 필드 자체를 생략함 — core/kakao.py 참고). redirect_uri는 카카오 디벨로퍼스에
+    # 등록한 값과 정확히 일치해야 함(프론트의 콜백 페이지 URL).
+    kakao_client_id: str = ""
+    kakao_client_secret: str = ""
+    kakao_redirect_uri: str = "http://localhost:3000/login/kakao/callback"
+
 
 settings = Settings()

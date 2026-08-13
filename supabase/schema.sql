@@ -121,14 +121,21 @@ ALTER TABLE scholarship ENABLE ROW LEVEL SECURITY;
 CREATE TABLE "user" (
     id SERIAL NOT NULL,
     username VARCHAR NOT NULL,
-    email VARCHAR NOT NULL,
-    hashed_password VARCHAR NOT NULL,
+    -- 2026-08-13 카카오 로그인 추가로 email/hashed_password 둘 다 NOT NULL 제약 제거 —
+    -- 소셜 전용 계정은 이메일 동의를 안 받았을 수 있고(email=NULL) 비밀번호 자체가 없음
+    -- (hashed_password=NULL). Postgres UNIQUE 컬럼은 NULL을 여러 개 허용하므로 소셜 유저
+    -- 여럿이 email=NULL이어도 유니크 제약과 충돌 안 함.
+    email VARCHAR,
+    hashed_password VARCHAR,
     is_verified BOOLEAN NOT NULL,
+    -- 2026-08-13 추가 — 카카오 회원번호. None이면 카카오로 로그인한 적 없는 계정.
+    kakao_id VARCHAR,
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
     PRIMARY KEY (id)
 );
 CREATE UNIQUE INDEX ix_user_username ON "user" (username);
 CREATE UNIQUE INDEX ix_user_email ON "user" (email);
+CREATE UNIQUE INDEX ix_user_kakao_id ON "user" (kakao_id);
 ALTER TABLE "user" ENABLE ROW LEVEL SECURITY;
 
 CREATE TABLE emailverification (
