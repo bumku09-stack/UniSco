@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { TopBar } from "@/components/form-ui";
 import { CommonFields, OptionalFields, SchoolFields, deriveSpecFields } from "@/components/spec-fields";
-import { apiUrl, authFetch, isLoggedIn } from "@/lib/auth";
+import { apiUrl, authFetch, clearTokens, isLoggedIn } from "@/lib/auth";
 import { clearGuestData, getGuestSpec, saveGuestResults, saveGuestSpec } from "@/lib/guest";
 import { SIDO_LIST } from "@/lib/regions";
 import { initialOptionalInfo, OptionalInfo, specFormToUserSpec, SpecForm, UserSpec } from "@/lib/spec";
@@ -87,6 +87,15 @@ export default function SpecWizard() {
   const derived = deriveSpecFields(spec);
   const totalSteps = mode === "guest" ? 2 : 3;
 
+  // 로그인은 됐는데 스펙을 아직 한 번도 저장 안 한 계정(카카오 로그인 직후 등)은 /home으로
+  // 못 가고(스펙 없으면 /home이 다시 여기로 돌려보냄) /spec에 갇히는데, 그동안 로그아웃할
+  // 방법이 아예 없었음(2026-08-13 사용자 실제 신고로 발견) — TopBar 오른쪽에 로그아웃 추가.
+  // 게스트 모드는 로그인 세션 자체가 없어서 안 보여줌.
+  function handleLogout() {
+    clearTokens();
+    router.push("/");
+  }
+
   async function handleGuestFinish(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
@@ -150,7 +159,19 @@ export default function SpecWizard() {
   return (
     <div className="min-h-screen bg-white pb-16">
       <div className="mx-auto w-full max-w-md px-6 py-6 sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
-        <TopBar />
+        <TopBar
+          right={
+            mode === "authed" ? (
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="text-sm font-semibold text-gray-400"
+              >
+                로그아웃
+              </button>
+            ) : undefined
+          }
+        />
 
         <h1 className="mt-6 text-xl font-bold leading-snug text-gray-900">
           {step === 1 && "어느 학교에 다니시나요?"}
