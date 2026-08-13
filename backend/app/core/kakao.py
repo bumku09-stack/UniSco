@@ -49,15 +49,17 @@ class KakaoUser:
     email: str | None
 
 
-def exchange_code_for_token(code: str) -> str:
-    """인가 코드를 카카오 access token으로 교환. client_secret은 카카오 앱에서 그 기능을
-    켰을 때만 필요 — 안 켰으면 settings.kakao_client_secret이 빈 문자열이라 그 필드 자체를
-    요청에서 뺌(빈 문자열을 그대로 보내면 카카오가 "Client Secret이 유효하지 않다"고
-    거부함)."""
+def exchange_code_for_token(code: str, redirect_uri: str) -> str:
+    """인가 코드를 카카오 access token으로 교환. redirect_uri는 프론트가 인가 요청 때 실제로
+    쓴 값을 그대로 받아야 함(api/models/auth.py의 KakaoLoginRequest.redirect_uri 참고) —
+    배포 도메인이 여러 개라 백엔드 쪽 고정값 하나로는 못 맞출 수 있어서 고정 설정값 대신
+    호출부에서 넘겨받음. client_secret은 카카오 앱에서 그 기능을 켰을 때만 필요 — 안 켰으면
+    settings.kakao_client_secret이 빈 문자열이라 그 필드 자체를 요청에서 뺌(빈 문자열을
+    그대로 보내면 카카오가 "Client Secret이 유효하지 않다"고 거부함)."""
     payload = {
         "grant_type": "authorization_code",
         "client_id": settings.kakao_client_id,
-        "redirect_uri": settings.kakao_redirect_uri,
+        "redirect_uri": redirect_uri,
         "code": code,
     }
     if settings.kakao_client_secret:

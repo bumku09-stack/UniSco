@@ -27,6 +27,12 @@ class LoginRequest(BaseModel):
 
 class KakaoLoginRequest(BaseModel):
     code: str  # 카카오가 콜백 URL에 붙여준 인가 코드(one-time, 짧은 유효시간)
+    # 2026-08-13 추가 — 프론트가 인가 요청 때 실제로 보낸 redirect_uri를 그대로 넘겨받음.
+    # 카카오는 토큰 교환 시 이 값이 인가 요청 때와 정확히 일치해야만 허용하는데, 배포
+    # 도메인이 여러 개(예: unisco-pi.vercel.app, www.unisco.co.kr)라 백엔드가 고정값 하나만
+    # 갖고 있으면 다른 도메인에서 로그인한 사람은 항상 mismatch로 실패함 — 그래서 백엔드가
+    # 추측하지 않고 프론트가 실제로 쓴 값을 그대로 전달받아 씀(core/kakao.py 참고).
+    redirect_uri: str
 
 
 class TokenResponse(BaseModel):

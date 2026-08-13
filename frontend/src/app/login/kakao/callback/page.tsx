@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { AuthError, AuthLogo, authSecondaryButtonClass, AuthShell } from "@/components/auth-ui";
-import { postJson, setTokens } from "@/lib/auth";
+import { kakaoRedirectUri, postJson, setTokens } from "@/lib/auth";
 
 // 카카오가 인가 후 여기로 ?code=...를 붙여서 되돌려보냄(카카오 디벨로퍼스에 등록해둔
 // Redirect URI가 정확히 이 경로여야 함, lib/auth.ts의 kakaoAuthorizeUrl() 참고). 이 코드를
@@ -25,7 +25,11 @@ function KakaoCallbackInner() {
         setError("카카오 로그인이 취소되었거나 코드가 전달되지 않았습니다.");
         return;
       }
-      const result = await postJson("/auth/kakao", { code }, "카카오 로그인에 실패했습니다.");
+      const result = await postJson(
+        "/auth/kakao",
+        { code, redirect_uri: kakaoRedirectUri() },
+        "카카오 로그인에 실패했습니다."
+      );
       if (!result.ok) {
         setError(result.error);
         return;

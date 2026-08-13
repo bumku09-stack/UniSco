@@ -49,15 +49,23 @@ export function isLoggedIn(): boolean {
   return getAccessToken() !== null;
 }
 
+// 배포 도메인이 여러 개(예: unisco-pi.vercel.app, 커스텀 도메인)일 수 있어서 고정 문자열
+// 대신 항상 현재 접속한 origin 기준으로 계산함 — 카카오 인가 요청과 백엔드 토큰 교환 둘 다
+// 이 함수로 계산한 같은 값을 써야 함(app/login/kakao/callback/page.tsx가 POST /auth/kakao
+// 보낼 때 이 값을 redirect_uri로 같이 실어보냄, backend/app/models/auth.py의
+// KakaoLoginRequest.redirect_uri 참고 — 백엔드는 고정 설정값을 안 씀).
+export function kakaoRedirectUri(): string {
+  return `${window.location.origin}/login/kakao/callback`;
+}
+
 // 카카오 인가(로그인 동의) 화면으로 보낼 URL. redirect_uri는 카카오 디벨로퍼스에 등록해둔
 // 값과 정확히 일치해야 하며, 그 URI로 카카오가 ?code=...를 붙여서 되돌려보내면
 // app/login/kakao/callback/page.tsx가 받아서 POST /auth/kakao로 넘김.
 export function kakaoAuthorizeUrl(): string {
   const clientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
-  const redirectUri = `${window.location.origin}/login/kakao/callback`;
   const params = new URLSearchParams({
     client_id: clientId ?? "",
-    redirect_uri: redirectUri,
+    redirect_uri: kakaoRedirectUri(),
     response_type: "code",
   });
   return `https://kauth.kakao.com/oauth/authorize?${params.toString()}`;

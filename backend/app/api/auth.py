@@ -290,7 +290,7 @@ def kakao_login(body: KakaoLoginRequest, session: Session = Depends(get_session)
        카카오가 이미 신원을 확인한 셈이라 곧바로 is_verified=True.
     """
     try:
-        kakao_access_token = exchange_code_for_token(body.code)
+        kakao_access_token = exchange_code_for_token(body.code, body.redirect_uri)
         kakao_user = fetch_kakao_user(kakao_access_token)
     except KakaoAuthError as e:
         raise HTTPException(status_code=502, detail=f"카카오 로그인에 실패했습니다: {e}") from e

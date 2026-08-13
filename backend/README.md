@@ -147,7 +147,7 @@ FastAPI가 자동 생성해주는 API 문서: http://localhost:8000/docs
 - **계정 매칭 우선순위**: `kakao_id`로 기존 계정 있으면 그대로 로그인 → 없고 카카오가 **검증된**(`is_email_verified`) 이메일을 줬는데 그 이메일로 이미 비밀번호 계정이 있으면 `kakao_id`만 연결(비밀번호 로그인도 계속 가능) → 그것도 아니면 신규 계정 생성(`username="kakao_{kakao_id}"`, `hashed_password=None`, `is_verified=True` — 카카오가 이미 신원 확인했으므로 우리 쪽 이메일 OTP 불필요).
 - **`User.email`/`hashed_password`가 nullable로 바뀜**: 소셜 전용 계정은 이메일 동의를 안 받았을 수도, 비밀번호 자체가 없을 수도 있음. `POST /auth/login`은 `hashed_password is None`인 계정에 대해 "카카오 로그인을 이용해주세요" 안내로 먼저 막고(그냥 `verify_password(password, None)` 호출하면 bcrypt가 죽음), `forgot-password`는 `email is None`인 계정을 기존 "사용자를 찾을 수 없습니다"와 동일하게 처리(코드 보낼 주소가 없고, 계정 존재 여부도 안 새게).
 - **이메일 동의항목**: 카카오 앱이 "카카오계정(이메일)" 동의항목을 허용 안 했으면(비즈니스 앱 전환 필요 등, 카카오 정책 영역이라 콘솔에서 직접 확인) `email=None`으로 옴 — 그래도 로그인 자체는 정상 동작하게 설계함(위 nullable 처리).
-- **환경변수**: `KAKAO_CLIENT_ID`(카카오 디벨로퍼스의 REST API 키), `KAKAO_CLIENT_SECRET`(Client Secret 기능을 켰을 때만, 안 켰으면 빈 값), `KAKAO_REDIRECT_URI`(프론트 콜백 페이지 URL, 카카오 디벨로퍼스에 등록한 값과 정확히 일치해야 함). `.env.example` 참고.
+- **환경변수**: `KAKAO_CLIENT_ID`(카카오 디벨로퍼스의 REST API 키), `KAKAO_CLIENT_SECRET`(Client Secret 기능을 켰을 때만, 안 켰으면 빈 값). `.env.example` 참고. **redirect_uri는 백엔드 설정값이 아님** — 배포 도메인이 여러 개(예: `unisco-pi.vercel.app`, 커스텀 도메인)일 수 있어서 프론트가 요청마다 실제로 쓴 값을 `POST /auth/kakao` body에 같이 실어보내고, 백엔드는 그걸 그대로 카카오에 전달함(고정값과 실제 접속 도메인이 달라서 나던 mismatch 버그를 2026-08-13에 이 방식으로 고침). 그 값이 카카오 디벨로퍼스의 Redirect URI 목록에 등록돼 있기만 하면 됨 — 여러 도메인 다 등록 가능.
 
 ## 배포 (Railway)
 
@@ -160,7 +160,7 @@ Railway 프로젝트 환경변수(Variables 탭)에 등록해야 하는 값:
 - `ENVIRONMENT` — `production`
 - `SECRET_KEY` — `openssl rand -hex 32`로 생성한 랜덤 문자열 (JWT 서명용, 로컬 개발용 기본값을 그대로 배포에 쓰면 안 됨)
 - `RESEND_API_KEY`, `EMAIL_FROM` — 회원가입 인증 메일 발송용 (`.env.example` 참고)
-- `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET`, `KAKAO_REDIRECT_URI` — 카카오 로그인용. `KAKAO_REDIRECT_URI`는 배포 도메인 기준 프론트 콜백 URL(예: `https://unisco-pi.vercel.app/login/kakao/callback`)로 설정 — 로컬 개발용 값을 그대로 두면 배포 환경에서 카카오가 리다이렉트 검증에 실패함
+- `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET` — 카카오 로그인용(redirect_uri는 요청마다 프론트가 보내주므로 별도 환경변수 없음, 위 "카카오 로그인" 섹션 참고)
 
 배포되면 Railway가 `https://<프로젝트명>.up.railway.app` 같은 URL을 발급함 — 이걸 프론트의 `NEXT_PUBLIC_API_URL`로 등록하면 됨.
 

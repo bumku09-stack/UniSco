@@ -14,6 +14,11 @@ harness/**/__pycache__/
 # OS
 .DS_Store
 
+# Vercel CLI project link (local metadata, not project source — root-level because
+# the "unisco" Vercel project's Root Directory setting means `vercel` commands must
+# run from the repo root, not frontend/)
+.vercel
+
 # personal local notes (not shared)
 CLAUDE.local.md
 TASKS.local.md
