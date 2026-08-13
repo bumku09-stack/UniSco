@@ -21,6 +21,23 @@ class KakaoAuthError(Exception):
     api/auth.py에서 502로 변환."""
 
 
+def _raise_with_kakao_detail(e: requests.RequestException, context: str) -> None:
+    """requests.HTTPError는 res.raise_for_status()가 상태 코드만 메시지에 담고 응답 본문은
+    버림 — 근데 카카오는 4xx 응답 본문에 {"error": "...", "error_description": "..."}로
+    실제 원인(예: redirect_uri 불일치, invalid client secret)을 알려주므로, 그걸 안 읽으면
+    "400 Client Error"까지만 보이고 왜 그런지는 매번 카카오 문서 뒤져야 함(2026-08-13,
+    배포 후 첫 로그인 시도에서 원인 없는 400만 보여서 디버깅 어려웠던 것 계기로 추가)."""
+    detail = str(e)
+    response = getattr(e, "response", None)
+    if response is not None:
+        try:
+            body = response.json()
+            detail = body.get("error_description") or body.get("error") or response.text
+        except ValueError:
+            detail = response.text or detail
+    raise KakaoAuthError(f"{context}: {detail}") from e
+
+
 @dataclass
 class KakaoUser:
     kakao_id: str
@@ -50,7 +67,7 @@ def exchange_code_for_token(code: str) -> str:
         res = requests.post(_TOKEN_URL, data=payload, timeout=_TIMEOUT_SECONDS)
         res.raise_for_status()
     except requests.RequestException as e:
-        raise KakaoAuthError(f"카카오 토큰 교환 실패: {e}") from e
+        _raise_with_kakao_detail(e, "카카오 토큰 교환 실패")
 
     access_token = res.json().get("access_token")
     if not access_token:
@@ -67,7 +84,7 @@ def fetch_kakao_user(kakao_access_token: str) -> KakaoUser:
         )
         res.raise_for_status()
     except requests.RequestException as e:
-        raise KakaoAuthError(f"카카오 유저 정보 조회 실패: {e}") from e
+        _raise_with_kakao_detail(e, "카카오 유저 정보 조회 실패")
 
     data = res.json()
     kakao_id = data.get("id")
