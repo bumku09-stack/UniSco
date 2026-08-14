@@ -17,6 +17,7 @@ export const UNIVERSITIES: { name: string; gpaScale: number; colleges: CollegeIn
   {
     name: "충남대학교",
     gpaScale: 4.5,
+    // gpaScale 확인(2026-08-14): 학사지원과 성적 등급표(A+95~100=4.5 ... D0 60~64=1.0) 확인됨.
     // 학과 목록 출처(2026-08-03 조사): 각 단과대학 공식 사이트(human/socialscience/cns/...
     // .cnu.ac.kr). 법학전문대학원(로스쿨)·의학전문대학원은 세부 학과 구분이 없는 단일
     // 과정이라 departments 빈 배열로 둠(학과 선택 시 자유 입력으로 대체됨).
@@ -85,6 +86,7 @@ export const UNIVERSITIES: { name: string; gpaScale: number; colleges: CollegeIn
   {
     name: "한밭대학교",
     gpaScale: 4.5,
+    // gpaScale 확인(2026-08-14): 학사종합안내 성적 등급표에 "평점평균(4.5기준)" 명시됨.
     // 학과 목록 출처(2026-08-03 조사): hanbat.ac.kr 각 단과대학 페이지.
     // **"정보통신대학"은 2026-08-03 조사 중 발견 — 현재 공식 명칭은 "정보기술대학"으로
     // 개편됐고, 정보통신공학과는 AI융합대학 소속으로 옮겨감. 기존에 써왔던 이름이 구
@@ -120,6 +122,7 @@ export const UNIVERSITIES: { name: string; gpaScale: number; colleges: CollegeIn
   {
     name: "배재대학교",
     gpaScale: 4.5,
+    // gpaScale 확인(2026-08-14): 배재대학교 학칙(2-1-01) 제26조 성적분류표(A+=4.50 ... F=0.00) 확인됨.
     // 학과 목록 출처(2026-08-03 조사): hakgwa.pcu.ac.kr 각 단과대 페이지 + 나무위키 교차확인.
     // AI·SW창의융합대학은 자동 조사로는 사이트가 JS 렌더링이라 매번 다르게 나와 확인 못했다가,
     // 사용자가 공식 페이지 표를 직접 확인해줘서 채움. 주시경교양대학·아펜젤러공유대학은 원래
@@ -154,6 +157,7 @@ export const UNIVERSITIES: { name: string; gpaScale: number; colleges: CollegeIn
   {
     name: "목원대학교",
     gpaScale: 4.5,
+    // gpaScale 확인(2026-08-14): 성적평가 페이지 등급표(A+95~100=4.5 ... F=0) 확인됨.
     // 학과 목록 출처(2026-08-03 조사): 목원대 사이트맵(mokwon.ac.kr/kr/html/sub09/0901.html).
     // 학부 하위 세부전공까지는 안 나누고 학부/학과 단위로만 정리함.
     colleges: [
@@ -190,6 +194,8 @@ export const UNIVERSITIES: { name: string; gpaScale: number; colleges: CollegeIn
   {
     name: "우송대학교",
     gpaScale: 4.5,
+    // gpaScale 확인(2026-08-14): "성적평가 및 처리규정[4-1-4a]" 제16조 종합평균등급표
+    // (평점평균 4.25~4.50=A+ ... 0~0.74=F) 확인됨.
     // 학과 목록 출처(2026-08-03 조사): ent.wsu.ac.kr(입학처, 학교 본사이트는 SSO 로그인 벽이라
     // 못 씀). 엔디컷국제대학은 입학년도별 탭이 섞여있어 신뢰도가 낮음(구 명칭 가능성 있음,
     // 아래 주석 참고) — 나중에 재확인 권장.
@@ -220,6 +226,8 @@ export const UNIVERSITIES: { name: string; gpaScale: number; colleges: CollegeIn
   {
     name: "한남대학교",
     gpaScale: 4.5,
+    // gpaScale 확인(2026-08-14): 성적평가 페이지 등급표 확인됨 — 최고등급 A+=4.5가 만점
+    // (A0=4.3은 만점이 아니라 A+ 바로 아래 세부등급 점수일 뿐이라 혼동 주의).
     // 학과 목록 출처(2026-08-03 조사): hannam.ac.kr 학사안내(educate_01_1~13.html 시리즈).
     // 각 대학의 "자유전공학부" 트랙은 그대로 포함, 학부 하위 세부전공(예: 법학부-법학전공)은
     // 학부 단위로 정리함.

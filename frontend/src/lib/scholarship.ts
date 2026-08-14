@@ -6,9 +6,14 @@ export type Scholarship = {
   provider: string | null;
   description: string | null;
   amount: number | null;
+  // 2026-08-14 추가 — 금액 상세 서술(지급주기/지급기간, 순위별 차등 등). 상세페이지 "금액"
+  // 블록 표시용, 매칭에는 안 씀.
+  amount_detail: string | null;
   application_url: string | null;
-  application_period: string | null;
+  application_period: string | null; // 신청 기간 (순수 날짜/기간만)
   application_deadline: string | null; // ISO date (YYYY-MM-DD) — application_period가 자유 텍스트라 정렬용으로 따로 있는 구조화된 값
+  // 2026-08-14 추가 — 신청방식(자동선발/직접신청 등). 상세페이지 "신청방식" 블록 표시용.
+  application_method: string | null;
   min_age: number | null;
   max_age: number | null;
   required_gender: "male" | "female" | null;
@@ -33,7 +38,17 @@ export type Scholarship = {
   category_l2: string | null;
   // 매칭 로직에는 안 쓰이지만(수동 확인 필요 원문 텍스트), 상세 페이지 참고용 표시엔 씀
   major: string | null;
+  // 2026-08-14 추가 — "이 학과만 빼고 나머지 전부 됨"(major와 정반대 의미). 실제 매칭
+  // 필터링에 씀(core/matching.py) — major와 동일하게 여태 상세페이지에 안 보이던 버그 발견.
+  excluded_major: string | null;
+  // 2026-08-14 추가 — 체육특기자 전형 등 입학전형 구분. 필드 자체는 있었는데 화면 어디에도
+  // 안 보이던 버그 발견(체육특기자 장학금에서 "체육진흥원 추천자"를 admission_score_condition에
+  // 잘못 넣어뒀던 걸 정리하다가 드러남).
+  admission_track: "general" | "athletic_specialty" | "other_specialty" | null;
   min_credits: string | null;
+  // 실제 매칭 필터링에 씀(core/matching.py의 credits_matches()) — min_credits(원문 텍스트)와
+  // 별개. 채워져 있으면 상세페이지에서 파란 점(시스템이 확인한 조건)으로 표시.
+  min_credits_last_semester: number | null;
   admission_score_condition: string | null;
   headcount: string | null;
 };
@@ -79,13 +94,21 @@ function formatRange(min: number | null, max: number | null, unit: string): stri
   return `${max}${unit} 이하`;
 }
 
-function eligibilityParts(s: Scholarship): string[] {
+// 2026-08-14: 학점 만점 기준은 대학마다 다름(예: KAIST 4.3만점) — min_gpa는 항상 4.5만점
+// 기준으로 저장돼 있는데(backend/app/core/matching.py 주석 참고), 그대로 보여주면 4.3만점
+// 대학 학생은 자기 학점표랑 숫자가 안 맞아서 헷갈림. 학생이 스펙에 대학을 등록해뒀으면
+// (viewerGpaScale로 전달됨) 그 대학 기준으로 환산해서 보여주고, 모르면 기존처럼 4.5만점
+// 기준 그대로 보여줌.
+function eligibilityParts(s: Scholarship, viewerGpaScale?: number): string[] {
   const parts: string[] = [];
   if (s.eligible_university) parts.push(`대학: ${s.eligible_university}`);
   if (s.eligible_college) parts.push(`단과대: ${s.eligible_college}`);
   // major_matches()가 실제로 필터링에 쓰는 필드인데(backend/app/core/matching.py) 프론트
   // 목록에서 빠져있던 버그 — 2026-08-11 발견, 여기로 옮김(예전엔 "참고조건"으로 잘못 표시).
   if (s.major) parts.push(`전공: ${s.major}`);
+  if (s.excluded_major) parts.push(`제외 전공: ${s.excluded_major}`);
+  if (s.admission_track === "athletic_specialty") parts.push("입학전형: 체육특기자 전형");
+  if (s.admission_track === "other_specialty") parts.push("입학전형: 기타 특기자·특별전형(농어촌·정원외 등)");
   if (s.required_enrollment_status) {
     parts.push(`재학상태: ${ENROLLMENT_STATUS_LABEL[s.required_enrollment_status]}`);
   }
@@ -100,7 +123,12 @@ function eligibilityParts(s: Scholarship): string[] {
   if (s.max_income_bracket != null) parts.push(`소득분위 ${s.max_income_bracket} 이하`);
   if (s.min_gpa != null) {
     const basis = s.min_gpa_basis ? `${GPA_BASIS_LABEL[s.min_gpa_basis]} ` : "";
-    parts.push(`${basis}학점 ${s.min_gpa} 이상`);
+    if (viewerGpaScale != null && viewerGpaScale !== 4.5) {
+      const converted = Math.round((s.min_gpa * (viewerGpaScale / 4.5)) * 100) / 100;
+      parts.push(`${basis}학점 ${converted} 이상 (${viewerGpaScale}만점 기준)`);
+    } else {
+      parts.push(`${basis}학점 ${s.min_gpa} 이상`);
+    }
   }
   if (s.required_military_status) parts.push(`병역: ${MILITARY_LABEL[s.required_military_status]}`);
   if (s.required_gender) parts.push(`성별: ${s.required_gender === "male" ? "남성" : "여성"}`);
@@ -127,6 +155,14 @@ function eligibilityParts(s: Scholarship): string[] {
     const labels = selectableSpecialStatus.map((v) => SPECIAL_STATUS_LABEL_MAP[v] ?? v);
     parts.push(`특수상황: ${labels.join(" 또는 ")}`);
   }
+  // 2026-08-14: min_credits_last_semester가 실제로 필터링에 쓰이는데(matching.py의
+  // credits_matches()) 지금까지 화면 어디에도 안 보이던 버그 발견 — 여기로 추가(major와
+  // 동일한 케이스). min_credits(원문 텍스트)는 이 값이 없을 때만 노란 점 참고용으로 따로 보임.
+  // 파란 목록 맨 끝에 둠 — 졸업학기 예외처럼 description(노란 점) 맨 앞에 이 값을 보충
+  // 설명하는 문장이 오는 경우가 많아서, 두 점이 화면에서 바로 붙어 보이게(사용자 요청).
+  if (s.min_credits_last_semester != null) {
+    parts.push(`이수학점: 직전학기 ${s.min_credits_last_semester}학점 이상`);
+  }
   return parts;
 }
 
@@ -148,10 +184,28 @@ const UNVERIFIABLE_SPECIAL_STATUS_LABELS: Record<string, string> = {
   extracurricular_program_condition: "학교 자체 비교과 프로그램 이수 조건",
 };
 
+// 뭉뚱그린 라벨을 보여주는 태그인데, 구체적인 내용이 이미 다른 칸(보통 description, 이 태그를
+// 넣을 때는 항상 구체적인 원문 설명도 같이 적어두는 게 컨벤션이라 — 2026-08-14 여러 건에서
+// 확인)에 적혀 있으면 화면에 중복으로 안 보이게 뺌 — id=7(수능 조건), id=10(출신 학교 조건),
+// 이후 id=74 등에서 반복 발견돼서 태그별로 하나씩 나열하는 대신 기본값을 "description 있으면
+// 숨김"으로 일반화함. suneung_score_condition만 예외 — 이 태그는 랭킹 페널티에도 쓰여서
+// required_special_status 자체는 그대로 두고, 화면에서 중복 여부만 admission_score_condition
+// 기준으로 따로 판단.
+const REDUNDANT_UNVERIFIABLE_OVERRIDES: Partial<Record<string, (s: Scholarship) => boolean>> = {
+  suneung_score_condition: (s) => Boolean(s.admission_score_condition),
+};
+
+function isRedundantUnverifiableTag(v: string, s: Scholarship): boolean {
+  const override = REDUNDANT_UNVERIFIABLE_OVERRIDES[v];
+  if (override) return override(s);
+  return Boolean(s.description);
+}
+
 // 상세페이지 "직접 확인 필요"(노란 점) 목록용 — required_special_status 중 학생이 선택할
 // 방법이 없는 태그들을 한글 라벨로 변환.
 export function unverifiableConditionParts(s: Scholarship): string[] {
   return s.required_special_status
+    .filter((v) => !isRedundantUnverifiableTag(v, s))
     .map((v) => UNVERIFIABLE_SPECIAL_STATUS_LABELS[v])
     .filter((label): label is string => Boolean(label));
 }
@@ -162,9 +216,10 @@ export function eligibilitySummary(s: Scholarship): string {
   return parts.length > 0 ? parts.join(" · ") : "제한 없음";
 }
 
-// 상세페이지용 — 항목별로 나눠서 bullet list로 보여주기 위한 배열
-export function eligibilityList(s: Scholarship): string[] {
-  const parts = eligibilityParts(s);
+// 상세페이지용 — 항목별로 나눠서 bullet list로 보여주기 위한 배열. viewerGpaScale을 넘기면
+// min_gpa를 그 대학 만점 기준으로 환산해서 보여줌(로그인+스펙 등록된 학생만 해당).
+export function eligibilityList(s: Scholarship, viewerGpaScale?: number): string[] {
+  const parts = eligibilityParts(s, viewerGpaScale);
   return parts.length > 0 ? parts : ["별도 제한 없음"];
 }
 
