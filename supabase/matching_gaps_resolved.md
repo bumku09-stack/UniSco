@@ -160,7 +160,7 @@ def special_status_matches(scholarship_special_status: list[SpecialStatus], spec
 
 `frontend/src/lib/universities.ts`의 `CollegeInfo.departments`로 대학→단과대→학과 3단 구조 구현, `/spec`·`/mypage` 둘 다 연결 완료, 백엔드 매칭(`major_matches()`)도 동작함. 9개 대학(을지대 제외) 전체 학과 목록을 병렬 조사 + 사용자 직접 재확인까지 마쳐서 확정함(자동 조사와 실제 화면이 다를 때는 사용자가 직접 대학 공식 페이지를 열어 확인한 결과가 최종 기준). 학과가 없는 게 맞는 조직(배재대 주시경교양대학/아펜젤러공유대학, 목원대 스톡스대학, 충남대 법학전문대학원·의학전문대학원 등 교양/융합/단일과정)은 빈 배열 유지가 정상.
 
-### 3번 후속(일부): 법학전문대학원(로스�uk) 계열 — ✅ 부분 해결 (2026-07-31)
+### 3번 후속(일부): 법학전문대학원(로스쿨) 계열 — ✅ 부분 해결 (2026-07-31)
 
 `universities.ts`에 `법학전문대학원`/`의학전문대학원` 추가, 로스쿨 장학금 4건은 `eligible_college`로 좁혀서 처리. `required_degree_level`은 JD/MD-PhD 전용 값이 없어 근사 처리(`eligible_college`로 이미 좁혀지므로 결과적으로 문제없음) — 정식 enum 값 추가는 호성과 논의 필요(급하지 않음).
 
@@ -386,6 +386,49 @@ list[SpecialStatus]` 신규 컬럼 추가 + `backend/app/core/matching.py`에
 
 관련 커밋: `feat/similar-recommendations-and-income-bracket` 브랜치, PR #9
 (https://github.com/hoseongdev/UniSco/pull/9) 이어서 진행 중.
+
+## 이질적 조건 OR 매칭 — `eligibility_alt_groups` 신설 (2026-08-14)
+
+기존엔 "스키마 설계가 더 필요한 사안"으로 미뤄뒀던 문제(아래 세부 항목들)를, id=91(농촌출신
+대학원생 학자금대출 — 거주지역/본인직업/전공이 서로 대체 가능한 자격요건) 작업 중 사용자가
+"OR문 지금 만들어야될듯 중요한작업이라서"라고 직접 지시해서 그 자리에서 설계·구현함.
+
+**설계**: `scholarship.eligibility_alt_groups`(JSONB, nullable) — 그룹 리스트. **그 중 하나의
+그룹만 완전히 만족해도 통과**. 각 그룹은 `scholarship` 표의 기존 컬럼과 똑같은 이름/형식의
+키를 담은 dict(예: `{"max_income_bracket": 6}`, `{"required_special_status": [...]}`,
+`{"requires_disability": true}`, `{"major": "..."}` 등 — 사실상 `is_eligible()`이 보는 모든
+필드를 그룹에서 오버라이드 가능). `NULL`(기본값)이면 100% 기존 방식(전부 AND) 그대로라 기존
+660여 건 매칭 결과에 전혀 영향 없음(opt-in).
+
+**구현**: `backend/app/core/matching.py`의 `alt_groups_match()` — 그룹마다 "이 그룹이 다루는
+필드는 그룹 값으로, 나머지 alt-group 대상 필드는 전부 '제한 없음'으로 리셋한 사본(shadow)"을
+만들어서 기존 `is_eligible()`을 그대로 재귀 호출함(매칭 함수를 새로 안 만들고 전부 재사용 —
+로직 두 곳에서 따로 관리할 필요 없음). 격리 테스트로 회귀 없음 확인(신규 4-way OR 케이스
+전부 정상, alt_groups 없는 기존 케이스도 그대로 정상 동작).
+
+### id=1046 인천 희망드림장학금 등 4건 — 소득분위·특수상황·장애 3-way OR ✅ 해결
+
+원문: "학자금지원구간 6구간 이하 또는 기초생활수급자·차상위·한부모·중증장애인 등록자(OR조건)".
+"6구간 이하"는 `max_income_bracket`, "기초생활수급자·차상위·한부모"는 `required_special_status`
+(OR 리스트), "중증장애인"은 `requires_disability` — 서로 다른 매칭 함수라 하나의 OR로 못
+묶었고, `max_income_bracket`이 독립 AND 게이트라서 소득분위는 안 맞아도 차상위·한부모·장애인
+등록자인 학생이 원래 자격이 있는데도 안 보이는 과소매칭 상태였음(2026-08-10 최초 발견,
+2026-08-11 동일 패턴 3건 추가 확인 — id=526/663/999).
+
+`eligibility_alt_groups`로 재작성해서 해결:
+- **id=1046**: `[{max_income_bracket:6}, {required_special_status:[basic_livelihood_recipient,
+  near_poor, single_parent_family]}, {requires_disability:true}]` (원문의 "중증장애인"은 장애
+  정도 구분이 시스템에 없어서 장애 유무만 봄)
+- **id=526**(모범장학생, 세종): `[{max_income_bracket:6}, {required_special_status:
+  [basic_livelihood_recipient, near_poor]}]`
+- **id=663**(신한장학재단 법학전문대학원): `[{max_income_bracket:3}, {required_special_status:
+  [basic_livelihood_recipient, near_poor]}]`
+- **id=999**(인재육성장학금, 횡성)는 애초에 `max_income_bracket`이 안 걸려있어서(태그 리스트
+  자체가 이미 OR라) 원래도 과소매칭이 아니었음 — 손 안 댐.
+
+**아직 안 쓰인 부분**(별도 논의 필요, `matching_gaps.md`에 남겨둠): id=91 자체의 3-way OR은
+③(전공)만 기존 `UserSpec` 필드로 표현 가능하고 ①②(본인 직업, 거주 개월수/농어촌 여부)는
+UserSpec에 아예 없는 정보라 의도적으로 비워둠.
 
 ## 참고
 
