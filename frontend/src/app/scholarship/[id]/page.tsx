@@ -224,10 +224,10 @@ export default function ScholarshipDetailPage({
             <div className="mt-7 border-b border-gray-100 pb-7">
               <SectionHeading>기간</SectionHeading>
               <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-gray-700">
-                {scholarship.application_period ??
-                  (scholarship.application_method
-                    ? `없음 — ${scholarship.application_method}`
-                    : "정보 없음")}
+                {/* application_period가 없을 때 application_method를 대신 보여주면 바로 위
+                    "신청방식" 섹션과 문장이 그대로 중복돼 보임(2026-08-15 리뷰에서 발견) —
+                    금액/신청방식과 동일하게 "정보 없음"으로 통일. */}
+                {scholarship.application_period ?? "정보 없음"}
               </p>
             </div>
 

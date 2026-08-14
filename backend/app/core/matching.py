@@ -1,4 +1,3 @@
-import copy
 import datetime
 import re
 
@@ -388,11 +387,12 @@ def enrollment_status_matches(
 # 하나만 만족해도 통과시키기 위함(예: id=91 농촌출신대학원생 학자금대출 — "농어촌 거주" 또는
 # "본인 농어업 종사" 또는 "농식품계열학과 재학" 중 하나). 각 그룹은 scholarship 표의 같은
 # 이름 필드를 담은 dict — 컨벤션상 아래 필드들은 alt_groups를 쓰는 장학금이라면 scholarship
-# 본체에는 채우지 않고(None/빈 리스트로 둠) 그룹 안에만 넣음. 본체에 남겨둔 다른 필드
-# (예: application_deadline, min_age)는 그대로 모든 그룹에 공통으로 적용되는 조건임.
+# 본체에는 채우지 않고(None/빈 리스트로 둠) 그룹 안에만 넣음. min_age처럼 여기 안 나열된
+# 필드는(예: application_deadline) 본체에 남겨서 그대로 모든 그룹에 공통으로 적용됨 — 2026-08-15,
+# min_age/max_age가 실수로 이 dict에도 들어있어서 그룹마다 나이 제한이 통째로 사라지는
+# 버그가 있었음(리뷰에서 발견, 이 주석이 원래 말하던 의도와 정반대로 동작했음). 나이 조건이
+# 그룹별로 달라지는 실제 사례가 나오면 그때 다시 추가할 것.
 _ALT_GROUP_FIELD_DEFAULTS: dict[str, object] = {
-    "min_age": None,
-    "max_age": None,
     "required_gender": None,
     "eligible_region": None,
     "required_military_status": None,
@@ -421,14 +421,36 @@ _ALT_GROUP_FIELD_DEFAULTS: dict[str, object] = {
 }
 
 
+class _AltGroupShadow:
+    """group에 없는 alt-group 대상 필드는 "제한 없음"으로, 있는 필드는 그 값으로 보여주는
+    읽기 전용 뷰 — scholarship 본체는 건드리지 않고 grade-out된 필드만 가려서 is_eligible()에
+    넘기기 위함. 나머지 속성(min_age 등 공통 필드 포함)은 원본 scholarship 그대로 위임.
+
+    2026-08-15: 원래 copy.copy(scholarship) 후 setattr로 덮어쓰던 구현은 Scholarship이
+    세션에 붙은 SQLModel(ORM) 매핑 인스턴스라 얕은 복사본이 원본과 _sa_instance_state를
+    공유함 — 복사본을 수정하면 원본이 session.dirty로 표시되는, SQLAlchemy가 지원하지 않는
+    패턴이었음(autoflush 세션에서 실제 DB 객체가 의도치 않게 dirty 처리될 위험). 이 클래스는
+    scholarship을 전혀 mutate하지 않고 속성 조회만 가로채므로 그 위험이 없음."""
+
+    def __init__(self, scholarship: Scholarship, overrides: dict):
+        object.__setattr__(self, "_scholarship", scholarship)
+        object.__setattr__(self, "_overrides", overrides)
+
+    def __getattr__(self, name: str):
+        overrides = object.__getattribute__(self, "_overrides")
+        if name in overrides:
+            return overrides[name]
+        return getattr(object.__getattribute__(self, "_scholarship"), name)
+
+
 def _group_shadow(scholarship: Scholarship, group: dict) -> Scholarship:
     """group에 없는 alt-group 대상 필드는 "제한 없음"으로 리셋하고, group에 있는 값만
-    덮어씌운 사본을 만듦 — 그룹별로 독립적인 자격조건 세트를 만들기 위함."""
-    shadow = copy.copy(scholarship)
-    for field, neutral in _ALT_GROUP_FIELD_DEFAULTS.items():
-        setattr(shadow, field, group.get(field, neutral))
-    shadow.eligibility_alt_groups = None  # 무한 재귀 방지
-    return shadow
+    덮어씌운 뷰를 만듦 — 그룹별로 독립적인 자격조건 세트를 만들기 위함."""
+    overrides = {
+        field: group.get(field, neutral) for field, neutral in _ALT_GROUP_FIELD_DEFAULTS.items()
+    }
+    overrides["eligibility_alt_groups"] = None  # 무한 재귀 방지
+    return _AltGroupShadow(scholarship, overrides)  # type: ignore[return-value]
 
 
 def alt_groups_match(scholarship: Scholarship, spec: UserSpec) -> bool:
