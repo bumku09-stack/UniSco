@@ -1,3 +1,4 @@
+import copy
 import datetime
 import re
 
@@ -24,6 +25,11 @@ def to_user_spec(saved: SavedSpec) -> UserSpec:
 # grade on different scales (KAIST is 4.3) — must mirror
 # frontend/src/lib/universities.ts's gpaScale so a user's self-reported GPA
 # compares correctly against that normalized 4.5-scale threshold.
+# 2026-08-14: all 9 KR universities below re-verified against each school's own
+# 학칙/성적평가 규정(등급표) — all confirmed 4.5, none actually use 4.3/4.0 (only
+# KAIST does). Previously only 을지대/대전대/한침대 had documented verification;
+# 충남대/한밭대/배재대/목원대/우송대/한남대 were unverified defaults that turned
+# out correct. See frontend/src/lib/universities.ts per-university comments for sources.
 UNIVERSITY_GPA_SCALE = {
     "충남대학교": 4.5,
     "KAIST": 4.3,
@@ -378,6 +384,64 @@ def enrollment_status_matches(
     return required == spec_status
 
 
+# 2026-08-14 추가 — eligibility_alt_groups(OR 조건) 지원. 이 필드에 나열된 그룹 중 단
+# 하나만 만족해도 통과시키기 위함(예: id=91 농촌출신대학원생 학자금대출 — "농어촌 거주" 또는
+# "본인 농어업 종사" 또는 "농식품계열학과 재학" 중 하나). 각 그룹은 scholarship 표의 같은
+# 이름 필드를 담은 dict — 컨벤션상 아래 필드들은 alt_groups를 쓰는 장학금이라면 scholarship
+# 본체에는 채우지 않고(None/빈 리스트로 둠) 그룹 안에만 넣음. 본체에 남겨둔 다른 필드
+# (예: application_deadline, min_age)는 그대로 모든 그룹에 공통으로 적용되는 조건임.
+_ALT_GROUP_FIELD_DEFAULTS: dict[str, object] = {
+    "min_age": None,
+    "max_age": None,
+    "required_gender": None,
+    "eligible_region": None,
+    "required_military_status": None,
+    "max_income_bracket": None,
+    "min_gpa": None,
+    "min_gpa_basis": None,
+    "requires_disability": None,
+    "required_disability_type": None,
+    "foreigner_eligibility": None,
+    "language_test_type": None,
+    "language_test_min_score": None,
+    "required_special_status": [],
+    "required_special_status_all": [],
+    "excluded_special_status": [],
+    "major": None,
+    "excluded_major": None,
+    "min_credits": None,
+    "min_credits_last_semester": None,
+    "eligible_university": None,
+    "eligible_college": None,
+    "required_enrollment_status": None,
+    "min_grade": None,
+    "max_grade": None,
+    "required_degree_level": None,
+    "admission_track": None,
+}
+
+
+def _group_shadow(scholarship: Scholarship, group: dict) -> Scholarship:
+    """group에 없는 alt-group 대상 필드는 "제한 없음"으로 리셋하고, group에 있는 값만
+    덮어씌운 사본을 만듦 — 그룹별로 독립적인 자격조건 세트를 만들기 위함."""
+    shadow = copy.copy(scholarship)
+    for field, neutral in _ALT_GROUP_FIELD_DEFAULTS.items():
+        setattr(shadow, field, group.get(field, neutral))
+    shadow.eligibility_alt_groups = None  # 무한 재귀 방지
+    return shadow
+
+
+def alt_groups_match(scholarship: Scholarship, spec: UserSpec) -> bool:
+    """eligibility_alt_groups가 없으면(기존 장학금 전부) 항상 통과 — 이 기능은 opt-in이라
+    기존 매칭 결과에 영향 없음. 있으면 그 중 한 그룹이라도 완전히 통과하는 게 있어야 함."""
+    if not scholarship.eligibility_alt_groups:
+        return True
+    return any(
+        is_eligible(_group_shadow(scholarship, group), spec)
+        for group in scholarship.eligibility_alt_groups
+    )
+
+
 def is_eligible(scholarship: Scholarship, spec: UserSpec) -> bool:
     """A scholarship field left as None means no restriction for that
     criterion (see backend/app/models/scholarship.py) — only check fields
@@ -446,6 +510,8 @@ def is_eligible(scholarship: Scholarship, spec: UserSpec) -> bool:
         scholarship.required_degree_level is not None
         and scholarship.required_degree_level != spec.degree_level
     ):
+        return False
+    if not alt_groups_match(scholarship, spec):
         return False
     return True
 

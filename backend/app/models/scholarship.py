@@ -1,6 +1,8 @@
 import datetime
+from typing import Any
 
 from sqlalchemy import ARRAY, Column, String
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
 from app.models.enums import (
@@ -27,6 +29,9 @@ class Scholarship(SQLModel, table=True):
     provider: str | None = None
     description: str | None = None
     amount: int | None = None
+    # 2026-08-14 추가 — 금액 상세 서술(지급주기/지급기간, 순위별 차등 등). description에
+    # 섞여있던 걸 분리(supabase/data_collection_guide.md 참고). 매칭에는 안 씀.
+    amount_detail: str | None = None
     application_url: str | None = None
 
     # Eligibility conditions. A field left as None means "no restriction" for
@@ -107,7 +112,11 @@ class Scholarship(SQLModel, table=True):
     min_credits_last_semester: int | None = None
     admission_score_condition: str | None = None  # 내신/입학성적 조건
     headcount: str | None = None  # 선발 인원
-    application_period: str | None = None  # 신청 기간
+    application_period: str | None = None  # 신청 기간 (순수 날짜/기간만 — 방식 설명은 아래로 분리)
+    # 2026-08-14 추가 — 신청방식(자동선발/직접신청 등). 예전엔 application_period 안에
+    # "입학 시 전형 결과로 자동 선발"처럼 방식 설명이 섞여 들어가곤 했음 — 이제 여기로 분리
+    # (supabase/data_collection_guide.md 참고). 매칭에는 안 씀.
+    application_method: str | None = None
 
     # 구조화된 자격조건 (정밀 매칭용). None=제한 없음, 기존 규칙과 동일.
     eligible_university: str | None = None  # 짧은 태그 (예: "충남대학교", "KAIST")
@@ -126,6 +135,18 @@ class Scholarship(SQLModel, table=True):
     admission_track: AdmissionTrack | None = Field(
         default=None, sa_type=enum_column(AdmissionTrack)
     )  # None=전형 무관(제한 없음)
+    # 2026-08-14 추가 — 서로 다른 종류의 조건 중 "하나만 만족하면 통과"(OR)하는 경우를 위한
+    # 재사용 가능한 필드(id=91 농촌출신대학원생 학자금대출처럼 거주지역/본인직업/전공이 서로
+    # 대체 가능한 자격요건일 때). None=이 기능 미사용, 기존처럼 모든 필드가 AND로 적용됨
+    # (기존 데이터 전부 영향 없음 — opt-in). 각 그룹은 이 표의 다른 컬럼과 같은 이름/형식의
+    # 키를 담은 dict — 예: [{"major": "농림축산식품계열"}, {"required_special_status":
+    # ["rural_student"]}]. core/matching.py의 alt_groups_match()가 평가함. 그룹에서 다루는
+    # 필드는 이 컬럼과 별개로 이 표의 본래 컬럼(eligible_region 등)에는 채우지 말 것 —
+    # 채워두면 그 필드가 모든 그룹에 걸쳐 추가로 AND 적용돼버림(그룹별 대체 조건이 아니라
+    # 전체 필수 조건이 되어버려 의도가 깨짐).
+    eligibility_alt_groups: list[dict[str, Any]] | None = Field(
+        default=None, sa_column=Column(JSONB, nullable=True)
+    )
 
     # 분류 체계 (자격조건 아님 — 매칭 필터링에 안 쓰고, 목록 표시/그룹핑용).
     # category_l2가 어느 category_l1에 속하는지는 app.models.enums.CATEGORY_L2_BY_L1 참고.
