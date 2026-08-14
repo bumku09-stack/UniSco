@@ -19,8 +19,11 @@ harness/
 ├── verify.py                   # [5] 자동 검증 — 인용 대조 + 2중추출 대조, LLM 자기검증 아님
 ├── build_pr.py                  # [6][7] SQL 초안 + 리뷰 마크다운 생성, 브랜치 커밋, PR 오픈
 ├── run.py                        # 오케스트레이션 — python -m harness.run
+├── onboard.py                     # 온보딩 에이전트 — 새 대학 게시판 조사, BoardConfig 초안 PR 생성. 아래 "온보딩 에이전트" 참고
 ├── state/rotation.json            # 다음 나이트런이 어느 대학부터 처리할지 기억하는 상태 파일
-└── prompts/extraction_spec.md      # LLM 시스템 프롬프트 재료 — 필드 정의/enum, extract.py가 읽어서 씀
+└── prompts/
+    ├── extraction_spec.md          # LLM 시스템 프롬프트 재료 — 필드 정의/enum, extract.py가 읽어서 씀
+    └── onboarding_spec.md          # 온보딩 에이전트 시스템 프롬프트 — onboard.py가 그대로 주입해서 씀
 ```
 
 ## 로컬 실행
@@ -65,7 +68,7 @@ python -m harness.run --university 한밭대학교
 `EXTRACTION_CONCURRENCY`)을 실제 공고문 샘플로 검증하는 것. 이미지 첨부파일 OCR
 (아래 "알려진 한계")과 PDF 미지원도 남아있음.
 
-새 대학 하나를 추가하려면:
+새 대학 하나를 추가하려면(수동):
 
 1. 그 대학의 장학공지 게시판(대학 공통 + 필요하면 학과별)을 브라우저로 직접 열어서 확인:
    - 목록 URL이 페이지 번호를 어떻게 받는지 (`?page=2` 같은 쿼리 파라미터가 보통)
@@ -75,6 +78,59 @@ python -m harness.run --university 한밭대학교
 2. `harness/sites.py`의 `SITES` 리스트에 `BoardConfig(...)` 하나 추가 (파일 안 예시 주석 참고).
 3. `python -m harness.run --university <그 대학>`으로 로컬에서 한 번 돌려서 `collect_links`
    단계 로그의 개수 대조가 맞는지 확인.
+
+또는 아래 "온보딩 에이전트"로 위 1~2번(브라우저로 직접 확인하고 `BoardConfig`를 채우는 부분)을
+자동화할 수 있음 — 3번(실제 나이트런으로 검증)은 여전히 사람이 함.
+
+## 온보딩 에이전트 (2026-08-14 추가, 아직 실전 투입 전)
+
+`harness/onboard.py` — 대학 이름과 게시판(또는 대학 메인) URL 하나를 주면, 그 사이트를
+직접 조사해서 `BoardConfig` 초안을 PR로 올리는 에이전트. 위 "새 대학 온보딩" 1~2번(브라우저로
+직접 열어서 페이지네이션 파라미터·총건수 문구·셀렉터 확인하고 `BoardConfig`를 채우는 작업)을
+대신함. 시스템 프롬프트는 [`prompts/onboarding_spec.md`](./prompts/onboarding_spec.md) —
+`extraction_spec.md`와 마찬가지로 사람이 읽는 설명이 아니라 에이전트에게 그대로 주입되는
+지시문이므로, 조사 절차나 출력 스키마를 바꾸고 싶으면 그 문서 자체를 고칠 것.
+
+```bash
+python -m harness.onboard --university 한밭대학교 --seed-url https://www.hanbat.ac.kr/... [--target-hint 장학금]
+```
+
+기존 데이터 추출 파이프라인과 같은 두 원칙을 그대로 따름 — 다만 대상이 "장학금 공고문"이
+아니라 "게시판을 크롤링하기 위한 설정값"이라는 점만 다름:
+
+1. **"다 조사했는지" 판단을 에이전트에게 전적으로 맡기지 않음** — `onboarding_spec.md`가
+   정해진 7단계(총건수 문구 찾기 → 셀렉터 찾기 → 페이지네이션 확인 → ... → 드라이런)를
+   순서대로 강제하고, 다 못 끝낸 항목은 `unresolved_issues`로 명시하게 함. 에이전트가 낸
+   `overall_confidence`도 신뢰하지 않고 `onboard.py`의 `_enforce_confidence_rule()`이
+   confidence 필드들을 보고 기계적으로 다시 계산해서 덮어씀.
+2. **모든 값에 원문 근거를 강제** — 총건수 문구·셀렉터 매칭 예시·JS 렌더링 필요 여부 판단
+   근거를 전부 원문 그대로 첨부하게 하고, `render_review_markdown()`이 PR 리뷰에 그대로
+   노출함.
+
+**프롬프트 캐싱**(2026-08-14) — 도구 호출로 계속 자라나는 에이전틱 대화라 캐싱을 안 하면
+매 턴 이전 도구 결과(특히 `fetch_raw_html`/`fetch_rendered_html`, 15,000자까지) 전체가
+그대로 재과금됨. 두 단계로 처리함:
+- system 프롬프트는 대학이 바뀌어도 거의 동일해서(참고용 `existing_configs_sample`도
+  여기로 옮김) 1시간 TTL로 캐싱 — 한 세션에서 대학 여러 곳을 연달아 온보딩할 때 공유됨.
+- `messages`(도구 결과가 쌓이는 부분)는 "움직이는" 브레이크포인트 하나로 처리 — 매 턴
+  직전 마커를 지우고 새 턴 끝으로 옮김(`_mark_cache_breakpoint`/`_strip_cache_control`).
+  캐싱은 프리픽스 매칭이라 오래된 마커를 계속 남겨둘 필요가 없어서, 대화가 `ONBOARD_MAX_TURNS`
+  (기본 20턴)까지 길어져도 요청당 브레이크포인트는 항상 2개(system 1 + 이동 마커 1)로
+  고정 — API 상한(4개)에 여유 있게 안전함.
+
+추가로 **에이전트 제안을 코드가 다시 실행해서 재검증**함(`_mechanical_reverify()`) — 제안된
+설정으로 실제 1~3페이지를 다시 요청해서 총건수 파싱·페이지네이션(2페이지에서 새 링크가
+실제로 나오는지)·(onclick 방식이면) 상세페이지 URL 응답까지 확인하고, 하나라도 안 맞으면
+`overall_confidence`를 `needs_manual_setup`으로 강제 전환함 — 에이전트 혼자만의 판단으로
+`sites.py`에 반영되는 경로는 없음. 산출물(`harness/onboarding_review_*.md` +
+`harness/onboarding_draft_*.py`)도 `harness/onboard-*` 브랜치로 별도 PR을 여는 것까지만 하고,
+`sites.py`는 항상 사람이 검토 후 직접 고침 — 기존 데이터 PR과 동일한 "PR로 올라옴 → 사람이
+리뷰 → 머지"게이트 위에 얹혀 있고, 자동으로 우회하는 경로가 없음.
+
+**아직 실제 대학으로 실행해본 적은 없음** — 구조는 기존 파이프라인 컨벤션(도구 함수는
+`http.py`/Playwright 재사용, PR 오픈은 `build_pr.py` 재사용)을 그대로 따르지만, 실제
+에이전트 조사 품질(셀렉터를 정확히 찾는지, 애매한 경우 정말 `needs_manual_setup`으로
+떨어지는지)은 실제 대학 몇 곳으로 돌려보며 확인 필요.
 
 ## 알려진 한계
 
