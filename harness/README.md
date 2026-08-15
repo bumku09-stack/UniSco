@@ -134,10 +134,13 @@ python -m harness.onboard --university 한밭대학교 --seed-url https://www.ha
 
 ## 알려진 한계
 
-- **이미지 첨부파일 OCR은 GitHub Actions(Linux)에서 실패함.** 기존
-  `supabase/tools/extract_text.py`의 Tesseract 경로가 데이터 입력을 맡은 친구분 Windows
-  컴퓨터 경로로 하드코딩돼 있음 — 이 파일은 재사용 대상이라 건드리지 않았고, `run.py`가 그
-  실패를 잡아서 해당 항목만 로그 남기고 건너뜀. HWP/HWPX 첨부파일은 문제없음.
+- **이미지 첨부파일 OCR — 2026-08-15 GitHub Actions(Linux)에서도 되게 고침.** 기존
+  `supabase/tools/extract_text.py`의 `TESSERACT_EXE`/`TESSDATA_DIR`가 데이터 입력을 맡은
+  친구분 Windows 컴퓨터 경로로 하드코딩돼 있던 걸, 그 기본값은 그대로 두고 env var로
+  오버라이드만 가능하게 열었음(그 친구분 로컬 워크플로는 그대로 안 건드림). CI는 apt로
+  `tesseract-ocr`/`tesseract-ocr-kor`를 설치하고 `TESSERACT_EXE=tesseract`,
+  `TESSDATA_DIR=""`를 넘겨서 씀 — `run.py`는 여전히 실패를 잡아서 해당 항목만 스킵하는
+  방어 로직을 유지(다른 원인의 OCR 실패까지 파이프라인 전체를 죽이면 안 되므로).
 - **dedup 시점의 "이름"은 게시글 제목**임 (설계안 3단계가 LLM 추출 이전이라 아직 정식
   명칭이 없음) — 장학금 정식 명칭과 게시글 제목이 많이 다르면 놓칠 수 있음. 애매하면 그냥
   통과시켜서 LLM 추출까지 가게 두는 쪽으로 설계함(과다매칭이 과소매칭보다 낫다는 기존 원칙과

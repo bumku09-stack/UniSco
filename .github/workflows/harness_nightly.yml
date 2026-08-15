@@ -38,6 +38,9 @@ jobs:
         run: |
           pip install -r harness/requirements.txt
           playwright install --with-deps chromium
+          # 이미지 첨부파일 OCR용(supabase/tools/extract_text.py 재사용, harness/README.md
+          # "알려진 한계" 참고) — 이 패키지 없이는 이미지 첨부파일만 조용히 스킵되고 있었음.
+          sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-kor
 
       - name: git 커밋 아이덴티티 설정
         run: |
@@ -54,6 +57,12 @@ jobs:
           # actions/checkout이 설정해둔 git 인증(contents: write)을 build_pr.py의
           # git push/PR 오픈이 그대로 씀 — 별도 PAT 불필요.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 이미지 첨부파일 OCR(supabase/tools/extract_text.py) — 기본값은 데이터 입력
+          # 담당자의 Windows 로컬 경로라 여기선 위에서 apt로 설치한 tesseract를 쓰도록 지정.
+          # TESSDATA_DIR=""는 --tessdata-dir 플래그를 아예 안 붙이겠다는 뜻(apt 설치본은
+          # 자기 기본 위치를 이미 앎).
+          TESSERACT_EXE: tesseract
+          TESSDATA_DIR: ""
         run: |
           if [ -n "${{ inputs.university }}" ]; then
             python -m harness.run --university "${{ inputs.university }}"

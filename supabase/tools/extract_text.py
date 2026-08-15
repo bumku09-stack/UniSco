@@ -9,14 +9,18 @@
     .hwpx  - 신버전 한글 포맷, zip+XML 구조 (표준 라이브러리만 사용)
     .png/.jpg/.jpeg/.bmp/.tif/.tiff - 이미지 OCR (Tesseract, 한국어+영어)
 """
+import os
 import re
 import subprocess
 import sys
 import zipfile
 from pathlib import Path
 
-TESSERACT_EXE = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-TESSDATA_DIR = r"C:\Users\bumku\AppData\Local\tessdata"
+# 기본값은 데이터 입력 담당자의 Windows 로컬 경로 그대로 유지(그 워크플로는 안 건드림) —
+# env var로 오버라이드 가능하게만 열어둠. harness_nightly.yml(GitHub Actions, Linux)이
+# apt로 설치한 tesseract를 쓰도록 TESSERACT_EXE=tesseract, TESSDATA_DIR=(미설정)을 넘김.
+TESSERACT_EXE = os.environ.get("TESSERACT_EXE", r"C:\Program Files\Tesseract-OCR\tesseract.exe")
+TESSDATA_DIR = os.environ.get("TESSDATA_DIR", r"C:\Users\bumku\AppData\Local\tessdata")
 
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
 
@@ -52,9 +56,10 @@ def extract_image(path: Path) -> str:
 
     pytesseract.pytesseract.tesseract_cmd = TESSERACT_EXE
     img = Image.open(path)
-    return pytesseract.image_to_string(
-        img, lang="kor+eng", config=f"--tessdata-dir {TESSDATA_DIR}"
-    )
+    # TESSDATA_DIR=""(빈 문자열)이면 --tessdata-dir을 아예 안 붙임 — apt로 설치한 tesseract는
+    # 자기 기본 위치를 이미 알아서, 강제로 경로를 지정하는 쪽이 오히려 깨짐(GitHub Actions용).
+    config = f"--tessdata-dir {TESSDATA_DIR}" if TESSDATA_DIR else ""
+    return pytesseract.image_to_string(img, lang="kor+eng", config=config)
 
 
 def extract(path: Path) -> str:
