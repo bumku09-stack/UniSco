@@ -39,7 +39,7 @@ src/
     ├── auth.ts           # 토큰 저장(localStorage) + authFetch(401이면 refresh 토큰으로 조용히 재시도, 그것도 실패하면 로그아웃) + postJson(로그인 전 페이지용) + apiUrl(NEXT_PUBLIC_API_URL 미설정 시 방어, 2026-08-13 추가 — 모든 API 호출이 이걸 거침)
     ├── guest.ts           # 게스트 스펙·매칭 결과 sessionStorage 저장소(2026-08-10 추가) — 서버에 원본이 없는 유일한 사본
     ├── spec.ts            # UserSpec/SpecForm 타입, specFormToUserSpec/userSpecToSpecForm 변환
-    ├── scholarship.ts     # Scholarship 타입, 정렬/분류/유사추천 헬퍼
+    ├── scholarship.ts     # Scholarship 타입, 정렬/분류/유사추천 헬퍼, isAutoSelected/isListingOnlyUrl(신청 버튼 안내 문구 판정, 아래 참고)
     ├── regions.ts         # 광역/기초자치단체 목록(SIDO_LIST) + 지역 표기 축약·역변환 헬퍼
     └── universities.ts    # 대학별 단과대 목록 + 학점 만점 기준(gpaScale)
 ```
@@ -111,7 +111,31 @@ npm run dev                    # http://localhost:3000
 
 두 페이지가 다른 부분(위저드 단계 구분, 신입생 안내 문구 `showFreshmanHint`, `/mypage`의 draft 자동저장·복원 배너 등)은 각 `page.tsx`에 그대로 남아있음 — 공유되는 건 순수 필드 편집 UI뿐임.
 
-## 남은 것 (2026-08-13 기준)
+## 조건부 하위 필드 UI 패턴 — `discharge_type` (2026-08-15 추가)
+
+`components/spec-fields.tsx`의 병역(`military_status`) `PillToggle` 아래, `military_status
+=== "completed"`(군필)일 때만 "병사 전역 / 장교·부사관 전역" 하위 `PillToggle`이 조건부로
+나타남(`DISCHARGE_TYPE_OPTIONS`, `lib/spec.ts`). 군필에서 다른 값으로 바꾸면 `discharge_type`도
+같이 지워짐. 상세페이지(`scholarship/[id]/page.tsx`)에서는 `lib/scholarship.ts`의
+`eligibilityParts()`가 `required_military_status`가 있을 때만 괄호로 세부구분을 덧붙임
+(예: "병역: 군필(장교/부사관 전역)"). 백엔드 배경은 `backend/README.md`의 동일 섹션 참고.
+
+## 신청 버튼 안내 문구 — `isAutoSelected` / `isListingOnlyUrl` (`lib/scholarship.ts`)
+
+상세페이지 하단 "신청하러 가기" 버튼은 항상 그대로 두고(잘못 판정해도 신청 기능 자체는
+안 사라지게), 위에 안내 문구만 조건부로 얹는 방식. 두 판정 기준이 서로 다름:
+
+- **`isAutoSelected(s)`**: `application_method` 자유텍스트에 "자동선발/자동지급" 같은
+  신호가 있고 "본인이 직접 신청해야 함" 같은 예외조항이 없을 때(2026-08-15, 실제 DB
+  고유값 104개 검토해서 정규식 확정) — "학교에서 자동으로 선발"로 안내.
+- **`isListingOnlyUrl(url)`**: `application_method` 값 유무와 무관하게, 그 `application_url`
+  자체가 신청 정보가 아예 없는 안내 목록 페이지라고 **직접 fetch해서 확인한** 알려진 URL일
+  때(2026-08-15 추가) — CNU 교내장학금 65건이 공유하는 `plus.cnu.ac.kr` 목록 페이지가 첫
+  사례. `harness/reverify.py`가 근거 없는 `application_method`를 null로 비운 레코드들에서
+  `isAutoSelected`가 조용히 무력화되는 구멍을 메우기 위해 만듦 — 값 추측이 아니라 URL
+  자체를 재확인한 사실에 기반함(`KNOWN_LISTING_ONLY_URLS`, 새 URL 발견 시 여기 추가).
+
+## 남은 것 (2026-08-15 기준)
 
 - 브라우저로 직접 클릭해보며 하는 E2E 테스트는 여전히 없음(이 환경엔 브라우저 자동화 도구가 없음) — `next build`/`tsc`/`eslint` 통과까지는 매번 확인하지만, 실제 브라우저에서 폼 입력/클릭까지 확인한 기능이 아직 많음 — 새 화면 추가할 때마다 실제 브라우저로 한 번씩 눌러보고 확인 권장.
 - **JWT를 `localStorage`에 평문 저장 중** — 배포 전 점검(2026-08-13)에서 나온 가장 큰 보안 갭. 정석 해결책은 백엔드가 `httpOnly` 쿠키로 토큰을 내려주는 방식으로 전환하는 것인데, 프론트(Vercel)와 백엔드(Railway)가 서로 다른 도메인이라 `SameSite=None` 크로스사이트 쿠키가 필요하고, Safari 등 일부 브라우저의 서드파티 쿠키 차단 정책에 걸려 로그인이 깨질 위험이 있음 — 백엔드(`backend/app/api/auth.py`, `backend/app/api/deps.py`) 변경까지 같이 필요한 작업이라 이번엔 손 안 대고 남겨둠. 진행하려면 같은 도메인으로 묶는 Vercel rewrite/프록시 구성까지 같이 설계할 것.

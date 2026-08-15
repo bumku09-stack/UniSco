@@ -11,6 +11,7 @@ app/
 │   ├── config.py        # 타입 있는 설정값 (Settings 클래스), pydantic-settings로 .env에서 로드
 │   ├── security.py       # 비밀번호 해싱(bcrypt) + JWT 발급/검증
 │   ├── email.py           # Resend로 인증 코드 메일 발송
+│   ├── kakao.py             # 카카오 REST API 호출 2개 (코드→토큰, 토큰→유저정보) — 아래 "카카오 로그인" 참고
 │   └── matching.py         # 자격조건 필터링 + 정렬 로직 (scholarships.py에서 가져다 씀)
 ├── db/
 │   └── session.py      # SQLAlchemy/SQLModel 엔진 + DB 접근용 get_session() 디펜던시
@@ -22,7 +23,7 @@ app/
 │   ├── users.py            # 로그인 유저 스펙 저장/조회/수정(GET·POST·PUT /users/me/spec*), 찜한 장학금 목록(GET /users/me/saved-scholarships), 회원탈퇴(DELETE /users/me)
 │   └── deps.py              # get_current_user — Authorization 헤더의 JWT로 User 로드하는 공용 디펜던시
 └── models/
-    ├── enums.py         # Gender, MilitaryStatus, EnrollmentStatus, CategoryL1/L2 등 자격조건·분류 enum
+    ├── enums.py         # Gender, MilitaryStatus, DischargeType, EnrollmentStatus, CategoryL1/L2 등 자격조건·분류 enum
     ├── scholarship.py    # Scholarship 테이블 정의 (자격조건 필드 + category_l1/l2 분류 필드)
     ├── user_spec.py      # UserSpec — /users/me/spec 요청·응답 바디 (DB 테이블 아님), SpecStatusResponse
     ├── saved_spec.py      # SavedSpec — UserSpec의 저장형(테이블), 유저당 한 행
@@ -107,6 +108,17 @@ FastAPI가 자동 생성해주는 API 문서: http://localhost:8000/docs
 
 `language_test_matches()`는 "어학점수 안 넣음"과 "다른 시험 종류 넣음"을 구분함 — 안 넣은
 경우는 정상 노출(순위엔 안 잡힘), 다른 시험 넣은 경우는 제외(진짜 불일치).
+
+### 조건부 하위 필드 패턴 — `discharge_type` (2026-08-15 추가)
+
+`required_enrollment_status`가 `post_undergrad`일 때만 `required_degree_level`이 의미
+있는 것과 동일한 패턴: `required_military_status`가 `completed`(군필)일 때만 의미 있는
+세부 구분으로 `required_discharge_type`(`enlisted` 병사전역 / `officer_or_nco` 장교·부사관
+전역)을 추가함 — id=652 "제대군인대부지원"(10년 이상 장기복무 제대군인 대상)에서 군필
+여부만으로는 못 거르는 조건을 발견해서 만듦. `discharge_type_matches()`(`core/matching.py`)가
+`is_eligible()` 안에서 `required_military_status` 체크 바로 다음에 옴 — 군필이 아닌
+학생(미필/면제/ROTC 후보생)은 `discharge_type` 답변 여부와 무관하게 무조건 탈락시키고,
+군필인데 아직 세부구분을 안 답한 학생만 기존 leniency(모르면 안 거름) 원칙을 적용함.
 
 ## 로그인 유저의 스펙 저장은 어디에
 
