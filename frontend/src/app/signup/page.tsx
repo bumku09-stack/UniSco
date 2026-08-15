@@ -11,8 +11,9 @@ import {
   AuthNotice,
   authSecondaryButtonClass,
   AuthShell,
+  KakaoLoginButton,
 } from "@/components/auth-ui";
-import { postJson } from "@/lib/auth";
+import { kakaoAuthorizeUrl, postJson } from "@/lib/auth";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -116,6 +117,8 @@ export default function SignupPage() {
               {loading ? "처리 중..." : "다음"}
             </button>
           </form>
+
+          <KakaoLoginButton onClick={() => (window.location.href = kakaoAuthorizeUrl())} />
         </>
       ) : (
         <>
