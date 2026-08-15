@@ -99,6 +99,20 @@ ONBOARD_MAX_TOKENS = 8192
 # (onboard.py의 run_onboarding_agent 참고 — 원칙 1과 같은 이유).
 ONBOARD_MAX_TURNS = int(os.environ.get("HARNESS_ONBOARD_MAX_TURNS", "20"))
 
+# ── 7.8 API 사용량 예산 (2026-08-15 추가, harness/budget.py) ──────────────
+# 토큰은 무제한이 아니므로, 한 번의 실행(나이트런 1회 = extract 쪽 / 온보딩 에이전트 대학
+# 1곳 = onboard 쪽)에서 이 값을 넘기면 그 시점부터 더 이상 새 API 호출을 시작하지 않고
+# 나머지는 스킵/미완료 처리함 — 배치가 예상보다 훨씬 커지거나 뭔가 잘못돼서 같은 항목을
+# 계속 재시도하는 등 비정상적으로 많이 도는 상황에서 비용이 그대로 새는 걸 막기 위한
+# 안전장치임. 정상적인 하룻밤 배치(대학 1~2곳, 수십 건)나 온보딩 1회(최대 ONBOARD_MAX_TURNS
+# 턴)는 이 값에 한참 못 미침 — 정교한 예산 관리가 아니라 "이상 상황 감지용 상한"이라, 캐시
+# 할인 여부는 구분하지 않고 응답의 네 usage 필드(input/output/cache_creation/cache_read)를
+# 전부 그냥 더함(harness/budget.py의 TokenBudget.record 참고).
+MAX_TOKENS_PER_EXTRACTION_RUN = int(
+    os.environ.get("HARNESS_MAX_TOKENS_PER_EXTRACTION_RUN", "2000000")
+)
+MAX_TOKENS_PER_ONBOARD_RUN = int(os.environ.get("HARNESS_MAX_TOKENS_PER_ONBOARD_RUN", "500000"))
+
 # ── 기타 ────────────────────────────────────────────────────────────────
 GITHUB_REPO = os.environ.get("HARNESS_GITHUB_REPO", "hoseongdev/UniSco")
 PR_BASE_BRANCH = "main"

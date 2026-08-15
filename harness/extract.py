@@ -17,6 +17,7 @@ from pathlib import Path
 import anthropic
 
 from harness import config
+from harness.budget import extraction_budget
 from harness.models import SCHOLARSHIP_FIELD_NAMES, ExtractedField, ExtractedScholarship
 
 # 레이트리밋(429)/서버 과부하(5xx)처럼 지나가는 오류는 재시도할 가치가 있지만, 스키마 위반
@@ -210,6 +211,11 @@ def extract_scholarship(
         ),
         "input_schema": _build_input_schema(field_names),
     }
+    # 이번 실행(나이트런 1회)의 토큰 예산을 넘겼으면 여기서 막음 — run.py의 _extract_one이
+    # 이미 항목 하나당 실패를 통째로 잡아서 스킵하는 try/except를 두고 있어서(2026-08-10,
+    # API 에러 시 배치 전체가 안 죽게), 이 예외도 같은 경로로 자연스럽게 처리됨. 별도로
+    # run.py를 고칠 필요 없음.
+    extraction_budget.check()
     response = None
     for attempt in range(_MAX_RETRIES + 1):
         try:
@@ -240,6 +246,7 @@ def extract_scholarship(
                     }
                 ],
             )
+            extraction_budget.record(response.usage)
             break
         except anthropic.APIStatusError as e:
             if e.status_code not in _RETRYABLE_STATUS_CODES or attempt == _MAX_RETRIES:

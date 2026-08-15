@@ -32,6 +32,7 @@ import anthropic
 from bs4 import BeautifulSoup
 
 from harness import build_pr, collect_links, config, http, sites
+from harness.budget import BudgetExceeded, onboard_budget
 from harness.sites import BoardConfig
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -417,6 +418,14 @@ def run_onboarding_agent(
     transcript: list[str] = []
 
     for turn in range(max_turns):
+        # 이번 온보딩 1회의 토큰 예산을 넘겼으면 max_turns를 다 못 채웠어도 여기서 멈춤 —
+        # 이 함수는 애초에 예외를 안 던지는 설계라(위 docstring 참고) raise 대신 max_turns
+        # 소진과 똑같은 방식으로 처리함(아래 루프 밖 반환문으로 흘러감).
+        try:
+            onboard_budget.check()
+        except BudgetExceeded as e:
+            transcript.append(f"[turn {turn}] {e} — 조사 중단, 사람이 직접 조사 필요")
+            break
         response = client.messages.create(
             model=model or config.ONBOARD_MODEL,
             max_tokens=config.ONBOARD_MAX_TOKENS,
@@ -424,6 +433,7 @@ def run_onboarding_agent(
             tools=tools,
             messages=messages,
         )
+        onboard_budget.record(response.usage)
         messages.append({"role": "assistant", "content": response.content})
 
         tool_uses = [b for b in response.content if b.type == "tool_use"]
