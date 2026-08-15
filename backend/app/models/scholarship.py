@@ -11,6 +11,7 @@ from app.models.enums import (
     CategoryL2,
     DegreeLevel,
     DisabilityType,
+    DischargeType,
     EnrollmentStatus,
     ForeignerEligibility,
     Gender,
@@ -42,6 +43,13 @@ class Scholarship(SQLModel, table=True):
     eligible_region: str | None = None
     required_military_status: MilitaryStatus | None = Field(
         default=None, sa_type=enum_column(MilitaryStatus)
+    )
+    # 2026-08-15 추가 — "10년 이상 장기복무 제대군인 대상"(id=652)처럼 군필 중에서도 병사
+    # 전역/장교·부사관 전역이 갈리는 조건. required_military_status=completed가 전제라는
+    # 뜻은 아님(그쪽은 그대로 두거나 같이 채움) — core/matching.py의 discharge_type_matches()
+    # 참고, 이 필드가 채워져 있으면 사실상 군필도 같이 요구하는 것으로 취급함.
+    required_discharge_type: DischargeType | None = Field(
+        default=None, sa_type=enum_column(DischargeType)
     )
     max_income_bracket: int | None = None  # 소득분위 N 이하
     min_gpa: float | None = None  # 4.5 만점 기준

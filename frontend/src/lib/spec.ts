@@ -12,6 +12,10 @@ export type DegreeLevel = "masters" | "doctoral" | "integrated_ms_phd";
 // 전형뿐이라 나머지(예능특기자·농어촌전형 등)는 OTHER_SPECIALTY로 뭉뚱그려 둠 — 확인된 사례가
 // 쌓이면 전용 값으로 분리할 것(backend/app/models/enums.py의 AdmissionTrack 참고).
 export type AdmissionTrack = "general" | "athletic_specialty" | "other_specialty";
+// 2026-08-15 추가 — military_status가 "completed"(군필)일 때만 의미 있는 세부 구분(id=652
+// "10년 이상 장기복무 제대군인 대상"에서 발견). enrollment_status=post_undergrad일 때만
+// 의미 있는 DegreeLevel과 같은 패턴 — backend/app/models/enums.py의 DischargeType 참고.
+export type DischargeType = "enlisted" | "officer_or_nco";
 
 export type UserSpec = {
   university: string;
@@ -30,6 +34,8 @@ export type UserSpec = {
   parent_region: string | null;
   parent_district: string | null; // 2026-08-05 추가 (matching_gaps.md 14번 후속)
   military_status: "completed" | "exempted" | "not_served" | "rotc_candidate";
+  // 2026-08-15 추가 — military_status가 "completed"일 때만 의미 있음(그 외엔 항상 null).
+  discharge_type: DischargeType | null;
   income_bracket: number | null; // null="모름" — 소득분위 조건이 있는 장학금도 안 거름
   has_disability: boolean;
   is_foreigner: boolean;
@@ -140,6 +146,10 @@ export function specFormToUserSpec(spec: SpecForm, optionalInfo: OptionalInfo): 
       : null,
     parent_district: optionalInfo.parentRegionEnabled ? optionalInfo.parentDistrict || null : null,
     military_status: spec.military_status,
+    // 2026-08-15 추가 — 군필이 아니면 세부구분 자체가 성립 안 하므로 항상 null로 정리
+    // (프론트가 폼에서 이미 군필일 때만 보여주지만, 이전에 군필→다른 값으로 바꾼 뒤에도
+    // discharge_type이 남아있을 수 있어 제출 시점에 한 번 더 확실히 함).
+    discharge_type: spec.military_status === "completed" ? spec.discharge_type : null,
     income_bracket: spec.income_bracket === "unknown" ? null : Number(spec.income_bracket),
     has_disability: spec.has_disability,
     is_foreigner: spec.is_foreigner,
@@ -193,6 +203,12 @@ export const ADMISSION_TRACK_OPTIONS: { value: AdmissionTrack; label: string }[]
   { value: "general", label: "일반전형(수시/정시 등 일반 입학)" },
   { value: "athletic_specialty", label: "체육특기자 전형" },
   { value: "other_specialty", label: "기타 특기자·특별전형(농어촌·정원외 등)" },
+];
+
+// 2026-08-15 추가 — military_status="completed"(군필) 선택 시 이어서 보여주는 세부 선택지.
+export const DISCHARGE_TYPE_OPTIONS: { value: DischargeType; label: string }[] = [
+  { value: "enlisted", label: "병사 전역" },
+  { value: "officer_or_nco", label: "장교/부사관 전역" },
 ];
 
 export const SPECIAL_STATUS_NOT_APPLICABLE = "not_applicable";
@@ -298,6 +314,7 @@ export function userSpecToSpecForm(spec: UserSpec): SpecForm {
     sido,
     district,
     military_status: spec.military_status,
+    discharge_type: spec.military_status === "completed" ? spec.discharge_type : null,
     income_bracket: spec.income_bracket != null ? String(spec.income_bracket) : "unknown",
     has_disability: spec.has_disability,
     is_foreigner: spec.is_foreigner,

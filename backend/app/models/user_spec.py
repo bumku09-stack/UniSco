@@ -4,6 +4,7 @@ from app.models.enums import (
     AdmissionTrack,
     DegreeLevel,
     DisabilityType,
+    DischargeType,
     EnrollmentStatus,
     Gender,
     LanguageTestType,
@@ -44,6 +45,10 @@ class UserSpec(SQLModel):
     parent_region: str | None = None
     parent_district: str | None = None  # 2026-08-05 추가 (matching_gaps.md 14번 후속) — 부모 쪽 시/군/구 단위
     military_status: MilitaryStatus
+    # 2026-08-15 추가 — military_status가 completed(군필)일 때만 의미 있는 세부 구분(id=652
+    # "10년 이상 장기복무 제대군인 대상" 발견 계기). None="입력 안 함/해당 없음"(군필 아니면
+    # 항상 None) — 이 조건이 걸린 장학금도 안 거름(다른 선택 입력들과 같은 leniency 원칙).
+    discharge_type: DischargeType | None = None
     income_bracket: int | None = None  # None="모름" — 소득분위 조건이 있는 장학금도 안 거름
     has_disability: bool
     is_foreigner: bool

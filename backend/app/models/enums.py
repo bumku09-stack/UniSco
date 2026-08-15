@@ -27,6 +27,18 @@ class MilitaryStatus(str, Enum):
     ROTC_CANDIDATE = "rotc_candidate"  # 학군사관후보생(ROTC)
 
 
+class DischargeType(str, Enum):
+    """전역 구분 — 2026-08-15 추가(id=652 "제대군인대부지원", "10년 이상 장기복무 제대군인
+    대상"에서 발견). military_status=completed(군필)일 때만 의미 있는 세부 구분이라 별도
+    필드로 뺌(enrollment_status가 post_undergrad일 때만 의미 있는 degree_level과 동일한
+    패턴) — military_status 자체에 합치면 "군필"이 두 갈래로 쪼개져서 기존 군필 단일값
+    데이터(수백 건)를 전부 재분류해야 하는 불필요한 마이그레이션이 생김.
+    frontend/src/lib/spec.ts의 병역 선택란에서 "군필" 고르면 이어서 나타나는 선택지."""
+
+    ENLISTED = "enlisted"  # 병사 전역
+    OFFICER_OR_NCO = "officer_or_nco"  # 장교/부사관 전역
+
+
 class ForeignerEligibility(str, Enum):
     KOREAN_ONLY = "korean_only"
     FOREIGNER_ONLY = "foreigner_only"

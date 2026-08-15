@@ -5,6 +5,7 @@ from app.models.enums import (
     AdmissionTrack,
     DegreeLevel,
     DisabilityType,
+    DischargeType,
     EnrollmentStatus,
     Gender,
     LanguageTestType,
@@ -36,6 +37,8 @@ class SavedSpec(SQLModel, table=True):
     parent_region: str | None = None  # 2026-08-05 추가, matching_gaps.md 19번
     parent_district: str | None = None  # 2026-08-05 추가, matching_gaps.md 14번 후속
     military_status: MilitaryStatus = Field(sa_type=enum_column(MilitaryStatus))
+    # 2026-08-15 추가 — UserSpec 참고. military_status가 completed일 때만 의미 있음.
+    discharge_type: DischargeType | None = Field(default=None, sa_type=enum_column(DischargeType))
     # 2026-08-03: 필수 -> 선택으로 변경 — 자기 소득분위를 모르는 사용자가 많아서 "모름"으로
     # 넘어갈 수 있게 함. None이면 소득분위 조건이 있는 장학금도 안 거르고 다 보여줌
     # (core/matching.py의 is_eligible() 참고, special_status의 "선택 안 함=모름=안 거름"

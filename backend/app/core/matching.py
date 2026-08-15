@@ -7,6 +7,7 @@ from app.models import (
     EnrollmentStatus,
     ForeignerEligibility,
     GpaBasis,
+    MilitaryStatus,
     SavedSpec,
     Scholarship,
     SpecialStatus,
@@ -279,6 +280,21 @@ def admission_track_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
     return scholarship.admission_track == effective_track
 
 
+def discharge_type_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
+    """전역 구분(병사/장교·부사관) 조건 — 2026-08-15 추가, id=652 "제대군인대부지원"(10년
+    이상 장기복무 제대군인 대상)에서 발견. required_discharge_type이 걸려있다는 건 최소
+    군필(completed)이 전제이므로, 군필이 아닌 학생(미필/면제/ROTC 후보생)은 세부구분
+    답변 여부와 무관하게 무조건 탈락 — discharge_type의 leniency("모르면 안 거름")는
+    "군필이긴 한데 세부구분을 아직 답 안 한" 경우에만 적용됨(다른 선택 입력들과 같은 원칙)."""
+    if scholarship.required_discharge_type is None:
+        return True
+    if spec.military_status != MilitaryStatus.COMPLETED:
+        return False
+    if spec.discharge_type is None:
+        return True
+    return spec.discharge_type == scholarship.required_discharge_type
+
+
 def deadline_matches(scholarship: Scholarship, today: datetime.date | None = None) -> bool:
     """마감일 자동 정리 (matching_gaps.md 7번, 2026-08-03 구현). application_deadline이
     구조화된 값으로 채워진 장학금만 자동으로 걸러짐 — 대부분의 기존 데이터는 "매 학기 초
@@ -480,6 +496,8 @@ def is_eligible(scholarship: Scholarship, spec: UserSpec) -> bool:
         scholarship.required_military_status is not None
         and scholarship.required_military_status != spec.military_status
     ):
+        return False
+    if not discharge_type_matches(scholarship, spec):
         return False
     if (
         scholarship.max_income_bracket is not None

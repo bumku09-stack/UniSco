@@ -15,6 +15,8 @@ import {
   applySpecialStatusExclusivity,
   DegreeLevel,
   DISABILITY_TYPES,
+  DISCHARGE_TYPE_OPTIONS,
+  DischargeType,
   EnrollmentStatus,
   gradeOptions,
   INCOME_BRACKET_OPTIONS,
@@ -331,6 +333,9 @@ export function CommonFields({
             setSpec({
               ...spec,
               military_status: v as "completed" | "exempted" | "not_served" | "rotc_candidate",
+              // 군필이 아니면 세부구분 자체가 성립 안 하므로 같이 지움(id=652 "10년 이상
+              // 장기복무 제대군인 대상"처럼 군필 세부구분이 걸린 장학금 발견 계기, 2026-08-15).
+              discharge_type: v === "completed" ? spec.discharge_type : null,
             })
           }
           options={[
@@ -344,6 +349,19 @@ export function CommonFields({
             { value: "rotc_candidate", label: "학군단(ROTC)" },
           ]}
         />
+        {/* 2026-08-15 추가 — 군필 선택 시에만 이어서 보여주는 세부 구분. "10년 이상 장기복무
+            제대군인 대상"(id=652)처럼 병사/장교·부사관 여부가 갈리는 장학금 발견 계기.
+            안 고르면 null로 남고(leniency), 이 조건이 걸린 장학금도 안 거름 — 다른 선택
+            입력들과 같은 원칙. */}
+        {spec.military_status === "completed" && (
+          <div className="mt-2">
+            <PillToggle
+              value={spec.discharge_type ?? ""}
+              onChange={(v) => setSpec({ ...spec, discharge_type: v as DischargeType })}
+              options={DISCHARGE_TYPE_OPTIONS}
+            />
+          </div>
+        )}
       </Field>
 
       <SelectField

@@ -19,6 +19,8 @@ export type Scholarship = {
   required_gender: "male" | "female" | null;
   eligible_region: string | null;
   required_military_status: "completed" | "exempted" | "not_served" | "rotc_candidate" | null;
+  // 2026-08-15 추가 — required_military_status="completed"일 때만 의미 있음.
+  required_discharge_type: "enlisted" | "officer_or_nco" | null;
   max_income_bracket: number | null;
   min_gpa: number | null;
   min_gpa_basis: "semester" | "cumulative" | "both" | null;
@@ -84,6 +86,11 @@ const MILITARY_LABEL: Record<string, string> = {
   exempted: "면제",
   not_served: "미필",
   rotc_candidate: "학군사관후보생(ROTC)",
+};
+
+const DISCHARGE_TYPE_LABEL: Record<string, string> = {
+  enlisted: "병사 전역",
+  officer_or_nco: "장교/부사관 전역",
 };
 
 const GPA_BASIS_LABEL: Record<string, string> = {
@@ -152,7 +159,12 @@ function eligibilityParts(s: Scholarship, viewerGpaScale?: number): string[] {
       parts.push(`${basis}학점 ${s.min_gpa} 이상`);
     }
   }
-  if (s.required_military_status) parts.push(`병역: ${MILITARY_LABEL[s.required_military_status]}`);
+  if (s.required_military_status) {
+    const discharge = s.required_discharge_type
+      ? `(${DISCHARGE_TYPE_LABEL[s.required_discharge_type]})`
+      : "";
+    parts.push(`병역: ${MILITARY_LABEL[s.required_military_status]}${discharge}`);
+  }
   if (s.required_gender) parts.push(`성별: ${s.required_gender === "male" ? "남성" : "여성"}`);
   if (s.requires_disability) {
     const type = s.required_disability_type

@@ -24,6 +24,7 @@ const initialSpec: SpecForm = {
   sido: DEFAULT_SIDO.name,
   district: DEFAULT_SIDO.districts[0] ?? "",
   military_status: "not_served",
+  discharge_type: null,
   income_bracket: "unknown",
   has_disability: false,
   is_foreigner: false,
