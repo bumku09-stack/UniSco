@@ -78,7 +78,7 @@ function ScholarshipCard({
   onToggleSave: (id: number) => void;
 }) {
   return (
-    <li className="relative rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
+    <li className="relative flex h-full flex-col rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
       {saved !== null && (
         <button
           type="button"
@@ -92,7 +92,11 @@ function ScholarshipCard({
         </button>
       )}
 
-      <Link href={`/scholarship/${s.id}`} className="block">
+      {/* 카드마다 내용 길이가 달라서(설명 유무, 신청기간 유무 등) "자세히 보기" 버튼 위치가
+          제각각이던 문제(2026-08-15 지적) — 이 블록을 flex-1로 늘려서 남는 세로 공간을
+          전부 흡수하게 하면, 같은 행의 카드들 높이가 그리드 stretch로 이미 맞춰져 있으니
+          버튼이 항상 카드 맨 아래에 붙음. */}
+      <Link href={`/scholarship/${s.id}`} className="block flex-1">
         {s.category_l2 && (
           <span className="mb-1.5 inline-block rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-600">
             {CATEGORY_L2_LABEL[s.category_l2] ?? s.category_l2}
