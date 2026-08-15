@@ -390,7 +390,7 @@ def run_onboarding_agent(
     (제안 또는 None, 사람이 읽을 실행 로그)를 돌려줌 — 실패해도 예외를 던지지 않고 None을
     돌려줌: "조사를 못 끝냈다"는 것 자체가 유효한 결과이지 시스템 오류가 아님(온보딩 스펙
     0장 원칙 1과 같은 이유)."""
-    client = anthropic.Anthropic(timeout=180.0)
+    client = anthropic.Anthropic(api_key=config.load_anthropic_api_key(), timeout=180.0)
 
     if existing_configs_sample is None:
         existing_configs_sample = _default_existing_configs_sample()

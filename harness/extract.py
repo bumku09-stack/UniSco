@@ -201,7 +201,7 @@ def extract_scholarship(
     # 명시적 타임아웃 없으면 네트워크가 어딘가서 멈출 때 SDK 기본값(꽤 김)까지 그냥 기다림 —
     # 여기에 재시도(_MAX_RETRIES)까지 겹치면 호출 하나가 비정상적으로 오래 걸릴 수 있어서
     # 짧게 잡아둠(2026-08-11, 원인은 아니었던 것으로 확인됐지만 잠재 위험이라 같이 막음).
-    client = anthropic.Anthropic(timeout=120.0)
+    client = anthropic.Anthropic(api_key=config.load_anthropic_api_key(), timeout=120.0)
     tool = {
         "name": "extract_scholarship",
         "description": (

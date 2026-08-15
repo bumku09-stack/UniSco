@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 # ── 7.1 인용 대조 임계값 ────────────────────────────────────────────────
 # 원문과 완전히 동일한 문자열만 인정하지 않고, 공백·문장부호 차이 정도는 허용하는 옵션.
@@ -103,3 +104,21 @@ GITHUB_REPO = os.environ.get("HARNESS_GITHUB_REPO", "hoseongdev/UniSco")
 PR_BASE_BRANCH = "main"
 REQUEST_TIMEOUT_SECONDS = 20
 REQUEST_USER_AGENT = "UniSco-Harness/1.0 (+https://github.com/hoseongdev/UniSco)"
+
+
+def load_anthropic_api_key() -> str:
+    """환경변수 우선(GitHub Actions Secret), 없으면 로컬 개발용으로 backend/.env를 읽음 —
+    harness/db.py의 load_database_url()과 동일한 패턴. anthropic.Anthropic()이 내부적으로
+    os.environ만 보는 것과 달리, 로컬에서 매번 export하지 않아도 되게 함."""
+    env_value = os.environ.get("ANTHROPIC_API_KEY")
+    if env_value:
+        return env_value
+    env_path = Path(__file__).resolve().parents[1] / "backend" / ".env"
+    if env_path.exists():
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("ANTHROPIC_API_KEY="):
+                return line.split("=", 1)[1].strip()
+    raise RuntimeError(
+        "ANTHROPIC_API_KEY가 환경변수에도 없고 backend/.env에도 없음 — 로컬에서는 "
+        "backend/.env에 채우거나, CI에서는 Secret으로 등록할 것."
+    )
