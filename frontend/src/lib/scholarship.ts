@@ -58,6 +58,27 @@ export function formatAmount(amount: number | null) {
   return `${amount.toLocaleString("ko-KR")}원`;
 }
 
+// 2026-08-15 추가 — "신청하러 가기" 버튼이 실제로는 신청 폼이 아니라 학교 안내 목록
+// 페이지로만 연결되는 자동선발 장학금(예: plus.cnu.ac.kr 재학생 장학금 목록)에서, 학생이
+// 신청할 게 있는 줄 알고 눌렀다가 정보만 나와서 헷갈리는 문제 발견(사용자 지적) — 버튼
+// 자체는 안 건드리고(잘못 판정해도 신청 기능이 사라지진 않게) 위에 안내 문구만 조건부로
+// 추가하는 안전한 접근.
+//
+// application_method는 자유텍스트라 표현이 제각각(자동선발/자동지급/"자동 선발"처럼
+// 띄어쓰기 있는 것/"학생 신청 대상 아님"/"~할 필요는 없음" 등) — 실제 운영 DB의 고유값
+// 104개를 전부 검토해서 잡은 패턴. "단, ~는 본인이 직접 신청해야 함"처럼 예외조항이 있으면
+// (자동선발 문구가 있어도) 안내를 안 띄움 — 잘못 숨겨서 학생이 진짜 필요한 신청을 놓치는
+// 쪽이 버튼 문구가 부정확한 쪽보다 훨씬 나쁨.
+const AUTO_SELECTED_SIGNAL =
+  /자동\s?선발|자동\s?지급|별도\s?신청\s?(절차\s?)?(없|불필요)|신청\s?대상\s?아님|신청\s?(할)?\s?필요\s?(는\s?)?없|신청\s?불필요/;
+const AUTO_SELECTED_OVERRIDE = /직접\s?신청해야|본인이.{0,4}신청|별도\s?기한/;
+
+export function isAutoSelected(s: Scholarship): boolean {
+  const method = s.application_method;
+  if (!method) return false;
+  return AUTO_SELECTED_SIGNAL.test(method) && !AUTO_SELECTED_OVERRIDE.test(method);
+}
+
 const MILITARY_LABEL: Record<string, string> = {
   completed: "군필",
   exempted: "면제",

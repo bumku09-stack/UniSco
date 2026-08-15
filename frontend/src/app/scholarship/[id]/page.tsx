@@ -8,6 +8,7 @@ import {
   CATEGORY_L2_LABEL,
   eligibilityList,
   formatAmount,
+  isAutoSelected,
   Scholarship,
   unverifiableConditionParts,
 } from "@/lib/scholarship";
@@ -320,17 +321,24 @@ export default function ScholarshipDetailPage({
         )}
       </div>
 
-      {/* 스크롤해도 항상 보이는 신청 버튼 */}
+      {/* 스크롤해도 항상 보이는 신청 버튼 — 자동선발 장학금은 버튼(링크)은 그대로 두고
+          (혹시 판정이 틀려도 신청 기능 자체는 안 사라지게) 위에 안내 문구만 얹음. */}
       {scholarship?.application_url && (
         <div className="sticky bottom-0 border-t border-gray-100 bg-white/95 px-6 py-4 backdrop-blur">
           <div className="mx-auto w-full max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
+            {isAutoSelected(scholarship) && (
+              <p className="mb-2 text-center text-xs text-gray-400">
+                별도 신청 없이 조건에 맞으면 학교에서 자동으로 선발해요 — 아래 버튼은 학교
+                안내 페이지로 연결돼요
+              </p>
+            )}
             <a
               href={scholarship.application_url}
               target="_blank"
               rel="noreferrer noopener"
               className="block w-full rounded-2xl bg-blue-500 py-4 text-center text-[15px] font-bold text-white transition hover:bg-blue-600 active:scale-[0.99]"
             >
-              신청하러 가기
+              {isAutoSelected(scholarship) ? "학교 안내 확인하기" : "신청하러 가기"}
             </a>
           </div>
         </div>
