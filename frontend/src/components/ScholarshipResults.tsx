@@ -195,7 +195,7 @@ export function ScholarshipResults({
     <div>
       <h2 className="mt-6 text-lg font-bold text-gray-900">내 맞춤 장학금</h2>
       <p className="mt-1 text-xs text-gray-400">
-        조건을 자세하게 입력할수록 더 적합도 높은 장학금을 추천해드려요
+        조건을 자세히 입력할수록 적합도가 더 높은 장학금을 추천해드려요
       </p>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
@@ -276,7 +276,7 @@ export function ScholarshipResults({
       </div>
 
       {filteredSorted.length === 0 ? (
-        <p className="mt-8 text-center text-sm text-gray-400">조건에 맞는 장학금이 없습니다.</p>
+        <p className="mt-8 text-center text-sm text-gray-400">조건에 맞는 장학금이 없어요.</p>
       ) : (
         <>
           <ul className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">

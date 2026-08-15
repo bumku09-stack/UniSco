@@ -22,13 +22,13 @@ function KakaoCallbackInner() {
     (async () => {
       const code = searchParams.get("code");
       if (!code) {
-        setError("카카오 로그인이 취소되었거나 코드가 전달되지 않았습니다.");
+        setError("카카오 로그인이 취소됐거나 코드가 전달되지 않았어요.");
         return;
       }
       const result = await postJson(
         "/auth/kakao",
         { code, redirect_uri: kakaoRedirectUri() },
-        "카카오 로그인에 실패했습니다."
+        "카카오 로그인에 실패했어요."
       );
       if (!result.ok) {
         setError(result.error);

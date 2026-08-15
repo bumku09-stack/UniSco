@@ -33,7 +33,7 @@ export default function ForgotPasswordPage() {
     const result = await postJson(
       "/auth/forgot-password",
       { identifier },
-      "코드 발송에 실패했습니다."
+      "코드 발송에 실패했어요."
     );
     setLoading(false);
     if (!result.ok) {
@@ -51,7 +51,7 @@ export default function ForgotPasswordPage() {
     const result = await postJson(
       "/auth/reset-password",
       { identifier, code, new_password: newPassword },
-      "비밀번호 재설정에 실패했습니다."
+      "비밀번호 재설정에 실패했어요."
     );
     setLoading(false);
     if (!result.ok) {
@@ -68,7 +68,7 @@ export default function ForgotPasswordPage() {
     const result = await postJson(
       "/auth/forgot-password",
       { identifier },
-      "재발송에 실패했습니다."
+      "재발송에 실패했어요."
     );
     setLoading(false);
     if (!result.ok) {

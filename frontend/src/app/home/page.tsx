@@ -67,7 +67,7 @@ export default function HomePage() {
         const statusRes = await authFetch("/users/me/spec-status");
         if (!statusRes.ok) {
           if (!hadCache) {
-            setError("정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
+            setError("정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
             setLoading(false);
           }
           return;
@@ -83,7 +83,7 @@ export default function HomePage() {
           // 캐시된 이전 결과가 이미 화면에 떠 있으면 그거 그대로 두고 조용히 넘어감 —
           // 캐시가 없을 때만(최초 진입) 에러를 실제로 보여줌.
           if (!hadCache) {
-            setError("매칭에 실패했습니다. 백엔드 서버가 켜져 있는지 확인해주세요.");
+            setError("매칭에 실패했어요. 백엔드 서버가 켜져 있는지 확인해주세요.");
             setLoading(false);
           }
           return;
@@ -94,7 +94,7 @@ export default function HomePage() {
         setLoading(false);
       } catch {
         if (!hadCache) {
-          setError("서버에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.");
+          setError("서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.");
           setLoading(false);
         }
       }
@@ -152,8 +152,8 @@ export default function HomePage() {
           <div className="mt-4 rounded-2xl bg-blue-50 px-4 py-4">
             <p className="text-sm font-bold text-blue-700">더 정확한 매칭을 원하시나요?</p>
             <p className="mt-1 text-xs leading-relaxed text-blue-600">
-              상세 정보를 입력해주시면 결과가 더 정확해지고, 
-              저장을 통해 언제든 불러오실 수 있습니다.
+              상세 정보를 입력하면 결과가 더 정확해지고,
+              저장해두면 언제든 다시 볼 수 있어요.
             </p>
             <Link
               href="/signup"

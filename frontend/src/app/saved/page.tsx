@@ -26,12 +26,12 @@ export default function SavedPage() {
       try {
         const res = await authFetch("/users/me/saved-scholarships");
         if (!res.ok) {
-          setError("찜 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
+          setError("찜 목록을 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
           return;
         }
         setResults(await res.json());
       } catch {
-        setError("서버에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.");
+        setError("서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.");
       }
     })();
   }, [router]);

@@ -58,7 +58,7 @@ export default function MyPage() {
           return;
         }
         if (!res.ok) {
-          setError("스펙을 불러오지 못했습니다.");
+          setError("스펙을 불러오지 못했어요.");
           setLoading(false);
           return;
         }
@@ -76,7 +76,7 @@ export default function MyPage() {
           }
         }
       } catch {
-        setError("서버에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.");
+        setError("서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.");
         setLoading(false);
       }
     })();
@@ -123,7 +123,7 @@ export default function MyPage() {
       clearTokens();
       router.push("/");
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : "회원탈퇴에 실패했습니다.");
+      setDeleteError(err instanceof Error ? err.message : "회원탈퇴에 실패했어요.");
     } finally {
       setDeleting(false);
     }
@@ -175,7 +175,7 @@ export default function MyPage() {
       sessionStorage.removeItem(DRAFT_KEY);
       setSaved(true);
     } catch {
-      setError("스펙 수정에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      setError("스펙 수정에 실패했어요. 잠시 후 다시 시도해주세요.");
     } finally {
       setSaving(false);
     }
@@ -260,7 +260,7 @@ export default function MyPage() {
             <div className="rounded-2xl bg-red-50 p-4">
               <p className="text-sm font-bold text-red-600">정말 탈퇴하시겠어요?</p>
               <p className="mt-1 text-xs leading-relaxed text-red-500">
-                저장된 스펙, 찜 목록을 포함한 모든 정보가 삭제되고 되돌릴 수 없어요.
+                저장된 스펙, 찜 목록을 포함한 모든 정보가 삭제돼요. 삭제하면 되돌릴 수 없어요.
               </p>
               <form onSubmit={handleDeleteAccount} className="mt-3 flex flex-col gap-2">
                 <input

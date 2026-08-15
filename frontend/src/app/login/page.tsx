@@ -24,7 +24,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const result = await postJson("/auth/login", { username, password }, "로그인에 실패했습니다.");
+    const result = await postJson("/auth/login", { username, password }, "로그인에 실패했어요.");
     setLoading(false);
     if (!result.ok) {
       setError(result.error);

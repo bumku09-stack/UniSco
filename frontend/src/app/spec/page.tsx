@@ -113,7 +113,7 @@ export default function SpecWizard() {
       saveGuestResults(results);
       router.push("/home");
     } catch {
-      setError("매칭에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      setError("매칭에 실패했어요. 잠시 후 다시 시도해주세요.");
     } finally {
       setSubmitting(false);
     }
@@ -140,7 +140,7 @@ export default function SpecWizard() {
       clearGuestData();
       router.push("/home");
     } catch {
-      setError("스펙 저장에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      setError("스펙 저장에 실패했어요. 잠시 후 다시 시도해주세요.");
     } finally {
       setSubmitting(false);
     }

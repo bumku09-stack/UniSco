@@ -31,7 +31,7 @@ export default function SignupPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const result = await postJson("/auth/signup", { username, password, email }, "회원가입에 실패했습니다.");
+    const result = await postJson("/auth/signup", { username, password, email }, "회원가입에 실패했어요.");
     setLoading(false);
     if (!result.ok) {
       setError(result.error);
@@ -48,7 +48,7 @@ export default function SignupPage() {
     const result = await postJson(
       "/auth/verify-code",
       { identifier: username, code },
-      "인증에 실패했습니다."
+      "인증에 실패했어요."
     );
     setLoading(false);
     if (!result.ok) {
@@ -62,7 +62,7 @@ export default function SignupPage() {
     setLoading(true);
     setError(null);
     setNotice(null);
-    const result = await postJson("/auth/resend-code", { identifier: username }, "재발송에 실패했습니다.");
+    const result = await postJson("/auth/resend-code", { identifier: username }, "재발송에 실패했어요.");
     setLoading(false);
     if (!result.ok) {
       setError(result.error);

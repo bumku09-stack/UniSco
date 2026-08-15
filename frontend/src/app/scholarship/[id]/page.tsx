@@ -165,7 +165,7 @@ export default function ScholarshipDetailPage({
         )}
 
         {scholarship === null && (
-          <p className="mt-8 text-center text-sm text-gray-400">장학금을 찾을 수 없습니다.</p>
+          <p className="mt-8 text-center text-sm text-gray-400">장학금을 찾을 수 없어요.</p>
         )}
 
         {scholarship && (
