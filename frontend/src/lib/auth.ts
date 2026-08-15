@@ -71,26 +71,6 @@ export function kakaoAuthorizeUrl(): string {
   return `https://kauth.kakao.com/oauth/authorize?${params.toString()}`;
 }
 
-// JWT의 payload(가운데 조각)만 디코드해서 만료 시각을 읽음 — 서명 검증은 안 함(그건
-// 백엔드가 매 요청마다 함), 순전히 "몇 분 남았는지" 화면에 보여주기 위한 용도라 그걸로 충분함.
-function decodeJwtExpiry(token: string): number | null {
-  try {
-    const payload = token.split(".")[1];
-    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
-    const json = JSON.parse(atob(padded));
-    return typeof json.exp === "number" ? json.exp * 1000 : null; // ms 단위로 변환
-  } catch {
-    return null;
-  }
-}
-
-/** access token 만료 시각(ms epoch). 토큰이 없거나 파싱 실패하면 null. */
-export function getAccessTokenExpiry(): number | null {
-  const token = getAccessToken();
-  return token ? decodeJwtExpiry(token) : null;
-}
-
 // 로그인 전(회원가입/로그인/이메일인증/재발송) 호출용 — 토큰이 아직 없어서 authFetch를 못 씀.
 // "JSON POST → 실패하면 detail 메시지, 네트워크 자체가 끊기면 폴백 메시지"가 로그인·회원가입
 // 페이지 곳곳에서 그대로 반복되길래 하나로 뽑음.
