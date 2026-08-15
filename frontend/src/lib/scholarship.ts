@@ -81,6 +81,23 @@ export function isAutoSelected(s: Scholarship): boolean {
   return AUTO_SELECTED_SIGNAL.test(method) && !AUTO_SELECTED_OVERRIDE.test(method);
 }
 
+// 2026-08-15 추가 — 위 isAutoSelected()는 application_method 텍스트가 있어야만 판단
+// 가능한데, harness/reverify.py가 원문에 근거 없는 값을 정리하면서(id=59 등 62건)
+// application_method가 null이 된 레코드들에선 이 판정 자체가 항상 false가 돼서 안내
+// 문구가 안 뜨는 구멍이 생김(사용자 지적, scholarship/59) — application_url을 직접
+// fetch+파싱해서 재확인해보니(2026-08-15) 이 URL 자체에 신청기간/신청방식/신청기한/
+// 접수기간/지원신청/신청서/신청방법 키워드가 전부 0건 — 65건 전체가 공유하는 이 URL은
+// 애초에 "안내 목록" 페이지일 뿐 신청 관련 정보가 아예 없음(개별 레코드의 값 추측이
+// 아니라 페이지 자체를 직접 확인한 사실). application_method 값 유무와 무관하게 이
+// URL로 연결되는 건 항상 캡션을 띄움.
+const KNOWN_LISTING_ONLY_URLS = new Set([
+  "https://plus.cnu.ac.kr/html/hub/support/support_030302.html",
+]);
+
+export function isListingOnlyUrl(url: string | null): boolean {
+  return url != null && KNOWN_LISTING_ONLY_URLS.has(url);
+}
+
 const MILITARY_LABEL: Record<string, string> = {
   completed: "군필",
   exempted: "면제",

@@ -9,6 +9,7 @@ import {
   eligibilityList,
   formatAmount,
   isAutoSelected,
+  isListingOnlyUrl,
   Scholarship,
   unverifiableConditionParts,
 } from "@/lib/scholarship";
@@ -332,13 +333,21 @@ export default function ScholarshipDetailPage({
                 안내 페이지로 연결돼요
               </p>
             )}
+            {!isAutoSelected(scholarship) && isListingOnlyUrl(scholarship.application_url) && (
+              <p className="mb-2 text-center text-xs text-gray-400">
+                이 링크는 학교의 장학금 안내 목록 페이지예요 — 실제 신청 방법은 학교(학생과
+                등)에 문의해 확인해주세요
+              </p>
+            )}
             <a
               href={scholarship.application_url}
               target="_blank"
               rel="noreferrer noopener"
               className="block w-full rounded-2xl bg-blue-500 py-4 text-center text-[15px] font-bold text-white transition hover:bg-blue-600 active:scale-[0.99]"
             >
-              {isAutoSelected(scholarship) ? "학교 안내 확인하기" : "신청하러 가기"}
+              {isAutoSelected(scholarship) || isListingOnlyUrl(scholarship.application_url)
+                ? "학교 안내 확인하기"
+                : "신청하러 가기"}
             </a>
           </div>
         </div>
