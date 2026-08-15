@@ -430,6 +430,32 @@ list[SpecialStatus]` 신규 컬럼 추가 + `backend/app/core/matching.py`에
 ③(전공)만 기존 `UserSpec` 필드로 표현 가능하고 ①②(본인 직업, 거주 개월수/농어촌 여부)는
 UserSpec에 아예 없는 정보라 의도적으로 비워둠.
 
+## 20번: 의사상자 유족·가족 조건 — ✅ 2026-08-10 해결 (뒤늦게 이 파일에 기록, 2026-08-15)
+
+`righteous_person_family_condition`을 원래 "확인 불가" 랭킹 전용 태그였다가 사용자가 직접
+선택 가능한 항목으로 승격. national_merit(국가유공자)와 똑같이 명확하게 정의된 법적 지위라
+확인 불가로 둘 이유가 없었음. `frontend/src/lib/spec.ts`의 `SPECIAL_STATUS_OPTIONS`에 이미
+추가돼 있었는데, `matching_gaps.md`에는 옮겨적는 걸 깜빡해서 2026-08-15까지 미해결처럼
+남아있었음(문서만 낡았던 것, 실제 기능은 5일 전부터 정상 동작 중이었음).
+
+## 15번 부분 해결: "부모가 목회자·선교사" — ✅ 2026-08-15
+
+`religious_or_career_intent_condition`(확인 불가) 21건을 전수 재검토해서, "부모가 목회자
+또는 선교사"라는 명확한 자기신고 가능 사실인 8건만 새 태그
+`SpecialStatus.PARENT_CLERGY_OR_MISSIONARY`로 승격(위 20번과 동일 패턴). 나머지 13건(학생
+본인의 상태·지망, 추천서·신앙에세이 요건 등)은 그대로 확인 불가 유지 — 상세 판단 근거는
+`audit_reports/fix_promote_parent_clergy_2026-08-15_diff.md` 참고. 16번(부모 직업/소속)은
+직업군이 8~9종으로 잘게 갈려서 태그 세분화 범위를 어떻게 잡을지 아직 미정 —
+`matching_gaps.md`에 남겨둠.
+
+## 25번·`required_degree_level` 단일값 한계 부분 해결 — ✅ 2026-08-15
+
+`eligibility_alt_groups`(2026-08-14 추가)로 "여러 어학시험 중 택1"(6건: id=31,32,52,197,
+317,343) 및 "석사 또는 박사 둘 다 대상"(7건: id=79,649,653,671,672,673,674) 조건을 구조화.
+상세는 `audit_reports/fix_or_conditions_alt_groups_2026-08-15_diff.md` 참고. `matching_gaps.md`
+25번과 `required_degree_level` 섹션에 남은 것(TEPS/HSK/JLPT 등 미지원 시험, 아직 못 찾은
+나머지 배치)은 계속 미해결로 남겨둠.
+
 ## 참고
 
 미해결/논의 필요 항목은 [supabase/matching_gaps.md](matching_gaps.md) 참고.

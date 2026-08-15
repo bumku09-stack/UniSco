@@ -128,6 +128,15 @@ class SpecialStatus(str, Enum):
     # 두는 게 맞음(matching_gaps.md 20번, 2026-08-06에 "확인 불가"로 처음 추가됐던 것을
     # 재검토해서 승격). frontend/src/lib/spec.ts의 SPECIAL_STATUS_OPTIONS에도 추가할 것.
     RIGHTEOUS_PERSON_FAMILY_CONDITION = "righteous_person_family_condition"  # 의사상자 유족·가족
+    # 2026-08-15 추가 — religious_or_career_intent_condition(확인 불가) 21건을 전수 재검토하다
+    # 발견: 그중 8건은 "부모가 목회자 또는 선교사"라는, national_merit과 똑같이 학생이 예/
+    # 아니오로 답할 수 있는 명확한 사실이었음(parent_university_staff/alumni 승격과 동일한
+    # 이유). 나머지 13건은 학생 본인의 상태·지망(군종사관후보생, 신학대학원생+교회사역중,
+    # 목회자/선교사 "지망" 등)이거나 추천서·신앙에세이처럼 정말 확인 불가한 절차 요건이라
+    # 그대로 둠 — 이 태그로 옮긴 8건만 required_special_status에서
+    # religious_or_career_intent_condition을 빼고 이걸로 교체함
+    # (fix_promote_parent_clergy_2026-08-15.py 참고).
+    PARENT_CLERGY_OR_MISSIONARY = "parent_clergy_or_missionary"  # 부모가 목회자·선교사
     # 2026-08-03 추가 — 배재대 희망복지장학금·대전대 장학사정관장학금 같은 복합조건
     # 장학금을 재분류하면서 새로 필요해진 값들
     BASIC_LIVELIHOOD_RECIPIENT = "basic_livelihood_recipient"  # 기초생활수급자

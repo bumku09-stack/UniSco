@@ -221,6 +221,10 @@ export const SPECIAL_STATUS_OPTIONS = [
   { value: "rural_student", label: "농어촌(읍·면) 출신" },
   { value: "parent_university_staff", label: "부모가 재학 대학 교직원" },
   { value: "parent_university_alumni", label: "부모가 재학 대학 동문(졸업생)" },
+  // 2026-08-15 추가 — religious_or_career_intent_condition(확인 불가) 21건 재검토 중 발견,
+  // national_merit·righteous_person_family_condition과 같은 이유(명확한 자기신고 가능
+  // 사실)로 승격. backend/app/models/enums.py의 PARENT_CLERGY_OR_MISSIONARY 참고.
+  { value: "parent_clergy_or_missionary", label: "부모가 목회자·선교사" },
   // 2026-08-07 추가 — "해당사항 없음" 명시적 선택지. 지금까지는 특수상황을 하나도 안 고르면
   // "아직 대답 안 함(모름)"으로 취급돼서 leniency로 관련 장학금이 계속 보였는데, "나는 이
   // 중 어디에도 해당 안 함"을 확정하고 싶은 학생을 위한 선택지(사용자 지적으로 추가). 다른
