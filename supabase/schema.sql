@@ -11,7 +11,7 @@
 -- 값은 소문자(예: 'male', 'foreigner_only')로 저장됨 — SQLAlchemy 기본값(대문자, enum
 -- 멤버 이름)을 values_callable로 오버라이드해서 API JSON/문서와 casing을 통일함.
 CREATE TYPE gender AS ENUM ('male', 'female');
-CREATE TYPE militarystatus AS ENUM ('completed', 'exempted', 'not_served');
+CREATE TYPE militarystatus AS ENUM ('completed', 'exempted', 'not_served', 'rotc_candidate');
 CREATE TYPE foreignereligibility AS ENUM ('korean_only', 'foreigner_only');
 -- gpabasis(2026-08-02 추가, 'both'는 2026-08-03 추가): min_gpa가 직전학기 성적 기준인지
 -- 전체 재학기간 누적(CGPA) 기준인지, 아니면 둘 다 동시에 만족해야 하는지 구분. NULL이면

@@ -19,6 +19,12 @@ class MilitaryStatus(str, Enum):
     COMPLETED = "completed"  # 군필
     EXEMPTED = "exempted"  # 면제
     NOT_SERVED = "not_served"  # 미필
+    # 2026-08-15 추가 — "학군사관후보생(ROTC) 대상" 조건인 장학금(id=63,212)이 있는데
+    # 기존 3종 어디로도 표현이 안 됐음(ROTC 후보생은 임관 전이라 사실상 미필이지만, 미필
+    # 학생 전체가 아니라 그중 ROTC 과정 중인 사람만 콕 집어 대상으로 하는 장학금이라
+    # not_served로는 못 거름 — 군필이면 애초에 ROTC 후보생 신분이 성립 안 하므로 의미 없음).
+    # frontend/src/lib/spec.ts의 병역 선택란에도 추가할 것.
+    ROTC_CANDIDATE = "rotc_candidate"  # 학군사관후보생(ROTC)
 
 
 class ForeignerEligibility(str, Enum):

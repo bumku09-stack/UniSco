@@ -18,7 +18,7 @@ export type Scholarship = {
   max_age: number | null;
   required_gender: "male" | "female" | null;
   eligible_region: string | null;
-  required_military_status: "completed" | "exempted" | "not_served" | null;
+  required_military_status: "completed" | "exempted" | "not_served" | "rotc_candidate" | null;
   max_income_bracket: number | null;
   min_gpa: number | null;
   min_gpa_basis: "semester" | "cumulative" | "both" | null;
@@ -83,6 +83,7 @@ const MILITARY_LABEL: Record<string, string> = {
   completed: "군필",
   exempted: "면제",
   not_served: "미필",
+  rotc_candidate: "학군사관후보생(ROTC)",
 };
 
 const GPA_BASIS_LABEL: Record<string, string> = {

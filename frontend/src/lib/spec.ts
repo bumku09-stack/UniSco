@@ -29,7 +29,7 @@ export type UserSpec = {
   // 표현하기 위한 선택 입력. null="입력 안 함" — OptionalInfo.parentRegionEnabled로 관리됨.
   parent_region: string | null;
   parent_district: string | null; // 2026-08-05 추가 (matching_gaps.md 14번 후속)
-  military_status: "completed" | "exempted" | "not_served";
+  military_status: "completed" | "exempted" | "not_served" | "rotc_candidate";
   income_bracket: number | null; // null="모름" — 소득분위 조건이 있는 장학금도 안 거름
   has_disability: boolean;
   is_foreigner: boolean;

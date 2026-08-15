@@ -328,12 +328,20 @@ export function CommonFields({
         <PillToggle
           value={spec.military_status}
           onChange={(v) =>
-            setSpec({ ...spec, military_status: v as "completed" | "exempted" | "not_served" })
+            setSpec({
+              ...spec,
+              military_status: v as "completed" | "exempted" | "not_served" | "rotc_candidate",
+            })
           }
           options={[
             { value: "not_served", label: "미필" },
             { value: "completed", label: "군필" },
             { value: "exempted", label: "면제" },
+            // 2026-08-15 추가 — "학군단(ROTC) 후보생만 대상" 장학금(id=63,212)이 군필/미필/
+            // 면제 어디로도 안 걸러져서 추가(군필이면 애초에 ROTC 후보생 신분 자체가 성립 안
+            // 하므로 의미상 겹치지 않음). backend/app/models/enums.py의
+            // MilitaryStatus.ROTC_CANDIDATE 참고.
+            { value: "rotc_candidate", label: "학군단(ROTC)" },
           ]}
         />
       </Field>
