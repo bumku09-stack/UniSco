@@ -56,3 +56,4 @@ class TokenBudget:
 
 extraction_budget = TokenBudget(config.MAX_TOKENS_PER_EXTRACTION_RUN)
 onboard_budget = TokenBudget(config.MAX_TOKENS_PER_ONBOARD_RUN)
+reverify_budget = TokenBudget(config.MAX_TOKENS_PER_REVERIFY_RUN)

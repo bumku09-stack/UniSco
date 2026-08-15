@@ -1,0 +1,64 @@
+name: harness reverify
+
+# 이미 DB에 들어간 장학금의 application_period/application_method가 실제 원문에 근거가
+# 있는지 재검증(harness/reverify.py, 2026-08-15 추가) — id=46(CNU복지 장학금)에서 두 필드
+# 다 원문에 없는 값이 들어가 있던 사고 이후, 사람이 형제 레코드 패턴만 보고 "맞겠지"
+# 판단하는 대신 매번 실제 원문을 다시 읽고 인용 근거를 기계적으로 대조하기 위해 만듦.
+#
+# 나이트런(harness_nightly.yml)과 달리 아직 크론 스케줄 없음 — 이제 막 만든 도구라 대학
+# 하나(충남대) 첫 실행에서 72건이 한 번에 쏟아졌음(전체 배치가 이런 상태일 가능성이 있어서
+# 아직은 사람이 "지금 이 대학 한번 돌려보자" 하고 수동으로 트리거하는 쪽이 안전함). 결과가
+# 좀 더 예측 가능해지면 그때 나이트런처럼 스케줄을 붙일 것.
+on:
+  workflow_dispatch:
+    inputs:
+      university:
+        description: "재검증할 대학 이름(eligible_university 값 그대로, 예: 충남대학교)"
+        required: false
+        type: string
+      all:
+        description: "true면 university 무시하고 전체 재검증(비용 큼 — 신중히)"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write # 리뷰 마크다운 브랜치 push
+  pull-requests: write # PR 오픈
+
+concurrency:
+  group: harness-reverify
+  cancel-in-progress: false
+
+jobs:
+  run-reverify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: harness 의존성 설치
+        run: pip install -r harness/requirements.txt
+
+      - name: git 커밋 아이덴티티 설정
+        run: |
+          git config user.name "unisco-harness[bot]"
+          git config user.email "unisco-harness[bot]@users.noreply.github.com"
+
+      - name: 재검증 실행
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ inputs.all }}" = "true" ]; then
+            python -m harness.reverify --all
+          elif [ -n "${{ inputs.university }}" ]; then
+            python -m harness.reverify --university "${{ inputs.university }}"
+          else
+            echo "university 입력이 비어있고 all도 false임 — 실행할 게 없음" >&2
+            exit 1
+          fi

@@ -113,6 +113,22 @@ MAX_TOKENS_PER_EXTRACTION_RUN = int(
 )
 MAX_TOKENS_PER_ONBOARD_RUN = int(os.environ.get("HARNESS_MAX_TOKENS_PER_ONBOARD_RUN", "500000"))
 
+# ── 7.9 재검증 (harness/reverify.py, 2026-08-15 추가) ─────────────────────
+# 이미 DB에 들어간 장학금의 application_period/application_method가 실제로 원문에 근거가
+# 있는지 재확인하는 모듈용 설정. id=46(CNU복지 장학금)에서 두 필드 다 원문에 없는 값이
+# 들어가 있던 걸 사람이 하나하나 원문 대조해서 찾은 사고 이후 추가 — "형제 레코드랑
+# 패턴이 비슷하니 맞겠지" 같은 사람의 판단 대신, 매번 실제 원문을 다시 읽고 인용 근거를
+# 강제하는 기계적 대조로 대체함.
+REVERIFY_MODEL = os.environ.get("HARNESS_REVERIFY_MODEL", EXTRACTION_MODEL)
+REVERIFY_MAX_TOKENS = 8192
+# 같은 URL(주로 대학 통합 장학금 목록 페이지)을 쓰는 기존 레코드가 한 번에 너무 많으면
+# (CNU 페이지는 65건) 한 호출에 다 넣지 않고 이 개수씩 나눠서 여러 번 호출 — 응답이
+# 너무 길어지면 항목을 누락하거나 다른 항목 정보와 섞어 말할 위험이 커지므로.
+REVERIFY_MAX_ITEMS_PER_CALL = int(os.environ.get("HARNESS_REVERIFY_MAX_ITEMS_PER_CALL", "25"))
+MAX_TOKENS_PER_REVERIFY_RUN = int(
+    os.environ.get("HARNESS_MAX_TOKENS_PER_REVERIFY_RUN", "1000000")
+)
+
 # ── 기타 ────────────────────────────────────────────────────────────────
 GITHUB_REPO = os.environ.get("HARNESS_GITHUB_REPO", "hoseongdev/UniSco")
 PR_BASE_BRANCH = "main"

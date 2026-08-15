@@ -35,13 +35,11 @@ def load_database_url() -> str:
     raise RuntimeError(f"DATABASE_URL not found in {env_path}")
 
 
-def fetch_existing_scholarships() -> list[tuple[str, str]]:
-    """중복 판정용 (name, provider) 전체 목록. provider가 NULL이면 빈 문자열로 취급."""
+def _connect():
     url = load_database_url()
     for attempt in range(_MAX_RETRIES + 1):
         try:
-            conn = psycopg2.connect(url)
-            break
+            return psycopg2.connect(url)
         except psycopg2.OperationalError:
             # Supabase 쪽 순간적인 연결 거부/타임아웃 대비(harness/http.py의 재시도와 같은
             # 이유, 2026-08-10) — 이 단계는 LLM 추출 이전이라 실패해도 토큰 손실은 없지만,
@@ -49,9 +47,42 @@ def fetch_existing_scholarships() -> list[tuple[str, str]]:
             if attempt == _MAX_RETRIES:
                 raise
             time.sleep(3 * (attempt + 1))
+    raise AssertionError("unreachable")
+
+
+def fetch_existing_scholarships() -> list[tuple[str, str]]:
+    """중복 판정용 (name, provider) 전체 목록. provider가 NULL이면 빈 문자열로 취급."""
+    conn = _connect()
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT name, COALESCE(provider, '') FROM scholarship")
             return [(name, provider) for name, provider in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+def fetch_records_for_reverification(
+    university: str | None = None,
+) -> list[tuple[int, str, str, str | None, str | None]]:
+    """reverify.py용 — application_period 또는 application_method가 이미 채워진(=재검증할
+    "주장"이 있는) 기존 레코드를 application_url과 함께 가져옴. 둘 다 NULL인 레코드는 애초에
+    검증할 값 자체가 없으므로 대상에서 뺌(id, name, application_url, application_period,
+    application_method) 튜플 목록."""
+    conn = _connect()
+    try:
+        with conn.cursor() as cur:
+            query = (
+                "SELECT id, name, application_url, application_period, application_method "
+                "FROM scholarship "
+                "WHERE application_url IS NOT NULL "
+                "AND (application_period IS NOT NULL OR application_method IS NOT NULL)"
+            )
+            params: tuple = ()
+            if university:
+                query += " AND eligible_university = %s"
+                params = (university,)
+            query += " ORDER BY application_url, id"
+            cur.execute(query, params)
+            return cur.fetchall()
     finally:
         conn.close()

@@ -20,6 +20,7 @@ harness/
 ├── build_pr.py                  # [6][7] SQL 초안 + 리뷰 마크다운 생성, 브랜치 커밋, PR 오픈
 ├── run.py                        # 오케스트레이션 — python -m harness.run
 ├── onboard.py                     # 온보딩 에이전트 — 새 대학 게시판 조사, BoardConfig 초안 PR 생성. 아래 "온보딩 에이전트" 참고
+├── reverify.py                     # 기존 데이터 재검증 — 아래 "재검증" 참고
 ├── budget.py                       # API 사용량 예산 추적 — 아래 "토큰 예산" 참고
 ├── state/rotation.json            # 다음 나이트런이 어느 대학부터 처리할지 기억하는 상태 파일
 └── prompts/
@@ -139,6 +140,43 @@ python -m harness.onboard --university 한밭대학교 --seed-url https://www.ha
 메인이 아니라 사람이 미리 찾아둔 정확한 게시판 URL을 직접 주면 더 잘 될 가능성이 높음
 (아직 검증 안 함). 신형 프레임워크(전자정부프레임워크 계열 등) 사이트로도 아직 테스트
 안 해봄.
+
+## 재검증 (`harness/reverify.py`, 2026-08-15 추가 — 실전 투입·검증 완료)
+
+이미 DB에 들어간 장학금의 `application_period`/`application_method`가 실제 원문에 근거가
+있는지 재확인하는 모듈. extract.py/verify.py와 같은 두 원칙(인용 강제 + 기계적 대조)을
+쓰지만, "공고문 1건=호출 1건"이 아니라 "URL 하나(주로 대학 통합 장학금 목록 페이지,
+여러 장학금이 한 표에 같이 있음)=그 URL을 쓰는 기존 레코드 여러 건을 한 번에 재확인"하는
+형태라 스키마가 다름.
+
+**계기**: 2026-08-15, id=46(CNU복지 장학금)의 두 필드 다 원문에 없는 값이 들어가 있던 사고.
+처음엔 사람이 application_period만 원문 대조해서 고치고, application_method는 "형제
+레코드(영탑A/B 등)랑 패턴이 비슷하니 맞겠지"라고 넘겨짚었다가 그것도 틀렸던 게 나중에
+드러남 — 패턴이 그럴듯한 것과 실제로 그 출처에서 확인된 것은 다르다는 교훈. 사람의
+"맞겠지" 판단을 코드의 기계적 대조로 대체하기 위해 만듦.
+
+```bash
+python -m harness.reverify --university 충남대학교
+python -m harness.reverify --all
+```
+
+같은 URL을 쓰는 기존 레코드를 묶어서(청크당 `config.REVERIFY_MAX_ITEMS_PER_CALL`, 기본
+25건) 원문과 함께 LLM에 보내고, 항목마다 값+원문 인용을 강제함. 인용이 원문에 없으면
+"근거 없음"(`no_source_evidence`), 인용은 있는데 현재 DB 값과 다르면 "값 다름"
+(`value_mismatch`)으로 분류해서 리뷰 마크다운을 PR로 올림 — **DB에는 아무것도 안 씀**,
+기존 파이프라인과 동일한 "사람 승인 게이트" 원칙.
+
+**첫 실전 실행 결과(충남대학교, 78건 재검증 대상)**: 근거 없음 137개 필드(72건) — id=46
+하나만의 문제가 아니라 plus.cnu.ac.kr 통합 안내표를 쓰는 배치 전체가 사실상 다 이 상태였음
+(전부 `fix_reverify_cnu_no_evidence_2026-08-15.py`로 NULL 처리, 상세는
+`supabase/reverify_review_충남대학교_2026-08-15.md` 참고). "값 다름" 13건은 자동 반영 안
+함 — 그중 일부(id=11/12/13)는 오히려 fresh 추출값이 현재 DB 값보다 부정확해서(더 짧고
+정보가 빠짐) 사람이 개별 판단해야 함이 드러남, 이래서 "값 다름"은 항상 사람 검토 대상으로
+남겨둠.
+
+GitHub Actions는 `.github/workflows/harness_reverify.yml`(workflow_dispatch만, 아직
+나이트런처럼 스케줄은 없음 — 첫 실행에서 대학 하나만으로도 72건이 쏟아진 걸 감안해 결과가
+더 예측 가능해질 때까지는 사람이 수동으로 트리거).
 
 ## 토큰 예산 (`harness/budget.py`, 2026-08-15 추가)
 
