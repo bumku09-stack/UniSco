@@ -68,10 +68,17 @@ def exchange_code_for_token(code: str, redirect_uri: str) -> str:
     try:
         res = requests.post(_TOKEN_URL, data=payload, timeout=_TIMEOUT_SECONDS)
         res.raise_for_status()
+        token_data = res.json()
     except requests.RequestException as e:
         _raise_with_kakao_detail(e, "카카오 토큰 교환 실패")
+    except ValueError as e:
+        # 상태코드는 2xx인데 본문이 JSON이 아닌 경우(카카오 쪽 장애/프록시 응답 등, 2026-08-15
+        # 배포 전 점검에서 방어 추가) — raise_for_status()를 통과했으니 RequestException으로는
+        # 안 잡힘. 흔한 케이스는 아니지만 그대로 두면 여기서 처리 안 된 예외로 502 대신
+        # 500이 나감.
+        raise KakaoAuthError(f"카카오 토큰 교환 실패: 응답을 JSON으로 해석할 수 없음 ({e})") from e
 
-    access_token = res.json().get("access_token")
+    access_token = token_data.get("access_token")
     if not access_token:
         raise KakaoAuthError("카카오 응답에 access_token이 없습니다.")
     return access_token
@@ -85,10 +92,14 @@ def fetch_kakao_user(kakao_access_token: str) -> KakaoUser:
             timeout=_TIMEOUT_SECONDS,
         )
         res.raise_for_status()
+        data = res.json()
     except requests.RequestException as e:
         _raise_with_kakao_detail(e, "카카오 유저 정보 조회 실패")
+    except ValueError as e:
+        raise KakaoAuthError(
+            f"카카오 유저 정보 조회 실패: 응답을 JSON으로 해석할 수 없음 ({e})"
+        ) from e
 
-    data = res.json()
     kakao_id = data.get("id")
     if kakao_id is None:
         raise KakaoAuthError("카카오 응답에 id가 없습니다.")

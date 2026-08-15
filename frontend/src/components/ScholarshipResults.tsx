@@ -167,16 +167,24 @@ export function ScholarshipResults({
 
       // 낙관적 업데이트 먼저 반영, 실패하면 되돌림 — API 자체는 idempotent라 재시도/중복
       // 클릭에도 안전함(app/api/scholarships.py의 save/unsave 참고).
-      authFetch(`/scholarships/${id}/save`, { method: wasSaved ? "DELETE" : "POST" }).then((res) => {
-        if (!res.ok) {
-          setSavedIds((cur) => {
-            const reverted = new Set(cur ?? []);
-            if (wasSaved) reverted.add(id);
-            else reverted.delete(id);
-            return reverted;
-          });
-        }
-      });
+      function revert() {
+        setSavedIds((cur) => {
+          const reverted = new Set(cur ?? []);
+          if (wasSaved) reverted.add(id);
+          else reverted.delete(id);
+          return reverted;
+        });
+      }
+      // authFetch는 네트워크 자체가 끊기면(서버 다운 등) reject하지 그냥 !ok로 돌아오지
+      // 않음 — .catch() 없이 두면 그 경우 낙관적 업데이트가 영영 안 되돌아가서, 사용자
+      // 화면엔 찜이 된 것처럼 보이는데 실제로는 서버에 반영 안 된 상태로 남았음
+      // (2026-08-15 배포 전 점검에서 발견 — home/spec 등 다른 화면의 authFetch 호출은
+      // 전부 try/catch가 있는데 여기만 .then()만 쓰고 있었음).
+      authFetch(`/scholarships/${id}/save`, { method: wasSaved ? "DELETE" : "POST" })
+        .then((res) => {
+          if (!res.ok) revert();
+        })
+        .catch(revert);
 
       return next;
     });

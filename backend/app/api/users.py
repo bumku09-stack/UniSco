@@ -84,7 +84,12 @@ def delete_account(
     """계정 완전 삭제. 되돌릴 수 없음 — 비밀번호 재확인을 받은 뒤에만 실행함(모델 쪽
     DeleteAccountRequest 주석 참고). FK가 CASCADE로 안 걸려있어서(schema.sql 기준) 참조하는
     테이블들을 먼저 지우고 마지막에 User를 지움 — 순서가 바뀌면 FK 제약 위반으로 실패함."""
-    if not verify_password(body.password, user.hashed_password):
+    # hashed_password가 None인 카카오 전용 계정은 verify_password()에 넘기면
+    # AttributeError로 그대로 터짐(auth.py의 login()과 동일한 이유, 2026-08-15 배포 전
+    # 점검에서 발견 — 프론트 탈퇴 폼은 비밀번호 입력을 항상 요구해서 카카오 유저도
+    # 뭔가는 입력하게 되므로 실제로 발생 가능한 경로였음). 이런 계정은 애초에 비밀번호
+    # 자체가 없으니 비교할 필요 없이 그냥 거부.
+    if user.hashed_password is None or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="비밀번호가 일치하지 않습니다.")
 
     for model in (SavedScholarship, SavedSpec, EmailVerification, PasswordReset):
