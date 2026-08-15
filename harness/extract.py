@@ -220,11 +220,15 @@ def extract_scholarship(
                 # (31건 기준 62회 호출) 매번 같은 내용이라 캐싱 대상으로 표시함 — 첫 호출만
                 # 전체 가격, 이후 호출은 캐시 히트로 입력 토큰 비용이 크게 줄어듦
                 # (2026-08-11, Anthropic 프롬프트 캐싱).
+                # 2026-08-15 — ttl 명시 안 하면 기본 5분짜리 캐시라, 목록 수집(원문 확보)
+                # 단계까지 포함한 배치 전체 소요시간이 5분을 넘으면 캐시가 중간에 만료돼서
+                # 다시 전체 가격으로 재기록되는 일이 생김(onboard.py는 처음부터 1h로 잡아둠 —
+                # 여기도 똑같이 맞춤. 콘솔 캐시 적중률이 낮다는 지적으로 발견).
                 system=[
                     {
                         "type": "text",
                         "text": load_extraction_spec(),
-                        "cache_control": {"type": "ephemeral"},
+                        "cache_control": {"type": "ephemeral", "ttl": "1h"},
                     }
                 ],
                 tools=[tool],
