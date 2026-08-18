@@ -86,11 +86,10 @@ function StatBox({
   value: string;
   tone: "blue" | "gray";
 }) {
-  const bg = tone === "blue" ? "bg-blue-50" : "bg-gray-50";
   const labelColor = tone === "blue" ? "text-blue-500" : "text-gray-500";
   const valueColor = tone === "blue" ? "text-blue-600" : "text-gray-700";
   return (
-    <div className={`flex-1 rounded-2xl ${bg} px-3.5 py-3`}>
+    <div className="flex-1 rounded-2xl bg-neu-surface px-3.5 py-3 shadow-neu-raised-sm">
       <p className={`text-[11px] font-semibold ${labelColor}`}>{label}</p>
       <p className={`mt-1 whitespace-pre-line text-sm font-bold leading-tight ${valueColor}`}>
         {value}
@@ -152,7 +151,7 @@ export default function ScholarshipDetailPage({
   }, []);
 
   return (
-    <div className="flex min-h-screen flex-col bg-white">
+    <div className="flex min-h-screen flex-col bg-neu-bg">
       <div className="mx-auto w-full max-w-md flex-1 px-6 pb-32 pt-6 sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
         <TopBar
           right={
@@ -209,21 +208,21 @@ export default function ScholarshipDetailPage({
                 (amount_detail/application_period/application_method)으로 나눠서 보여줌.
                 값이 없으면 "정보 없음"으로 표시 — 위 StatBox랑 동일한 원칙(칸 개수가
                 장학금마다 들쭉날쭉하지 않게). */}
-            <div className="mt-7 border-b border-gray-100 pb-7">
+            <div className="mt-7 pb-7">
               <SectionHeading>금액</SectionHeading>
               <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-gray-700">
                 {scholarship.amount_detail ?? formatAmount(scholarship.amount) ?? "정보 없음"}
               </p>
             </div>
 
-            <div className="mt-7 border-b border-gray-100 pb-7">
+            <div className="mt-7 pb-7">
               <SectionHeading>신청방식</SectionHeading>
               <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-gray-700">
                 {scholarship.application_method ?? "정보 없음"}
               </p>
             </div>
 
-            <div className="mt-7 border-b border-gray-100 pb-7">
+            <div className="mt-7 pb-7">
               <SectionHeading>기간</SectionHeading>
               <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-gray-700">
                 {/* application_period가 없을 때 application_method를 대신 보여주면 바로 위
@@ -296,7 +295,7 @@ export default function ScholarshipDetailPage({
                     <li key={s.id}>
                       <Link
                         href={`/scholarship/${s.id}?from=${id}`}
-                        className="block rounded-2xl border border-gray-100 bg-white p-3.5 shadow-[0_2px_10px_rgba(15,23,42,0.05)] transition hover:border-gray-200"
+                        className="block rounded-2xl bg-neu-surface p-3.5 shadow-neu-raised-sm transition hover:shadow-neu-raised"
                       >
                         {s.category_l2 && (
                           <span className="mb-1.5 inline-block rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-600">
@@ -325,7 +324,7 @@ export default function ScholarshipDetailPage({
       {/* 스크롤해도 항상 보이는 신청 버튼 — 자동선발 장학금은 버튼(링크)은 그대로 두고
           (혹시 판정이 틀려도 신청 기능 자체는 안 사라지게) 위에 안내 문구만 얹음. */}
       {scholarship?.application_url && (
-        <div className="sticky bottom-0 border-t border-gray-100 bg-white/95 px-6 py-4 backdrop-blur">
+        <div className="sticky bottom-0 bg-neu-bg/95 px-6 py-4 shadow-neu-raised-lg backdrop-blur">
           <div className="mx-auto w-full max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
             {isAutoSelected(scholarship) && (
               <p className="mb-2 text-center text-xs text-gray-400">
@@ -343,7 +342,7 @@ export default function ScholarshipDetailPage({
               href={scholarship.application_url}
               target="_blank"
               rel="noreferrer noopener"
-              className="block w-full rounded-2xl bg-blue-500 py-4 text-center text-[15px] font-bold text-white transition hover:bg-blue-600 active:scale-[0.99]"
+              className="block w-full rounded-2xl bg-blue-500 py-4 text-center text-[15px] font-bold text-white shadow-neu-raised transition hover:bg-blue-600 hover:shadow-neu-raised-lg active:shadow-neu-pressed"
             >
               {isAutoSelected(scholarship) || isListingOnlyUrl(scholarship.application_url)
                 ? "학교 안내 확인하기"

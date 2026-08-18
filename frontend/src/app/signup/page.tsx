@@ -114,7 +114,7 @@ export default function SignupPage() {
                 type="button"
                 onClick={handleCheckUsername}
                 disabled={username.length < 3 || usernameCheck === "checking"}
-                className="shrink-0 rounded-2xl border border-gray-200 px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
+                className="shrink-0 rounded-2xl bg-neu-surface px-4 text-sm font-semibold text-gray-600 shadow-neu-raised transition hover:shadow-neu-raised-lg active:shadow-neu-pressed disabled:opacity-50"
               >
                 중복확인
               </button>

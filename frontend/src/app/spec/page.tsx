@@ -36,7 +36,7 @@ const initialSpec: SpecForm = {
 
 function ProgressBar({ step, totalSteps }: { step: number; totalSteps: number }) {
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-neu-surface shadow-neu-inset">
       <div
         className="h-full rounded-full bg-blue-500 transition-all duration-300"
         style={{ width: `${(step / totalSteps) * 100}%` }}
@@ -183,7 +183,7 @@ export default function SpecWizard() {
 
   if (mode === "loading") {
     return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-neu-bg">
         <div className="mx-auto w-full max-w-md px-6 py-6 sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
           <TopBar />
         </div>
@@ -192,7 +192,7 @@ export default function SpecWizard() {
   }
 
   return (
-    <div className="min-h-screen bg-white pb-16">
+    <div className="min-h-screen bg-neu-bg pb-16">
       <div className="mx-auto w-full max-w-md px-6 py-6 sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
         <TopBar
           right={
@@ -242,7 +242,7 @@ export default function SpecWizard() {
 
             <button
               type="submit"
-              className="mt-2 w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white transition hover:bg-blue-600 active:scale-[0.99]"
+              className="mt-2 w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white shadow-neu-raised transition hover:bg-blue-600 hover:shadow-neu-raised-lg active:shadow-neu-pressed"
             >
               다음
             </button>
@@ -270,14 +270,14 @@ export default function SpecWizard() {
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="w-full rounded-2xl border border-gray-200 py-4 text-[15px] font-semibold text-gray-600 transition hover:bg-gray-50"
+                className="w-full rounded-2xl bg-neu-surface py-4 text-[15px] font-semibold text-gray-600 shadow-neu-raised transition hover:shadow-neu-raised-lg active:shadow-neu-pressed"
               >
                 이전
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white transition hover:bg-blue-600 active:scale-[0.99] disabled:opacity-50"
+                className="w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white shadow-neu-raised transition hover:bg-blue-600 hover:shadow-neu-raised-lg active:shadow-neu-pressed disabled:opacity-50"
               >
                 {submitting ? "찾는 중..." : "장학금 찾아보기"}
               </button>
@@ -306,13 +306,13 @@ export default function SpecWizard() {
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="w-full rounded-2xl border border-gray-200 py-4 text-[15px] font-semibold text-gray-600 transition hover:bg-gray-50"
+                className="w-full rounded-2xl bg-neu-surface py-4 text-[15px] font-semibold text-gray-600 shadow-neu-raised transition hover:shadow-neu-raised-lg active:shadow-neu-pressed"
               >
                 이전
               </button>
               <button
                 type="submit"
-                className="w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white transition hover:bg-blue-600 active:scale-[0.99]"
+                className="w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white shadow-neu-raised transition hover:bg-blue-600 hover:shadow-neu-raised-lg active:shadow-neu-pressed"
               >
                 다음
               </button>
@@ -340,14 +340,14 @@ export default function SpecWizard() {
               <button
                 type="button"
                 onClick={() => setStep(2)}
-                className="w-full rounded-2xl border border-gray-200 py-4 text-[15px] font-semibold text-gray-600 transition hover:bg-gray-50"
+                className="w-full rounded-2xl bg-neu-surface py-4 text-[15px] font-semibold text-gray-600 shadow-neu-raised transition hover:shadow-neu-raised-lg active:shadow-neu-pressed"
               >
                 이전
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white transition hover:bg-blue-600 active:scale-[0.99] disabled:opacity-50"
+                className="w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white shadow-neu-raised transition hover:bg-blue-600 hover:shadow-neu-raised-lg active:shadow-neu-pressed disabled:opacity-50"
               >
                 {submitting ? "찾는 중..." : "장학금 찾아보기"}
               </button>
@@ -372,14 +372,14 @@ export default function SpecWizard() {
               <button
                 type="button"
                 onClick={() => setStep(2)}
-                className="w-full rounded-2xl border border-gray-200 py-4 text-[15px] font-semibold text-gray-600 transition hover:bg-gray-50"
+                className="w-full rounded-2xl bg-neu-surface py-4 text-[15px] font-semibold text-gray-600 shadow-neu-raised transition hover:shadow-neu-raised-lg active:shadow-neu-pressed"
               >
                 이전
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white transition hover:bg-blue-600 active:scale-[0.99] disabled:opacity-50"
+                className="w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white shadow-neu-raised transition hover:bg-blue-600 hover:shadow-neu-raised-lg active:shadow-neu-pressed disabled:opacity-50"
               >
                 {submitting ? "저장 중..." : "내 장학금 찾기"}
               </button>

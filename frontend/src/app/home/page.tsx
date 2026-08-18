@@ -112,7 +112,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-white pb-16">
+    <div className="min-h-screen bg-neu-bg pb-16">
       <div className="mx-auto w-full max-w-md px-6 py-6 sm:max-w-2xl md:max-w-4xl lg:max-w-6xl lg:px-10">
         <TopBar
           right={
@@ -160,7 +160,7 @@ export default function HomePage() {
             </p>
             <Link
               href="/signup"
-              className="mt-3 block w-full rounded-xl bg-blue-500 py-2.5 text-center text-sm font-bold text-white transition hover:bg-blue-600 active:scale-[0.99]"
+              className="mt-3 block w-full rounded-xl bg-blue-500 py-2.5 text-center text-sm font-bold text-white shadow-neu-raised-sm transition hover:bg-blue-600 hover:shadow-neu-raised active:shadow-neu-pressed"
             >
               회원가입하고 결과 저장하기
             </Link>
@@ -193,7 +193,7 @@ export default function HomePage() {
           onClick={dismissGuestWarning}
         >
           <div
-            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+            className="w-full max-w-sm rounded-3xl bg-neu-surface p-5 shadow-neu-raised-lg"
             onClick={(e) => e.stopPropagation()}
           >
             <p className="text-sm font-bold text-gray-900">⚠️ 아직 저장되지 않았어요</p>
@@ -211,13 +211,13 @@ export default function HomePage() {
               <button
                 type="button"
                 onClick={dismissGuestWarning}
-                className="w-full rounded-xl border border-gray-200 py-2.5 text-xs font-bold text-gray-600"
+                className="w-full rounded-xl bg-neu-surface py-2.5 text-xs font-bold text-gray-600 shadow-neu-raised-sm transition active:shadow-neu-pressed"
               >
                 알겠어요
               </button>
               <Link
                 href="/signup"
-                className="w-full rounded-xl bg-blue-500 py-2.5 text-center text-xs font-bold text-white"
+                className="w-full rounded-xl bg-blue-500 py-2.5 text-center text-xs font-bold text-white shadow-neu-raised-sm transition active:shadow-neu-pressed"
               >
                 회원가입하기
               </Link>

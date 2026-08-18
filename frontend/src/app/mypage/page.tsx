@@ -131,7 +131,7 @@ export default function MyPage() {
 
   if (loading || spec === null) {
     return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-neu-bg">
         <div className="mx-auto w-full max-w-md px-6 py-6 sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
           <TopBar />
           {!error && <p className="mt-8 text-center text-sm text-gray-400">불러오는 중...</p>}
@@ -182,7 +182,7 @@ export default function MyPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white pb-16">
+    <div className="min-h-screen bg-neu-bg pb-16">
       <div className="mx-auto w-full max-w-md px-6 py-6 sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
         <TopBar right={<Link href="/home" className="text-sm font-semibold text-gray-400">← 홈으로</Link>} />
 
@@ -198,14 +198,14 @@ export default function MyPage() {
               <button
                 type="button"
                 onClick={restoreDraft}
-                className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-white"
+                className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-white shadow-neu-raised-sm transition active:shadow-neu-pressed"
               >
                 불러오기
               </button>
               <button
                 type="button"
                 onClick={discardDraft}
-                className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-bold text-amber-700"
+                className="rounded-lg bg-neu-surface px-3 py-1.5 text-xs font-bold text-amber-700 shadow-neu-raised-sm transition active:shadow-neu-pressed"
               >
                 무시하기
               </button>
@@ -241,7 +241,7 @@ export default function MyPage() {
           <button
             type="submit"
             disabled={saving}
-            className="mt-2 w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white transition hover:bg-blue-600 active:scale-[0.99] disabled:opacity-50"
+            className="mt-2 w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white shadow-neu-raised transition hover:bg-blue-600 hover:shadow-neu-raised-lg active:shadow-neu-pressed disabled:opacity-50"
           >
             {saving ? "저장 중..." : "저장하기"}
           </button>
@@ -269,7 +269,7 @@ export default function MyPage() {
                   placeholder="비밀번호 확인"
                   value={deletePassword}
                   onChange={(e) => setDeletePassword(e.target.value)}
-                  className="w-full rounded-xl border border-red-200 bg-white px-3.5 py-3 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-red-400"
+                  className="w-full rounded-xl bg-neu-surface px-3.5 py-3 text-sm text-gray-900 placeholder:text-gray-400 outline-none shadow-neu-inset transition focus:shadow-[inset_4px_4px_8px_rgba(0,0,0,0.15),inset_-4px_-4px_8px_rgba(210,225,255,0.6),0_0_0_3px_rgba(239,68,68,0.35)]"
                 />
                 {deleteError && <p className="text-xs font-medium text-red-600">{deleteError}</p>}
                 <div className="mt-1 flex gap-2">
@@ -280,14 +280,14 @@ export default function MyPage() {
                       setDeletePassword("");
                       setDeleteError(null);
                     }}
-                    className="w-full rounded-xl border border-gray-200 bg-white py-2.5 text-xs font-bold text-gray-600"
+                    className="w-full rounded-xl bg-neu-surface py-2.5 text-xs font-bold text-gray-600 shadow-neu-raised-sm transition active:shadow-neu-pressed"
                   >
                     취소
                   </button>
                   <button
                     type="submit"
                     disabled={deleting}
-                    className="w-full rounded-xl bg-red-500 py-2.5 text-xs font-bold text-white disabled:opacity-50"
+                    className="w-full rounded-xl bg-red-500 py-2.5 text-xs font-bold text-white shadow-neu-raised-sm transition active:shadow-neu-pressed disabled:opacity-50"
                   >
                     {deleting ? "처리 중..." : "탈퇴하기"}
                   </button>

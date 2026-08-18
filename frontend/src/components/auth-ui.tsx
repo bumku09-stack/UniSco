@@ -7,17 +7,20 @@
 import Link from "next/link";
 
 export const authInputClass =
-  "w-full rounded-2xl bg-gray-100 px-4 py-4 text-[15px] text-gray-900 placeholder:text-gray-400 outline-none transition focus:bg-blue-50 focus:ring-2 focus:ring-blue-500";
+  "w-full rounded-2xl bg-neu-surface px-4 py-4 text-[15px] text-gray-900 placeholder:text-gray-400 outline-none transition shadow-neu-inset focus:shadow-neu-focus";
 
+// 눌린 버튼(active)은 튀어나온 그림자 → 움푹 들어간 그림자로 전환해서 실제 눌림 피드백을
+// 줌 — 기존 active:scale-[0.99](살짝 축소)는 뉴모피즘 그림자 전환만으로도 눌림이 충분히
+// 표현되고 둘을 같이 쓰면 과해서 뺌. 브랜드 블루(bg-blue-500)는 그대로 유지(원칙 3).
 export const authPrimaryButtonClass =
-  "mt-4 w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white transition hover:bg-blue-600 active:scale-[0.99] disabled:opacity-50";
+  "mt-4 w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white transition shadow-neu-raised hover:shadow-neu-raised-lg active:shadow-neu-pressed disabled:opacity-50";
 
 export const authSecondaryButtonClass =
-  "w-full rounded-2xl border border-gray-200 py-4 text-[15px] font-semibold text-gray-600 transition hover:bg-gray-50 disabled:opacity-50";
+  "w-full rounded-2xl bg-neu-surface py-4 text-[15px] font-semibold text-gray-600 transition shadow-neu-raised hover:shadow-neu-raised-lg active:shadow-neu-pressed disabled:opacity-50";
 
 export function AuthShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-col bg-white">
+    <div className="flex min-h-screen flex-col bg-neu-bg">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-16 sm:max-w-lg md:max-w-xl">
         {children}
       </div>
@@ -31,7 +34,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
 export function AuthLogo({ href }: { href?: string }) {
   const content = (
     <>
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500 text-base font-bold text-white">
+      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500 text-base font-bold text-white shadow-neu-raised-sm">
         U
       </div>
       <span className="text-lg font-bold text-gray-900">UniSco</span>
@@ -68,7 +71,7 @@ export function KakaoLoginButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FEE500] py-4 text-[15px] font-semibold text-[#191919] transition hover:brightness-95 active:scale-[0.99]"
+      className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FEE500] py-4 text-[15px] font-semibold text-[#191919] shadow-neu-raised transition hover:shadow-neu-raised-lg hover:brightness-95 active:shadow-neu-pressed"
     >
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
         <path d="M12 3C6.48 3 2 6.48 2 10.8c0 2.76 1.85 5.19 4.63 6.58-.2.75-.73 2.73-.84 3.15-.13.53.19.52.4.38.17-.11 2.66-1.81 3.74-2.55.68.1 1.38.15 2.07.15 5.52 0 10-3.48 10-7.71C22 6.48 17.52 3 12 3z" />
