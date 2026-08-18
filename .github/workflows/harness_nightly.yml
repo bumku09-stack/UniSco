@@ -38,9 +38,10 @@ jobs:
         run: |
           pip install -r harness/requirements.txt
           playwright install --with-deps chromium
-          # 이미지 첨부파일 OCR용(supabase/tools/extract_text.py 재사용, harness/README.md
-          # "알려진 한계" 참고) — 이 패키지 없이는 이미지 첨부파일만 조용히 스킵되고 있었음.
-          sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-kor
+          # 이미지 첨부파일 OCR + PDF 첨부파일용(supabase/tools/extract_text.py 재사용,
+          # harness/README.md "알려진 한계" 참고) — 이 패키지들 없이는 이미지/PDF 첨부파일만
+          # 조용히 스킵되고 있었음. poppler-utils는 2026-08-18 PDF 지원 추가 시 같이 넣음.
+          sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-kor poppler-utils
 
       - name: git 커밋 아이덴티티 설정
         run: |

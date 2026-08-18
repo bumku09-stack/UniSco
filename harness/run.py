@@ -26,7 +26,7 @@ from harness.models import CollectionResult, Listing, VerifiedScholarship
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ROTATION_STATE_PATH = REPO_ROOT / "harness" / "state" / "rotation.json"
 
-_ATTACHMENT_EXTS = {".hwp", ".hwpx", ".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
+_ATTACHMENT_EXTS = {".hwp", ".hwpx", ".pdf", ".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
 
 
 def _log(msg: str) -> None:
@@ -36,15 +36,17 @@ def _log(msg: str) -> None:
 def fetch_source_text(listing: Listing) -> str | None:
     """게시글 상세페이지 또는 첨부파일에서 원문 텍스트를 뽑음.
 
-    URL 확장자로 첨부파일(HWP/HWPX/이미지)인지 HTML 상세페이지인지 구분함 — 첨부파일이면
+    URL 확장자로 첨부파일(HWP/HWPX/PDF/이미지)인지 HTML 상세페이지인지 구분함 — 첨부파일이면
     기존 supabase/tools/extract_text.py를 그대로 재사용함(신규 구현 안 함). HTML이면 bs4로
     태그만 벗겨낸 텍스트를 씀. 어느 쪽이든 실패하면 None을 반환하고 이 항목만 건너뛰며 로그를
     남김 — 파이프라인 전체를 죽이지 않음.
 
     주의: extract_text.py의 이미지 OCR은 TESSERACT_EXE/TESSDATA_DIR이 데이터 입력을 맡은
     친구분 Windows 컴퓨터 경로로 하드코딩돼 있어서, Linux인 GitHub Actions 러너에서는 이미지
-    첨부파일만 실패함(HWP/HWPX는 문제없음) — extract_text.py 자체는 건드리지 않고 이 함수가
-    그 실패를 흡수해서 해당 항목만 스킵/로그로 남김.
+    첨부파일만 실패함(HWP/HWPX/PDF는 문제없음) — extract_text.py 자체는 건드리지 않고 이 함수가
+    그 실패를 흡수해서 해당 항목만 스킵/로그로 남김. PDF는 poppler(pdftotext)가 있어야 동작 —
+    로컬은 `brew install poppler`, CI는 harness_nightly.yml이 apt로 설치(아래 참고). 텍스트
+    레이어 없는 스캔 이미지 PDF는 여전히 미지원(extract_text.py의 extract_pdf() 참고).
     """
     ext = Path(urlparse(listing.url).path).suffix.lower()
 
