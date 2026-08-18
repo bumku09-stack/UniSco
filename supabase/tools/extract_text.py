@@ -38,7 +38,16 @@ def extract_hwp(path: Path) -> str:
     )
     if result.returncode != 0:
         raise RuntimeError(f"hwp5txt 실패: {result.stderr}")
-    return result.stdout
+    text = result.stdout
+    if not text.strip():
+        # 2026-08-18 발견 — pyhwp(0.1b15, 마지막 업데이트가 오래됨)가 특정 HWP5 파일에서
+        # 에러 없이 빈 문자열만 돌려주는 경우가 실제로 있었음(신형 한글 버전이 만든 파일의
+        # 내부 구조 변형을 이 구버전 파서가 못 읽는 것으로 추정). extract_pdf()와 동일한
+        # 이유로 여기서도 명시적 실패 처리 — 안 그러면 "원문 확보 성공, 근데 빈 텍스트"가
+        # 호출부(run.py/reverify.py)에 그대로 넘어가서 "원문에 근거 없음"으로 잘못
+        # 해석되거나(사실은 우리 파서가 실패한 것뿐인데) LLM에 빈 문서를 넘기게 됨.
+        raise RuntimeError("추출된 텍스트가 비어있음(구버전 pyhwp 파서 한계로 추정)")
+    return text
 
 
 def extract_hwpx(path: Path) -> str:
