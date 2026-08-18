@@ -176,7 +176,7 @@ export default function HomePage() {
             className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="text-sm font-bold text-gray-900">⚠️ 이 결과, 저장 안 돼있어요</p>
+            <p className="text-sm font-bold text-gray-900">⚠️ 아직 저장되지 않았어요</p>
             <p className="mt-1.5 text-xs leading-relaxed text-gray-500">
               새로고침하거나 창을 닫으면 사라져요. 정보를 저장하고
               싶으면 회원가입 후 상세 정보를 입력해주세요.
