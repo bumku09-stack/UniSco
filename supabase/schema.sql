@@ -73,6 +73,12 @@ CREATE TABLE scholarship (
     max_income_bracket INTEGER,
     min_gpa FLOAT,
     min_gpa_basis gpabasis,  -- 2026-08-02 추가
+    -- 2026-08-18 추가 — min_gpa(4.5만점 GPA)와 별개 축. 일부 외부(재단) 장학금은 성적조건을
+    -- GPA가 아니라 100점 만점 백분위/백분율 점수로 걺("전체학기 평점 백분위 90점 이상" 등).
+    -- 학생의 GPA를 본인 대학 만점 기준으로 100점 환산해서 비교(core/matching.py의
+    -- normalized_percentile() 참고) — 공식 등급→백분율 환산표가 아니라 만점 대비 비율로
+    -- 근사한 값이라는 한계 있음(사용자 확인 후 채택, 2026-08-18).
+    min_score_percentile FLOAT,
     requires_disability BOOLEAN,
     required_disability_type disabilitytype,  -- 2026-08-03 추가
     foreigner_eligibility foreignereligibility,

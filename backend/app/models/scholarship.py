@@ -56,6 +56,11 @@ class Scholarship(SQLModel, table=True):
     min_gpa_basis: GpaBasis | None = Field(
         default=None, sa_type=enum_column(GpaBasis)
     )  # 이 min_gpa가 직전학기/전체누적 중 어느 기준인지. None=미지정(둘 중 하나만 만족해도 통과)
+    # 2026-08-18 추가 — min_gpa(4.5만점)와 별개 축. 일부 외부 재단 장학금은 성적조건을
+    # 100점 만점 백분위/백분율로 걺(예: "평점 백분위 90점 이상"). 학생 GPA를 본인 대학
+    # 만점 기준으로 100점 환산해서 비교(core/matching.py의 normalized_percentile()).
+    # 공식 등급-백분율 환산표가 아니라 만점 대비 비율로 근사한 값이라는 한계가 있음.
+    min_score_percentile: float | None = None
     requires_disability: bool | None = None  # None=무관, True=장애인 한정
     required_disability_type: DisabilityType | None = Field(
         default=None, sa_type=enum_column(DisabilityType)

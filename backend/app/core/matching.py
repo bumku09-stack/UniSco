@@ -50,6 +50,16 @@ def normalized_gpa(gpa: float, university: str) -> float:
     return gpa * (4.5 / scale)
 
 
+def normalized_percentile(gpa: float, university: str) -> float:
+    """학생 GPA를 본인 대학 만점 기준 100점 환산 비율로 바꿈(2026-08-18, 외부 재단
+    장학금 중 "백분위 90점 이상"처럼 GPA가 아니라 100점제로 조건을 거는 경우용).
+    normalized_gpa와 같은 UNIVERSITY_GPA_SCALE을 쓰되 4.5가 아니라 100을 기준으로 함 —
+    공식 등급→백분율 환산표가 아니라 만점 대비 비율 근사치라는 한계가 있음(사용자 확인,
+    matching_gaps.md 참고)."""
+    scale = UNIVERSITY_GPA_SCALE.get(university, DEFAULT_GPA_SCALE)
+    return (gpa / scale) * 100
+
+
 def gpa_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
     """min_gpa_basis가 직전학기/전체누적 중 무엇을 요구하는지에 따라 그쪽 GPA만 비교함
     (2026-08-02 추가 — matching_gaps.md 13번, 우송대 재검증 중 발견). 아직 basis를
@@ -74,6 +84,20 @@ def gpa_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
     return (
         normalized_gpa(spec.semester_gpa, spec.university) >= threshold
         or normalized_gpa(spec.cumulative_gpa, spec.university) >= threshold
+    )
+
+
+def percentile_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
+    """min_score_percentile(100점 만점 백분위 조건, 2026-08-18 추가) 체크. gpa_matches의
+    basis-미지정 케이스와 동일한 관대한 기본값(직전학기·전체누적 중 하나만 만족해도 통과)
+    만 씀 — 이 필드를 쓰는 장학금들이 원문에 직전학기/누적 구분을 명시하지 않는 경우가
+    대부분이라 별도 basis 필드는 아직 안 둠."""
+    if scholarship.min_score_percentile is None:
+        return True
+    threshold = scholarship.min_score_percentile
+    return (
+        normalized_percentile(spec.semester_gpa, spec.university) >= threshold
+        or normalized_percentile(spec.cumulative_gpa, spec.university) >= threshold
     )
 
 
@@ -506,6 +530,8 @@ def is_eligible(scholarship: Scholarship, spec: UserSpec) -> bool:
     ):
         return False
     if not gpa_matches(scholarship, spec):
+        return False
+    if not percentile_matches(scholarship, spec):
         return False
     if not credits_matches(scholarship, spec):
         return False
