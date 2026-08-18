@@ -8,3 +8,15 @@ lxml
 playwright
 rapidfuzz
 psycopg2-binary
+
+# 2026-08-18 추가 — supabase/tools/extract_text.py(첨부파일 원문 추출, run.py가 재사용)가
+# 쓰는데 여기 빠져 있던 걸 발견함: HWP(pyhwp)/이미지 OCR(pytesseract, Pillow) 둘 다 이
+# 목록에 없어서, 로컬 venv든 harness_nightly.yml의 CI든 pip install만으로는 ModuleNotFoundError로
+# 죽었을 것 — 2026-08-15 "이미지 OCR CI에서도 되게 고침" 커밋은 apt tesseract-ocr 설치와
+# TESSERACT_EXE 환경변수만 다뤘고, 이 파이썬 패키지 자체가 없다는 건 못 잡았던 걸로 보임
+# (사람이 실제로 이미지/HWP 첨부파일이 있는 게시판을 온보딩해서 나이트런을 돌려본 적이
+# 없어서 지금까지 안 드러났을 가능성). pyhwp는 six를 자체 의존성으로 선언 안 해서 따로 추가.
+pyhwp
+six
+pytesseract
+Pillow

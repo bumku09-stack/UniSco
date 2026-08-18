@@ -196,13 +196,19 @@ try/except를 갖고 있어서(2026-08-10, 배치 전체가 안 죽게 하려고
 
 ## 알려진 한계
 
-- **이미지 첨부파일 OCR — 2026-08-15 GitHub Actions(Linux)에서도 되게 고침.** 기존
-  `supabase/tools/extract_text.py`의 `TESSERACT_EXE`/`TESSDATA_DIR`가 데이터 입력을 맡은
-  친구분 Windows 컴퓨터 경로로 하드코딩돼 있던 걸, 그 기본값은 그대로 두고 env var로
-  오버라이드만 가능하게 열었음(그 친구분 로컬 워크플로는 그대로 안 건드림). CI는 apt로
+- **이미지/HWP 첨부파일 — 2026-08-15에 OS 레벨(apt tesseract-ocr) 설정은 고쳤다고 여겼는데,
+  2026-08-18에 실제로 첨부파일 하나를 끝까지 재검증해보다가 더 근본적인 구멍을 발견함:
+  `harness/requirements.txt`에 `pyhwp`/`pytesseract`/`Pillow`/`six` 자체가 아예 안 들어있어서,
+  로컬이든 CI든 `pip install -r requirements.txt`만으로는 HWP·이미지 첨부파일을 만나는 순간
+  `ModuleNotFoundError`로 죽었을 것(사람이 실제로 그런 첨부파일 있는 게시판을 나이트런으로
+  돌려본 적이 없어서 여태 안 드러났던 걸로 보임). 2026-08-15의 apt 설치 + env var 수정은
+  맞는 방향이었지만 "OS 바이너리는 있는데 그걸 부르는 파이썬 패키지가 없는" 절반짜리
+  수정이었음 — 이번에 네 패키지를 전부 `requirements.txt`에 추가하고 빈 venv에 설치해서
+  4개 다 정상 import되는 것까지 확인함. `TESSERACT_EXE`/`TESSDATA_DIR`는 여전히 env var로
+  오버라이드 가능(데이터 입력 담당자 Windows 로컬 기본값은 안 건드림), CI는 apt로
   `tesseract-ocr`/`tesseract-ocr-kor`를 설치하고 `TESSERACT_EXE=tesseract`,
   `TESSDATA_DIR=""`를 넘겨서 씀 — `run.py`는 여전히 실패를 잡아서 해당 항목만 스킵하는
-  방어 로직을 유지(다른 원인의 OCR 실패까지 파이프라인 전체를 죽이면 안 되므로).
+  방어 로직을 유지(다른 원인의 OCR/HWP 실패까지 파이프라인 전체를 죽이면 안 되므로).
 - **dedup 시점의 "이름"은 게시글 제목**임 (설계안 3단계가 LLM 추출 이전이라 아직 정식
   명칭이 없음) — 장학금 정식 명칭과 게시글 제목이 많이 다르면 놓칠 수 있음. 애매하면 그냥
   통과시켜서 LLM 추출까지 가게 두는 쪽으로 설계함(과다매칭이 과소매칭보다 낫다는 기존 원칙과
