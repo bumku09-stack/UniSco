@@ -90,7 +90,7 @@ export default function SignupPage() {
 
   return (
     <AuthShell>
-      <AuthLogo />
+      <AuthLogo href="/" />
 
       {step === "signup" ? (
         <>
