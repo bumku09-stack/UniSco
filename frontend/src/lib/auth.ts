@@ -93,6 +93,19 @@ export async function postJson(
   }
 }
 
+// 회원가입 폼의 "중복확인" 버튼용 — 성공/사용중/에러 세 갈래만 구분하면 돼서 postJson처럼
+// detail 메시지를 그대로 살릴 필요가 없음, 그래서 별도로 뽑음.
+export async function checkUsernameAvailable(username: string): Promise<"available" | "taken" | "error"> {
+  try {
+    const res = await fetch(apiUrl(`/auth/check-username?username=${encodeURIComponent(username)}`));
+    if (!res.ok) return "error";
+    const data = await res.json();
+    return data.available ? "available" : "taken";
+  } catch {
+    return "error";
+  }
+}
+
 function authHeaders(token: string | null, extra?: HeadersInit): HeadersInit {
   return { ...(extra ?? {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 }

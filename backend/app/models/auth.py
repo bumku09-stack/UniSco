@@ -11,6 +11,10 @@ class SignupResponse(BaseModel):
     message: str = "인증 코드를 이메일로 보냈습니다."
 
 
+class CheckUsernameResponse(BaseModel):
+    available: bool
+
+
 class VerifyCodeRequest(BaseModel):
     identifier: str  # username 또는 email
     code: str = Field(min_length=6, max_length=6)

@@ -1,7 +1,7 @@
 import secrets
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
 
 from app.core.email import send_password_reset_code, send_verification_code
@@ -16,6 +16,7 @@ from app.core.security import (
 )
 from app.db.session import get_session
 from app.models import (
+    CheckUsernameResponse,
     EmailVerification,
     ForgotPasswordRequest,
     ForgotPasswordResponse,
@@ -147,6 +148,17 @@ def _consume_code(
 
     row.is_used = True
     return row
+
+
+@router.get("/check-username", response_model=CheckUsernameResponse)
+def check_username(
+    username: str = Query(min_length=3, max_length=32), session: Session = Depends(get_session)
+):
+    """회원가입 폼에서 아이디 입력 즉시 중복 여부만 확인하는 용도 — 별도 인증/rate limit
+    없음(이메일을 새로 발송하는 resend-code/forgot-password와 달리 스팸 비용이 없고, 어차피
+    signup 자체가 409로 같은 정보를 이미 노출함)."""
+    exists = session.exec(select(User).where(User.username == username)).first() is not None
+    return CheckUsernameResponse(available=not exists)
 
 
 @router.post("/signup", response_model=SignupResponse)

@@ -1,4 +1,5 @@
 from app.models.auth import (
+    CheckUsernameResponse,
     DeleteAccountRequest,
     ForgotPasswordRequest,
     ForgotPasswordResponse,
@@ -41,6 +42,7 @@ __all__ = [
     "AdmissionTrack",
     "CategoryL1",
     "CategoryL2",
+    "CheckUsernameResponse",
     "DegreeLevel",
     "DeleteAccountRequest",
     "DisabilityType",
