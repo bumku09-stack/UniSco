@@ -58,17 +58,96 @@ export function kakaoRedirectUri(): string {
   return `${window.location.origin}/login/kakao/callback`;
 }
 
+const KAKAO_STATE_STORAGE_KEY = "kakao_oauth_state";
+
 // 카카오 인가(로그인 동의) 화면으로 보낼 URL. redirect_uri는 카카오 디벨로퍼스에 등록해둔
 // 값과 정확히 일치해야 하며, 그 URI로 카카오가 ?code=...를 붙여서 되돌려보내면
 // app/login/kakao/callback/page.tsx가 받아서 POST /auth/kakao로 넘김.
+//
+// state는 CSRF 방지용(2026-08-21 추가) — 로그인을 시작한 이 브라우저가 실제로 콜백을
+// 받는 그 브라우저가 맞는지 확인하는 1회용 값. 여기서 랜덤하게 만들어 카카오한테 그대로
+// 보내는 동시에, 이 브라우저 안(sessionStorage)에만 저장해둠 — 서버로는 안 보냄. 공격자가
+// 자기 계정용으로 미리 받아둔 code를 피해자한테 링크로 심어 콜백 페이지를 직접 열게 만드는
+// 로그인 CSRF를 막기 위함(consumeKakaoState 참고).
 export function kakaoAuthorizeUrl(): string {
   const clientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
+  const state = crypto.randomUUID();
+  sessionStorage.setItem(KAKAO_STATE_STORAGE_KEY, state);
   const params = new URLSearchParams({
     client_id: clientId ?? "",
     redirect_uri: kakaoRedirectUri(),
     response_type: "code",
+    state,
   });
   return `https://kauth.kakao.com/oauth/authorize?${params.toString()}`;
+}
+
+// 콜백 단계(app/login/kakao/callback/page.tsx)에서, 카카오가 돌려준 state가 로그인 시작 시
+// 이 브라우저가 저장해둔 값과 같은지 확인함. 1회용이라 결과와 무관하게 바로 지움 — 같은
+// 콜백 URL을 새로고침/재방문해도 두 번째부터는 항상 실패하게(replay 방지).
+export function consumeKakaoState(returnedState: string | null): boolean {
+  const saved = sessionStorage.getItem(KAKAO_STATE_STORAGE_KEY);
+  sessionStorage.removeItem(KAKAO_STATE_STORAGE_KEY);
+  return saved !== null && returnedState === saved;
+}
+
+// 비밀번호 규칙(2026-08-21 추가) — 백엔드 models/auth.py의 _validate_password_complexity와
+// 같은 규칙(영문+숫자+특수문자 필수, 8자 이상)을 프론트에서도 미리 검사해서, 서버까지 갔다가
+// 에러 받는 대신 제출 전에 바로 안내함. 통과하면 null, 아니면 안내 문구를 돌려줌.
+export function passwordRequirementError(password: string): string | null {
+  if (password.length < 8) return "비밀번호는 8자 이상이어야 해요.";
+  const hasLetter = /[A-Za-z]/.test(password);
+  const hasDigit = /\d/.test(password);
+  const hasSpecial = /[^A-Za-z0-9]/.test(password);
+  if (!hasLetter || !hasDigit || !hasSpecial) {
+    return "비밀번호는 영문, 숫자, 특수문자를 모두 포함해야 해요.";
+  }
+  return null;
+}
+
+export type PasswordStrengthLevel = "empty" | "weak" | "medium" | "strong" | "very-strong";
+
+export interface PasswordStrength {
+  score: number; // 0~5, 만족한 체크 항목 개수
+  level: PasswordStrengthLevel;
+  label: string;
+}
+
+// 규칙 기반 강도 계산(2026-08-21 추가) — 실제 필수 통과 조건(영문+숫자+특수문자+8자)보다
+// 더 세분화된 체크리스트 5개를 두고, 몇 개를 만족하는지 개수만 세는 방식. 타이핑할 때마다
+// (매 keystroke) 즉시 다시 계산해도 부담 없을 만큼 가벼움 — zxcvbn 같은 사전 기반 라이브러리는
+// 안 씀(이 프로젝트 규모엔 과함, lib/auth.ts에 룰만 추가하는 게 더 단순함).
+export function passwordStrength(password: string): PasswordStrength {
+  if (password.length === 0) return { score: 0, level: "empty", label: "" };
+
+  const checks = [
+    password.length >= 8,
+    password.length >= 12,
+    /[A-Za-z]/.test(password),
+    /\d/.test(password),
+    /[^A-Za-z0-9]/.test(password),
+  ];
+  const score = checks.filter(Boolean).length;
+
+  if (score <= 2) return { score, level: "weak", label: "약함" };
+  if (score === 3) return { score, level: "medium", label: "보통" };
+  if (score === 4) return { score, level: "strong", label: "강함" };
+  return { score, level: "very-strong", label: "매우 강함" };
+}
+
+// 아이디 중복확인(2026-08-21 추가) — GET /auth/check-username 호출. true/false/null 중
+// null은 "네트워크 오류 등으로 확인 자체가 실패함"을 뜻함(사용 가능/불가능과는 다른 상태라
+// 호출부가 따로 안내 문구를 보여줘야 함). 최종 방어선인 signup()의 409 에러는 여전히
+// 살아있으니(레이스 컨디션 대비), 이 함수는 어디까지나 제출 전 사전 안내용.
+export async function checkUsernameAvailable(username: string): Promise<boolean | null> {
+  try {
+    const res = await fetch(apiUrl(`/auth/check-username?username=${encodeURIComponent(username)}`));
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.available === true;
+  } catch {
+    return null;
+  }
 }
 
 // 로그인 전(회원가입/로그인/이메일인증/재발송) 호출용 — 토큰이 아직 없어서 authFetch를 못 씀.

@@ -41,7 +41,6 @@ def _raise_with_kakao_detail(e: requests.RequestException, context: str) -> None
 @dataclass
 class KakaoUser:
     kakao_id: str
-    nickname: str | None
     # 카카오가 이메일을 아예 안 줬으면 None(동의항목 미허용 등). 카카오는 이메일을 줄 때만
     # is_email_verified를 같이 주는데, 우리 쪽에서 그 값을 신뢰해서 기존 계정과 자동으로
     # 연결하는 데 쓰므로(api/auth.py 참고) 검증 안 된 이메일은 email 자체를 None으로 버림 —
@@ -105,7 +104,6 @@ def fetch_kakao_user(kakao_access_token: str) -> KakaoUser:
         raise KakaoAuthError("카카오 응답에 id가 없습니다.")
 
     account = data.get("kakao_account") or {}
-    profile = account.get("profile") or {}
     email = account.get("email") if account.get("is_email_verified") else None
 
-    return KakaoUser(kakao_id=str(kakao_id), nickname=profile.get("nickname"), email=email)
+    return KakaoUser(kakao_id=str(kakao_id), email=email)

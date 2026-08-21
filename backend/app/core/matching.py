@@ -412,6 +412,10 @@ _ALT_GROUP_FIELD_DEFAULTS: dict[str, object] = {
     "required_gender": None,
     "eligible_region": None,
     "required_military_status": None,
+    # required_military_status(군필 여부)는 이미 그룹별로 리셋되는데 그 세부구분만 공통
+    # 취급되면 앞뒤가 안 맞아서 같이 추가함(2026-08-21, min_age와 같은 종류의 누락 위험을
+    # 미리 막음 — 지금 당장 이 조합을 쓰는 실제 데이터는 없음, 예방 차원).
+    "required_discharge_type": None,
     "max_income_bracket": None,
     "min_gpa": None,
     "min_gpa_basis": None,
@@ -461,7 +465,18 @@ class _AltGroupShadow:
 
 def _group_shadow(scholarship: Scholarship, group: dict) -> Scholarship:
     """group에 없는 alt-group 대상 필드는 "제한 없음"으로 리셋하고, group에 있는 값만
-    덮어씌운 뷰를 만듦 — 그룹별로 독립적인 자격조건 세트를 만들기 위함."""
+    덮어씌운 뷰를 만듦 — 그룹별로 독립적인 자격조건 세트를 만들기 위함.
+
+    group의 키가 _ALT_GROUP_FIELD_DEFAULTS에 없으면(오타 등) ValueError를 던짐(2026-08-21
+    추가) — 예전엔 모르는 키를 그냥 조용히 버려서, 예를 들어 "major"를 "majors"로 오타
+    내면 그 조건이 아예 없는 셈 치고 통과시키면서도 아무 에러 없이 넘어갔음(과다매칭을
+    유발하는데 아무도 눈치챌 방법이 없었음) — 데이터 입력 시점에 바로 걸러지도록 함."""
+    unknown_keys = set(group) - set(_ALT_GROUP_FIELD_DEFAULTS)
+    if unknown_keys:
+        raise ValueError(
+            f"eligibility_alt_groups에 알 수 없는 필드 이름(id={scholarship.id}): "
+            f"{sorted(unknown_keys)} — 오타이거나 _ALT_GROUP_FIELD_DEFAULTS에 등록 안 된 필드"
+        )
     overrides = {
         field: group.get(field, neutral) for field, neutral in _ALT_GROUP_FIELD_DEFAULTS.items()
     }
@@ -634,6 +649,40 @@ def unverifiable_condition_count(scholarship: Scholarship, spec: UserSpec) -> in
     return count
 
 
+def _fit_score(scholarship: Scholarship, spec: UserSpec) -> tuple[float, int]:
+    """personal_fit_key와 동일한 (ratio, confirmed) 계산 — _best_matching_group_shadow가
+    후보 그룹들을 personal_fit_key와 같은 기준으로 비교하기 위해 분리함."""
+    confirmed = confirmed_match_count(scholarship, spec)
+    unverifiable = unverifiable_condition_count(scholarship, spec)
+    total = confirmed + unverifiable
+    ratio = confirmed / total if total > 0 else 1.0
+    return (ratio, confirmed)
+
+
+def _best_matching_group_shadow(scholarship: Scholarship, spec: UserSpec) -> Scholarship:
+    """eligibility_alt_groups(OR 조건) 장학금의 랭킹 계산용 뷰를 고름(2026-08-21 추가).
+
+    confirmed_match_count/unverifiable_condition_count는 항상 scholarship "본체"의 필드만
+    읽는데, alt_groups 컨벤션상 본체는 대부분 비워두고 조건은 그룹 안에만 넣음 — 그래서 학생이
+    그룹 하나를 완벽히 만족해도 랭킹 계산은 "본체에 조건이 하나도 없네"로 착각해서 항상 낮은
+    점수를 매김. 학생이 실제로 통과하는 그룹들 중, personal_fit_key와 똑같은 기준(_fit_score:
+    ratio 먼저, confirmed 나중)으로 가장 좋은 점수가 나오는 그룹을 골라 그 뷰를 대신 씀 —
+    "확인 개수만 많은 그룹"이 아니라 "실제 순위 계산 기준으로 제일 좋은 그룹"을 고르는 것이
+    핵심(단순히 confirmed 개수만 비교하면 ratio가 더 높은 다른 그룹을 놓칠 수 있음).
+
+    eligibility_alt_groups가 없으면 원본 scholarship 그대로 반환(기존 646건+ 동작 변화 없음)."""
+    if not scholarship.eligibility_alt_groups:
+        return scholarship
+    matching_shadows = [
+        shadow
+        for group in scholarship.eligibility_alt_groups
+        if is_eligible(shadow := _group_shadow(scholarship, group), spec)
+    ]
+    if not matching_shadows:
+        return scholarship  # 방어용 — is_eligible을 이미 통과한 장학금만 여기 오므로 이론상 항상 1개 이상 있음
+    return max(matching_shadows, key=lambda s: _fit_score(s, spec))
+
+
 def personal_fit_key(scholarship: Scholarship, spec: UserSpec) -> tuple[float, int]:
     """랭킹 정렬 키. (ratio, confirmed) 튜플을 둘 다 내림차순으로 정렬함.
 
@@ -642,12 +691,11 @@ def personal_fit_key(scholarship: Scholarship, spec: UserSpec) -> tuple[float, i
     건 조건은 다 확인된 것이므로), 그 안에서는 confirmed 값으로 순위가 갈림. "확인 불가"
     조건이 하나라도 있으면 분모만 커져서 ratio가 1.0 밑으로 내려가 자동으로 뒤로 밀림 —
     "확인된 것끼리는 개수로, 확인 안 되는 게 섞이면 무조건 그 아래로" 규칙을 하나의 정렬
-    키로 표현한 것."""
-    confirmed = confirmed_match_count(scholarship, spec)
-    unverifiable = unverifiable_condition_count(scholarship, spec)
-    total = confirmed + unverifiable
-    ratio = confirmed / total if total > 0 else 1.0
-    return (ratio, confirmed)
+    키로 표현한 것.
+
+    eligibility_alt_groups 장학금은 본체 대신 _best_matching_group_shadow로 고른 그룹
+    기준으로 점수를 매김(2026-08-21) — 이유는 그 함수 docstring 참고."""
+    return _fit_score(_best_matching_group_shadow(scholarship, spec), spec)
 
 
 def match_scholarships(scholarships: list[Scholarship], spec: UserSpec) -> list[Scholarship]:

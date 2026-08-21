@@ -12,8 +12,12 @@ import {
   authSecondaryButtonClass,
   AuthShell,
   KakaoLoginButton,
+  PasswordMatchHint,
+  PasswordStrengthMeter,
 } from "@/components/auth-ui";
-import { kakaoAuthorizeUrl, postJson } from "@/lib/auth";
+import { checkUsernameAvailable, kakaoAuthorizeUrl, passwordRequirementError, postJson } from "@/lib/auth";
+
+type UsernameCheckStatus = "idle" | "checking" | "available" | "taken" | "error";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -21,17 +25,56 @@ export default function SignupPage() {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
+
+  // 아이디 중복확인(2026-08-21 추가) — "확인한 값"을 따로 저장해서, 확인 버튼 누른 뒤에
+  // 아이디를 다시 고치면 checkedUsername !== username이 되어 자동으로 재확인을 요구함.
+  const [usernameCheckStatus, setUsernameCheckStatus] = useState<UsernameCheckStatus>("idle");
+  const [checkedUsername, setCheckedUsername] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  async function handleCheckUsername() {
+    if (username.length < 3) {
+      setUsernameCheckStatus("error");
+      setError("아이디는 3자 이상이어야 해요.");
+      return;
+    }
+    setError(null);
+    setUsernameCheckStatus("checking");
+    const available = await checkUsernameAvailable(username);
+    setCheckedUsername(username);
+    if (available === null) {
+      setUsernameCheckStatus("error");
+    } else {
+      setUsernameCheckStatus(available ? "available" : "taken");
+    }
+  }
+
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setError(null);
+
+    if (usernameCheckStatus !== "available" || checkedUsername !== username) {
+      setError("아이디 중복확인을 먼저 해주세요.");
+      return;
+    }
+
+    const requirementError = passwordRequirementError(password);
+    if (requirementError) {
+      setError(requirementError);
+      return;
+    }
+    if (password !== passwordConfirm) {
+      setError("비밀번호가 서로 일치하지 않아요.");
+      return;
+    }
+
+    setLoading(true);
     const result = await postJson("/auth/signup", { username, password, email }, "회원가입에 실패했어요.");
     setLoading(false);
     if (!result.ok) {
@@ -84,24 +127,67 @@ export default function SignupPage() {
           </p>
 
           <form onSubmit={handleSignup} className="mt-10 flex flex-col gap-3">
-            <input
-              type="text"
-              required
-              minLength={3}
-              placeholder="아이디"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className={authInputClass}
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                required
+                minLength={3}
+                maxLength={32}
+                placeholder="아이디"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className={authInputClass}
+              />
+              <button
+                type="button"
+                onClick={handleCheckUsername}
+                disabled={usernameCheckStatus === "checking" || username.length < 3}
+                className="shrink-0 rounded-2xl border border-gray-200 px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
+              >
+                {usernameCheckStatus === "checking" ? "확인 중..." : "중복확인"}
+              </button>
+            </div>
+            {checkedUsername === username && usernameCheckStatus === "available" && (
+              <p className="-mt-1 px-1 text-xs font-semibold text-green-600">
+                사용 가능한 아이디예요
+              </p>
+            )}
+            {checkedUsername === username && usernameCheckStatus === "taken" && (
+              <p className="-mt-1 px-1 text-xs font-semibold text-red-500">
+                이미 사용 중인 아이디예요
+              </p>
+            )}
+            {checkedUsername === username && usernameCheckStatus === "error" && (
+              <p className="-mt-1 px-1 text-xs font-semibold text-gray-400">
+                확인에 실패했어요. 다시 시도해주세요.
+              </p>
+            )}
             <input
               type="password"
               required
               minLength={8}
-              placeholder="비밀번호 (8자 이상)"
+              placeholder="비밀번호 (영문+숫자+특수문자, 8자 이상)"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className={authInputClass}
             />
+            <PasswordStrengthMeter password={password} />
+            <input
+              type="password"
+              required
+              minLength={8}
+              placeholder="비밀번호 확인"
+              value={passwordConfirm}
+              onChange={(e) => setPasswordConfirm(e.target.value)}
+              className={`${authInputClass} ${
+                passwordConfirm.length === 0
+                  ? ""
+                  : passwordConfirm === password
+                    ? "ring-2 ring-green-500"
+                    : "ring-2 ring-red-400"
+              }`}
+            />
+            <PasswordMatchHint password={password} confirm={passwordConfirm} />
             <input
               type="email"
               required

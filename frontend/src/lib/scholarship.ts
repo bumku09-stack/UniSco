@@ -53,6 +53,13 @@ export type Scholarship = {
   min_credits_last_semester: number | null;
   admission_score_condition: string | null;
   headcount: string | null;
+  // 2026-08-21 추가 — 여러 조건 중 하나만 만족하면 통과하는 OR 그룹(core/matching.py의
+  // alt_groups_match() 참고). 각 그룹은 이 표의 다른 필드와 같은 이름의 키를 담은 부분 객체
+  // (예: [{language_test_type: "TOEFL", language_test_min_score: 90}, {...}]) — 실제
+  // 필터링(백엔드)엔 이미 2026-08-14부터 쓰이고 있었는데, 화면(conditionParts)이 이 필드를
+  // 몰라서 파란 점에 아예 안 보이던 버그를 여기서 같이 고침(major/min_credits_last_semester와
+  // 동일한 종류의 반복 버그 — eligibilityParts 참고).
+  eligibility_alt_groups: Record<string, unknown>[] | null;
 };
 
 export function formatAmount(amount: number | null) {
@@ -145,7 +152,13 @@ function formatRange(min: number | null, max: number | null, unit: string): stri
 // 대학 학생은 자기 학점표랑 숫자가 안 맞아서 헷갈림. 학생이 스펙에 대학을 등록해뒀으면
 // (viewerGpaScale로 전달됨) 그 대학 기준으로 환산해서 보여주고, 모르면 기존처럼 4.5만점
 // 기준 그대로 보여줌.
-function eligibilityParts(s: Scholarship, viewerGpaScale?: number): string[] {
+// eligibilityParts와 그룹 표시(altGroupsText) 둘 다 재사용 — 장학금 "몸통"이든
+// eligibility_alt_groups의 그룹 하나든 같은 모양(부분 객체)이면 똑같은 필드 판독 로직을
+// 그대로 쓰게 뜯어냄(2026-08-21). 예전엔 이 로직이 몸통 하나만 받게 짜여있어서, 새 필드가
+// 생길 때마다(major, min_credits_last_semester 등 — 아래 주석 참고) 몸통 표시만 챙기고
+// 그룹 표시는 깜빡하는 사고가 반복됐음 — 로직을 하나로 합쳐서 필드 하나만 추가하면 몸통·
+// 그룹 둘 다 자동으로 반영되게 함.
+function conditionParts(s: Partial<Scholarship>, viewerGpaScale?: number): string[] {
   const parts: string[] = [];
   if (s.eligible_university) parts.push(`대학: ${s.eligible_university}`);
   if (s.eligible_college) parts.push(`단과대: ${s.eligible_college}`);
@@ -160,11 +173,11 @@ function eligibilityParts(s: Scholarship, viewerGpaScale?: number): string[] {
   }
   if (s.required_degree_level) parts.push(`과정: ${DEGREE_LEVEL_LABEL[s.required_degree_level]}`);
   if (s.min_grade != null || s.max_grade != null) {
-    parts.push(`학년: ${formatRange(s.min_grade, s.max_grade, "학년")}`);
+    parts.push(`학년: ${formatRange(s.min_grade ?? null, s.max_grade ?? null, "학년")}`);
   }
   if (s.eligible_region) parts.push(`거주지역: ${s.eligible_region}`);
   if (s.min_age != null || s.max_age != null) {
-    parts.push(`나이: ${formatRange(s.min_age, s.max_age, "세")}`);
+    parts.push(`나이: ${formatRange(s.min_age ?? null, s.max_age ?? null, "세")}`);
   }
   if (s.max_income_bracket != null) parts.push(`소득분위 ${s.max_income_bracket} 이하`);
   if (s.min_gpa != null) {
@@ -201,7 +214,9 @@ function eligibilityParts(s: Scholarship, viewerGpaScale?: number): string[] {
   // 학생이 프로필에서 실제로 선택 가능한 태그만 여기 포함 — UNVERIFIABLE_SPECIAL_STATUS_LABELS에
   // 있는 "확인 불가"(랭킹 전용, 선택 불가) 태그는 여기서 빼고 unverifiableConditionParts()로
   // 따로 뺌(2026-08-11, "parent_occupation_condition"이라는 원본 값 그대로 노출되던 버그 수정).
-  const selectableSpecialStatus = s.required_special_status.filter((v) => v in SPECIAL_STATUS_LABEL_MAP);
+  const selectableSpecialStatus = (s.required_special_status ?? []).filter(
+    (v) => v in SPECIAL_STATUS_LABEL_MAP
+  );
   if (selectableSpecialStatus.length > 0) {
     const labels = selectableSpecialStatus.map((v) => SPECIAL_STATUS_LABEL_MAP[v] ?? v);
     parts.push(`특수상황: ${labels.join(" 또는 ")}`);
@@ -215,6 +230,23 @@ function eligibilityParts(s: Scholarship, viewerGpaScale?: number): string[] {
     parts.push(`이수학점: 직전학기 ${s.min_credits_last_semester}학점 이상`);
   }
   return parts;
+}
+
+// eligibility_alt_groups(OR 조건) 표시 — 그룹 하나하나를 conditionParts로 판독해서 문장으로
+// 만든 뒤 "또는"으로 이어붙임(2026-08-21 추가). 지금까지 이 필드가 화면 어디에도 안 보여서,
+// (a) 다른 조건이 하나라도 있으면 그 OR 조건 자체는 안 뜨고, (b) 이 필드가 유일한 조건인
+// 장학금(예: 소득분위 OR 특수상황만 있는 경우)은 "별도 제한 없음"으로 완전히 잘못 표시되고
+// 있었음 — 실제로 조건이 있는데 없다고 나오는 심각한 정보 오류였음.
+function altGroupsParts(s: Scholarship, viewerGpaScale?: number): string[] {
+  if (!s.eligibility_alt_groups || s.eligibility_alt_groups.length === 0) return [];
+  const groupTexts = s.eligibility_alt_groups
+    .map((group) => conditionParts(group as Partial<Scholarship>, viewerGpaScale).join(" · "))
+    .filter((text) => text.length > 0);
+  return groupTexts.length > 0 ? [groupTexts.join(" 또는 ")] : [];
+}
+
+function eligibilityParts(s: Scholarship, viewerGpaScale?: number): string[] {
+  return [...conditionParts(s, viewerGpaScale), ...altGroupsParts(s, viewerGpaScale)];
 }
 
 const SPECIAL_STATUS_LABEL_MAP: Record<string, string> = Object.fromEntries(

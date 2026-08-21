@@ -11,8 +11,10 @@ import {
   AuthNotice,
   authSecondaryButtonClass,
   AuthShell,
+  PasswordMatchHint,
+  PasswordStrengthMeter,
 } from "@/components/auth-ui";
-import { postJson } from "@/lib/auth";
+import { passwordRequirementError, postJson } from "@/lib/auth";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -21,6 +23,7 @@ export default function ForgotPasswordPage() {
   const [identifier, setIdentifier] = useState("");
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,8 +49,19 @@ export default function ForgotPasswordPage() {
 
   async function handleReset(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setError(null);
+
+    const requirementError = passwordRequirementError(newPassword);
+    if (requirementError) {
+      setError(requirementError);
+      return;
+    }
+    if (newPassword !== newPasswordConfirm) {
+      setError("비밀번호가 서로 일치하지 않아요.");
+      return;
+    }
+
+    setLoading(true);
     const result = await postJson(
       "/auth/reset-password",
       { identifier, code, new_password: newPassword },
@@ -129,11 +143,28 @@ export default function ForgotPasswordPage() {
               type="password"
               required
               minLength={8}
-              placeholder="새 비밀번호 (8자 이상)"
+              placeholder="새 비밀번호 (영문+숫자+특수문자, 8자 이상)"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               className={authInputClass}
             />
+            <PasswordStrengthMeter password={newPassword} />
+            <input
+              type="password"
+              required
+              minLength={8}
+              placeholder="새 비밀번호 확인"
+              value={newPasswordConfirm}
+              onChange={(e) => setNewPasswordConfirm(e.target.value)}
+              className={`${authInputClass} ${
+                newPasswordConfirm.length === 0
+                  ? ""
+                  : newPasswordConfirm === newPassword
+                    ? "ring-2 ring-green-500"
+                    : "ring-2 ring-red-400"
+              }`}
+            />
+            <PasswordMatchHint password={newPassword} confirm={newPasswordConfirm} />
 
             {notice && !error && <AuthNotice>{notice}</AuthNotice>}
             {error && <AuthError>{error}</AuthError>}

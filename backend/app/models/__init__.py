@@ -10,6 +10,7 @@ from app.models.auth import (
     SignupRequest,
     SignupResponse,
     TokenResponse,
+    UsernameAvailabilityResponse,
     VerifyCodeRequest,
 )
 from app.models.enums import (
@@ -70,5 +71,6 @@ __all__ = [
     "TokenResponse",
     "User",
     "UserSpec",
+    "UsernameAvailabilityResponse",
     "VerifyCodeRequest",
 ]

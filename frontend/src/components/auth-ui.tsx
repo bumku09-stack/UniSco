@@ -5,6 +5,7 @@
 // placeholder:text-gray-400 유무) — 실수로 통일하지 말 것, 의도된 차이임.
 
 import Link from "next/link";
+import { passwordStrength } from "@/lib/auth";
 
 export const authInputClass =
   "w-full rounded-2xl bg-gray-100 px-4 py-4 text-[15px] text-gray-900 placeholder:text-gray-400 outline-none transition focus:bg-blue-50 focus:ring-2 focus:ring-blue-500";
@@ -45,6 +46,61 @@ export function AuthLogo({ href }: { href?: string }) {
     );
   }
   return <div className="mb-10 flex items-center gap-2">{content}</div>;
+}
+
+// 5칸짜리 막대바(각 칸 = passwordStrength 체크리스트 5개 중 몇 개 만족했는지) + 색깔 +
+// 라벨(약함/보통/강함/매우 강함). 빈 문자열이면 아무것도 안 그림(입력 전엔 표시할 이유 없음).
+const STRENGTH_BAR_COLOR: Record<string, string> = {
+  weak: "bg-red-400",
+  medium: "bg-amber-400",
+  strong: "bg-lime-500",
+  "very-strong": "bg-green-500",
+};
+
+const STRENGTH_LABEL_COLOR: Record<string, string> = {
+  weak: "text-red-500",
+  medium: "text-amber-500",
+  strong: "text-lime-600",
+  "very-strong": "text-green-600",
+};
+
+export function PasswordStrengthMeter({ password }: { password: string }) {
+  const strength = passwordStrength(password);
+  if (strength.level === "empty") return null;
+
+  const barColor = STRENGTH_BAR_COLOR[strength.level];
+  const labelColor = STRENGTH_LABEL_COLOR[strength.level];
+
+  return (
+    <div className="-mt-1 flex items-center gap-2 px-1">
+      <div className="flex flex-1 gap-1">
+        {Array.from({ length: 5 }, (_, i) => (
+          <div
+            key={i}
+            className={`h-1.5 flex-1 rounded-full transition-colors ${
+              i < strength.score ? barColor : "bg-gray-200"
+            }`}
+          />
+        ))}
+      </div>
+      <span className={`text-xs font-semibold ${labelColor}`}>{strength.label}</span>
+    </div>
+  );
+}
+
+// 비밀번호 확인 칸에 타이핑할 때마다(매 keystroke) 원본 비밀번호와 즉시 비교해서 보여줌
+// (2026-08-21 추가) — 확인 칸이 비어있으면 아직 아무것도 안 쳤다는 뜻이라 표시 안 함.
+export function PasswordMatchHint({ password, confirm }: { password: string; confirm: string }) {
+  if (confirm.length === 0) return null;
+
+  const matches = password === confirm;
+  return (
+    <p
+      className={`-mt-1 px-1 text-xs font-semibold ${matches ? "text-green-600" : "text-red-500"}`}
+    >
+      {matches ? "비밀번호가 일치해요" : "비밀번호가 일치하지 않아요"}
+    </p>
+  );
 }
 
 export function AuthNotice({ children }: { children: React.ReactNode }) {

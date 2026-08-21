@@ -9,11 +9,6 @@ from app.models import SavedScholarship, SavedSpec, Scholarship, User
 router = APIRouter()
 
 
-@router.get("/scholarships", response_model=list[Scholarship])
-def list_scholarships(session: Session = Depends(get_session)):
-    return session.exec(select(Scholarship)).all()
-
-
 @router.get("/scholarships/recommendations", response_model=list[Scholarship])
 def recommendations(
     saved: SavedSpec = Depends(get_saved_spec), session: Session = Depends(get_session)

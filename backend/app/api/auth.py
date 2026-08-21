@@ -1,7 +1,7 @@
 import secrets
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
 
 from app.core.email import send_password_reset_code, send_verification_code
@@ -30,6 +30,7 @@ from app.models import (
     SignupResponse,
     TokenResponse,
     User,
+    UsernameAvailabilityResponse,
     VerifyCodeRequest,
 )
 
@@ -147,6 +148,14 @@ def _consume_code(
 
     row.is_used = True
     return row
+
+
+@router.get("/check-username", response_model=UsernameAvailabilityResponse)
+def check_username(
+    username: str = Query(min_length=3, max_length=32), session: Session = Depends(get_session)
+):
+    exists = session.exec(select(User).where(User.username == username)).first()
+    return UsernameAvailabilityResponse(available=exists is None)
 
 
 @router.post("/signup", response_model=SignupResponse)

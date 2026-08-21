@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { AuthError, AuthLogo, authSecondaryButtonClass, AuthShell } from "@/components/auth-ui";
-import { kakaoRedirectUri, postJson, setTokens } from "@/lib/auth";
+import { consumeKakaoState, kakaoRedirectUri, postJson, setTokens } from "@/lib/auth";
 
 // 카카오가 인가 후 여기로 ?code=...를 붙여서 되돌려보냄(카카오 디벨로퍼스에 등록해둔
 // Redirect URI가 정확히 이 경로여야 함, lib/auth.ts의 kakaoAuthorizeUrl() 참고). 이 코드를
@@ -23,6 +23,12 @@ function KakaoCallbackInner() {
       const code = searchParams.get("code");
       if (!code) {
         setError("카카오 로그인이 취소됐거나 코드가 전달되지 않았어요.");
+        return;
+      }
+      // CSRF 방지(lib/auth.ts의 kakaoAuthorizeUrl/consumeKakaoState 참고) — 이 브라우저가
+      // 실제로 로그인을 시작한 게 맞는지 확인. 실패하면 code를 백엔드로 넘기지 않고 여기서 멈춤.
+      if (!consumeKakaoState(searchParams.get("state"))) {
+        setError("로그인 요청을 확인할 수 없어요. 다시 시도해주세요.");
         return;
       }
       const result = await postJson(

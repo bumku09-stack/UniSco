@@ -1,8 +1,12 @@
 import resend
+from resend.http_client_requests import RequestsClient
 
 from app.core.config import settings
 
 resend.api_key = settings.resend_api_key
+# 기본값(30초)이 kakao.py의 카카오 API 호출(_TIMEOUT_SECONDS=10)보다 훨씬 길어서 20초로
+# 줄임(2026-08-21) — Resend가 응답 없을 때 사용자가 에러를 보기까지 기다리는 최대 시간.
+resend.default_http_client = RequestsClient(timeout=20)
 
 
 # 2026-08-15 — SPF/DKIM/DMARC 다 정상인데도 스팸함으로 가는 문제 점검 중 추가. HTML만 있고
