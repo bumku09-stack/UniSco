@@ -34,7 +34,7 @@ from app.models.saved_scholarship import SavedScholarship
 from app.models.saved_spec import SavedSpec
 from app.models.scholarship import Scholarship
 from app.models.user import EmailVerification, PasswordReset, User
-from app.models.user_spec import SpecStatusResponse, UserSpec
+from app.models.user_spec import LanguageTestEntry, SpecStatusResponse, UserSpec
 
 __all__ = [
     "CATEGORY_L2_BY_L1",
@@ -54,6 +54,7 @@ __all__ = [
     "ForgotPasswordResponse",
     "Gender",
     "GpaBasis",
+    "LanguageTestEntry",
     "LanguageTestType",
     "KakaoLoginRequest",
     "LoginRequest",

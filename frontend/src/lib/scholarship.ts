@@ -18,7 +18,13 @@ export type Scholarship = {
   max_age: number | null;
   required_gender: "male" | "female" | null;
   eligible_region: string | null;
-  required_military_status: "completed" | "exempted" | "not_served" | "rotc_candidate" | null;
+  required_military_status:
+    | "completed"
+    | "exempted"
+    | "not_served"
+    | "rotc_candidate"
+    | "not_applicable"
+    | null;
   // 2026-08-15 추가 — required_military_status="completed"일 때만 의미 있음.
   required_discharge_type: "enlisted" | "officer_or_nco" | null;
   max_income_bracket: number | null;

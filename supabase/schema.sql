@@ -11,7 +11,7 @@
 -- 값은 소문자(예: 'male', 'foreigner_only')로 저장됨 — SQLAlchemy 기본값(대문자, enum
 -- 멤버 이름)을 values_callable로 오버라이드해서 API JSON/문서와 casing을 통일함.
 CREATE TYPE gender AS ENUM ('male', 'female');
-CREATE TYPE militarystatus AS ENUM ('completed', 'exempted', 'not_served', 'rotc_candidate');
+CREATE TYPE militarystatus AS ENUM ('completed', 'exempted', 'not_served', 'rotc_candidate', 'not_applicable');  -- not_applicable 2026-08-21 추가
 CREATE TYPE dischargetype AS ENUM ('enlisted', 'officer_or_nco');
 CREATE TYPE foreignereligibility AS ENUM ('korean_only', 'foreigner_only');
 -- gpabasis(2026-08-02 추가, 'both'는 2026-08-03 추가): min_gpa가 직전학기 성적 기준인지
@@ -20,7 +20,11 @@ CREATE TYPE foreignereligibility AS ENUM ('korean_only', 'foreigner_only');
 -- (matching_gaps.md 13번 참고).
 CREATE TYPE gpabasis AS ENUM ('semester', 'cumulative', 'both');
 -- languagetesttype/disabilitytype/specialstatus (2026-08-03 추가, matching_gaps.md 9·10·12번)
-CREATE TYPE languagetesttype AS ENUM ('TOEIC', 'TOEFL', 'IELTS', 'TOPIK', '기타');
+-- 2026-08-21 추가: TOEIC Speaking/TOEFL(PBT)/TEPS/JLPT/HSK
+CREATE TYPE languagetesttype AS ENUM (
+    'TOEIC', 'TOEFL', 'IELTS', 'TOPIK', '기타',
+    'TOEIC Speaking', 'TOEFL(PBT)', 'TEPS', 'JLPT', 'HSK'
+);
 CREATE TYPE disabilitytype AS ENUM (
     'physical_impairment', 'learning_disability', 'medical_disability', 'mental_impairment',
     'muscular_dystrophy', 'developmental_impairment', 'disabled_parent'
@@ -159,6 +163,8 @@ ALTER TABLE emailverification ENABLE ROW LEVEL SECURITY;
 CREATE TABLE savedspec (
     id SERIAL NOT NULL,
     user_id INTEGER NOT NULL REFERENCES "user" (id),
+    display_name VARCHAR,  -- 2026-08-21 추가, 개인화 표시용(매칭엔 안 씀)
+    birth_date DATE,  -- 2026-08-21 추가, age는 이 값에서 프론트가 계산해서 채움
     university VARCHAR NOT NULL,
     college VARCHAR NOT NULL,
     department VARCHAR,  -- 2026-08-03 추가(matching_gaps.md 2번), 선택 입력
@@ -169,12 +175,14 @@ CREATE TABLE savedspec (
     gender gender NOT NULL,
     region VARCHAR NOT NULL,
     district VARCHAR,  -- 2026-08-05 추가(matching_gaps.md 14번), 선택 입력(세종 등은 없음)
+    address VARCHAR,  -- 2026-08-21 추가, 주소 검색으로 받은 전체 도로명주소(표시용)
     parent_region VARCHAR,  -- 2026-08-05 추가(matching_gaps.md 19번), 선택 입력
     parent_district VARCHAR,  -- 2026-08-05 추가(matching_gaps.md 14번 후속), 선택 입력
-    military_status militarystatus NOT NULL,
+    parent_address VARCHAR,  -- 2026-08-21 추가, address와 동일한 이유(부모님 쪽)
+    military_status militarystatus,  -- 2026-08-21 NOT NULL 해제(필수 -> 선택 입력)
     discharge_type dischargetype,  -- 2026-08-15 추가, military_status=completed일 때만 의미
     income_bracket INTEGER NOT NULL,
-    has_disability BOOLEAN NOT NULL,
+    has_disability BOOLEAN,  -- 2026-08-22 NOT NULL 해제(필수 -> 선택 입력)
     is_foreigner BOOLEAN NOT NULL,
     enrollment_status enrollmentstatus NOT NULL,
     grade INTEGER,
@@ -182,9 +190,10 @@ CREATE TABLE savedspec (
     -- 2026-08-12 추가 — NULL이면 매칭 시 general로 간주(admission_track_matches() 참고).
     admission_track admissiontrack,
     -- 2026-08-03 추가 (matching_gaps.md 9·10·12번, 전부 선택 입력)
-    language_test_type languagetesttype,
-    language_test_score FLOAT,
-    disability_type disabilitytype,
+    -- 2026-08-21 — 시험 하나만(language_test_type/language_test_score) 저장하던 걸 여러 개
+    -- 넣을 수 있게 JSONB 배열로 변경. 각 원소는 {"type": "TOEIC", "score": 900} 모양.
+    language_tests JSONB NOT NULL DEFAULT '[]',
+    disability_type TEXT[] NOT NULL DEFAULT '{}',  -- 2026-08-21 단일 -> 복수선택(TEXT[])으로 변경
     special_status TEXT[] NOT NULL DEFAULT '{}',  -- 다중 선택이라 ARRAY(Enum) 대신 TEXT[]로 저장
     PRIMARY KEY (id)
 );

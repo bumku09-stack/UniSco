@@ -4,11 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
 import { TopBar } from "@/components/form-ui";
-import { CommonFields, OptionalFields, SchoolFields, deriveSpecFields } from "@/components/spec-fields";
+import { OptionalFields, PersonalFields, SchoolFields, deriveSpecFields } from "@/components/spec-fields";
 import { authFetch, clearTokens, isLoggedIn, MYPAGE_DRAFT_KEY as DRAFT_KEY } from "@/lib/auth";
 import { clearCachedRecommendations } from "@/lib/recommendations-cache";
 import {
   initialOptionalInfo,
+  initialSpec,
   OptionalInfo,
   specFormToUserSpec,
   SpecForm,
@@ -30,6 +31,7 @@ export default function MyPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [showAddressError, setShowAddressError] = useState(false);
   const [draft, setDraft] = useState<{ spec: SpecForm; optionalInfo: OptionalInfo } | null>(null);
   const isInitialLoad = useRef(true);
 
@@ -70,7 +72,17 @@ export default function MyPage() {
         const draftRaw = sessionStorage.getItem(DRAFT_KEY);
         if (draftRaw) {
           try {
-            setDraft(JSON.parse(draftRaw));
+            // 폼 필드 구조가 바뀌면 세션에 남아있던 예전 임시저장엔 새 필드가 없을 수 있음 —
+            // 항상 최신 기본값 위에 덮어써서 없는 키 참조로 터지는 걸 방지(2026-08-21,
+            // guest.ts의 getGuestSpec()과 동일한 이유).
+            const parsed = JSON.parse(draftRaw) as {
+              spec: Partial<SpecForm>;
+              optionalInfo: Partial<OptionalInfo>;
+            };
+            setDraft({
+              spec: { ...initialSpec, ...parsed.spec },
+              optionalInfo: { ...initialOptionalInfo, ...parsed.optionalInfo },
+            });
           } catch {
             sessionStorage.removeItem(DRAFT_KEY);
           }
@@ -155,6 +167,11 @@ export default function MyPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!spec) return;
+    if (!spec.address) {
+      setShowAddressError(true);
+      return;
+    }
+    setShowAddressError(false);
     setSaving(true);
     setError(null);
     setSaved(false);
@@ -214,8 +231,14 @@ export default function MyPage() {
         )}
 
         <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-5">
-          <SchoolFields spec={spec} setSpec={setNonNullSpec} derived={derived} />
-          <CommonFields
+          <PersonalFields
+            spec={spec}
+            setSpec={setNonNullSpec}
+            optionalInfo={optionalInfo}
+            setOptionalInfo={setOptionalInfo}
+            showErrors={showAddressError}
+          />
+          <SchoolFields
             spec={spec}
             setSpec={setNonNullSpec}
             derived={derived}

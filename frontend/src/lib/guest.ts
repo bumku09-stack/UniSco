@@ -1,5 +1,5 @@
 import { Scholarship } from "@/lib/scholarship";
-import { OptionalInfo, SpecForm } from "@/lib/spec";
+import { initialOptionalInfo, initialSpec, OptionalInfo, SpecForm } from "@/lib/spec";
 
 // 로그인 없이 "가볍게 둘러보기"용 상태 저장소 (2026-08-10 추가). recommendations-cache.ts와
 // 달리 이건 서버에 원본이 있는 데이터의 "캐시"가 아니라 — 게스트는 애초에 서버에 아무것도
@@ -20,7 +20,15 @@ export function getGuestSpec(): { spec: SpecForm; optionalInfo: OptionalInfo } |
   const raw = sessionStorage.getItem(GUEST_SPEC_KEY);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as { spec: SpecForm; optionalInfo: OptionalInfo };
+    // 폼 필드 구조가 바뀌면(필드 추가/이름 변경 등) 세션에 저장된 예전 JSON엔 새 필드가 아예
+    // 없을 수 있음 — 그대로 쓰면 없는 키를 참조하는 컴포넌트가 undefined에서 터짐(2026-08-21,
+    // MultiPillSelect의 values.includes(...) 크래시로 발견). 항상 최신 기본값 위에 저장된
+    // 값을 덮어써서, 새로 생긴 필드는 기본값으로라도 채워지게 함.
+    const parsed = JSON.parse(raw) as { spec: Partial<SpecForm>; optionalInfo: Partial<OptionalInfo> };
+    return {
+      spec: { ...initialSpec, ...parsed.spec },
+      optionalInfo: { ...initialOptionalInfo, ...parsed.optionalInfo },
+    };
   } catch {
     return null;
   }

@@ -169,7 +169,7 @@ export default function LandingPage() {
   }, [router]);
 
   return (
-    <div className="flex min-h-screen flex-col overflow-x-hidden bg-neu-bg">
+    <div className="flex min-h-screen flex-col bg-neu-bg">
       <section className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 py-16">
         {/* 배경 장식 — 순수 흰 배경이 밋밋하다는 피드백으로 추가. 새 색 없이 기존
             blue-100/blue-50만 아주 옅게 블러 처리해서 존재감은 은은하게만 남김. */}

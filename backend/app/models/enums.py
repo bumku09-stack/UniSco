@@ -25,6 +25,12 @@ class MilitaryStatus(str, Enum):
     # not_served로는 못 거름 — 군필이면 애초에 ROTC 후보생 신분이 성립 안 하므로 의미 없음).
     # frontend/src/lib/spec.ts의 병역 선택란에도 추가할 것.
     ROTC_CANDIDATE = "rotc_candidate"  # 학군사관후보생(ROTC)
+    # 2026-08-21 추가 — 여성 등 기존 4종(군필/면제/미필/ROTC) 어디에도 자기 상황을 대입하기
+    # 애매하다고 느끼는 사용자를 위한 명시적 선택지(SpecialStatus의 NOT_APPLICABLE과 같은
+    # 패턴). "미필"로 대충 채우게 하지 않고 실제로 구분되는 값으로 저장 — required_military_status
+    # 조건이 있는 장학금(예: "제대군인만")은 여전히 정상적으로 걸러짐(이 값은 그 어떤
+    # required_military_status와도 안 같으므로).
+    NOT_APPLICABLE = "not_applicable"  # 해당사항 없음
 
 
 class DischargeType(str, Enum):
@@ -98,9 +104,14 @@ class LanguageTestType(str, Enum):
     LANGUAGE_TESTS와 값을 정확히 맞춰야 함 — 프론트가 이 문자열 그대로 보냄."""
 
     TOEIC = "TOEIC"
+    TOEIC_SPEAKING = "TOEIC Speaking"  # 2026-08-21 추가
     TOEFL = "TOEFL"
+    TOEFL_PBT = "TOEFL(PBT)"  # 2026-08-21 추가
     IELTS = "IELTS"
+    TEPS = "TEPS"  # 2026-08-21 추가(뉴텝스, 600점 만점)
     TOPIK = "TOPIK"
+    JLPT = "JLPT"  # 2026-08-21 추가(180점 만점, 급수 무관 공통)
+    HSK = "HSK"  # 2026-08-21 추가(3~6급 기준 300점 만점)
     OTHER = "기타"
 
 
@@ -116,6 +127,13 @@ class DisabilityType(str, Enum):
     MUSCULAR_DYSTROPHY = "muscular_dystrophy"  # 근이영양증
     DEVELOPMENTAL_IMPAIRMENT = "developmental_impairment"  # 발달장애
     DISABLED_PARENT = "disabled_parent"  # 장애가 있는 부모(자녀 대상) — 본인 장애 아님, 주의
+    # 2026-08-22 추가 — SpecialStatus.NOT_APPLICABLE과 같은 패턴. 장애인 패널은 열었지만 실제로는
+    # 해당 안 되는 학생을 위한 확정 선택지 — 이 값이 골라져 있으면 has_disability와 무관하게
+    # 장애 조건 있는 장학금은 무조건 제외됨(core/matching.py의 disability_matches() 참고).
+    # scholarship.required_disability_type(Postgres 네이티브 enum 컬럼)에는 절대 안 쓰이므로
+    # 그 컬럼 타입(disabilitytype) 자체에는 이 값 추가 안 함 — SavedSpec.disability_type은
+    # TEXT[]라 Python enum 값만 맞으면 되고 DB 마이그레이션이 필요 없음.
+    NOT_APPLICABLE = "not_applicable"
 
 
 class SpecialStatus(str, Enum):

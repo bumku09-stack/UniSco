@@ -3,44 +3,71 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { TopBar } from "@/components/form-ui";
-import { CommonFields, OptionalFields, SchoolFields, deriveSpecFields } from "@/components/spec-fields";
+import { OptionalFields, PersonalFields, SchoolFields, deriveSpecFields } from "@/components/spec-fields";
 import { apiUrl, authFetch, clearTokens, isLoggedIn } from "@/lib/auth";
 import { clearGuestData, getGuestSpec, saveGuestResults, saveGuestSpec } from "@/lib/guest";
-import { SIDO_LIST } from "@/lib/regions";
-import { initialOptionalInfo, OptionalInfo, specFormToUserSpec, SpecForm, UserSpec } from "@/lib/spec";
-import { UNIVERSITIES } from "@/lib/universities";
+import {
+  initialOptionalInfo,
+  initialSpec,
+  OptionalInfo,
+  specFormToUserSpec,
+  SpecForm,
+  UserSpec,
+} from "@/lib/spec";
 
-const DEFAULT_SIDO = SIDO_LIST.find((s) => s.name === "대전광역시")!;
-const DEFAULT_UNIVERSITY = UNIVERSITIES[0];
+const STEP_LABELS = ["인적사항", "학교정보", "선택사항"];
 
-const initialSpec: SpecForm = {
-  university: DEFAULT_UNIVERSITY.name,
-  college: DEFAULT_UNIVERSITY.colleges[0]?.name ?? "",
-  department: DEFAULT_UNIVERSITY.colleges[0]?.departments[0] ?? "",
-  semester_gpa: "4.0",
-  cumulative_gpa: "4.0",
-  age: "20",
-  gender: "male",
-  sido: DEFAULT_SIDO.name,
-  district: DEFAULT_SIDO.districts[0] ?? "",
-  military_status: "not_served",
-  discharge_type: null,
-  income_bracket: "unknown",
-  has_disability: false,
-  is_foreigner: false,
-  enrollment_status: "undergrad_enrolled",
-  grade: "1",
-  degree_level: null,
-  admission_track: "general",
-};
-
-function ProgressBar({ step, totalSteps }: { step: number; totalSteps: number }) {
+// 2026-08-21 추가 — 얇은 진행 바 대신 번호 원 + 라벨을 눌러서 원하는 단계로 바로 이동할 수
+// 있는 스텝 인디케이터로 교체. 사용자 요청으로 이미 지나온 단계뿐 아니라 앞 단계로도 자유롭게
+// 건너뛸 수 있게 함 — 대신 각 단계의 실제 "다음"/제출 버튼은 그대로 그 단계 <form>에 남아있어서
+// (여기서 새로 안 건드림) 정상적으로 "다음"을 눌러 넘어갈 때는 필수 입력값 검증이 그대로
+// 걸림. 원을 눌러 건너뛴 뒤 앞 단계를 안 채우고 마지막에서 바로 제출하면 그 단계 필수값
+// 검증은 건너뛰게 되는데, 이건 사용자가 자유 이동을 선택하면서 감수하기로 한 트레이드오프.
+function StepIndicator({
+  step,
+  totalSteps,
+  onStepClick,
+}: {
+  step: number;
+  totalSteps: number;
+  onStepClick: (n: number) => void;
+}) {
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-neu-surface shadow-neu-inset">
-      <div
-        className="h-full rounded-full bg-blue-500 transition-all duration-300"
-        style={{ width: `${(step / totalSteps) * 100}%` }}
-      />
+    <div className="flex items-start">
+      {STEP_LABELS.slice(0, totalSteps).map((label, i) => {
+        const n = i + 1;
+        const isActive = n === step;
+        const isPast = n < step;
+        return (
+          <div key={n} className="contents">
+            <button
+              type="button"
+              onClick={() => onStepClick(n)}
+              className="flex flex-col items-center gap-1.5"
+            >
+              <span
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold transition ${
+                  isActive
+                    ? "bg-blue-500 text-white shadow-neu-raised-sm"
+                    : isPast
+                      ? "bg-neu-surface text-blue-500 shadow-neu-pressed"
+                      : "bg-neu-surface text-gray-400 shadow-neu-raised-sm"
+                }`}
+              >
+                {n}
+              </span>
+              <span
+                className={`whitespace-nowrap text-xs font-semibold ${
+                  isActive ? "text-blue-600" : isPast ? "text-blue-400" : "text-gray-400"
+                }`}
+              >
+                {label}
+              </span>
+            </button>
+            {n < totalSteps && <div className="mt-4 h-px flex-1 bg-gray-200" />}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -50,14 +77,15 @@ function ProgressBar({ step, totalSteps }: { step: number; totalSteps: number })
 // 없어서 render 본문에서 직접 부르면 SSR이 죽음 — 그래서 항상 "loading"으로 시작해서
 // useEffect(클라이언트 전용) 안에서만 실제로 판단함(홈 화면의 hydration-mismatch 회피
 // 패턴과 동일한 이유).
-//   - 로그인 안 됨(게스트): 3단계(학교 정보 + 공통 정보 + 선택 정보) 전부 받고 POST /match로
+//   - 로그인 안 됨(게스트): 3단계(인적정보 + 학교정보 + 선택 정보, 2026-08-21 재구성 —
+//     아래 PersonalFields/SchoolFields/OptionalFields 참고) 전부 받고 POST /match로
 //     즉석 매칭 → 결과+입력값을 세션에 저장하고 /home으로.
 //   - 로그인 됨: 3단계 + POST /users/me/spec. 방금 게스트로 입력해둔 값이 세션에 있으면
 //     (회원가입 직후 전환 케이스) 그걸로 폼을 미리 채우고 3단계부터 이어서 입력하게 함 —
 //     1·2단계를 다시 안 치게.
 // 2026-08-18 — UX 배포용으로 게스트도 3단계(선택 정보)까지 받도록 임시로 풀었음(원래는 게스트
 // 2단계에서 바로 매칭 끝, 3단계는 회원가입 후에만 — 아래 원본 설명):
-//   - 로그인 안 됨(게스트, 원래): 1·2단계(학교 정보 + 공통 정보)만 받고 POST /match로 즉석
+//   - 로그인 안 됨(게스트, 원래): 1·2단계만 받고 POST /match로 즉석
 //     매칭 → 결과+입력값을 세션에 저장하고 /home으로. 3단계(선택 정보)는 아예 안 보여줌 —
 //     회원가입 후에 마저 입력하도록 유도(/home의 안내 배너 참고).
 // 되돌리려면: 아래 "2026-08-18" 표시된 주석 처리 코드들(totalSteps, handleGuestFinish,
@@ -72,6 +100,7 @@ export default function SpecWizard() {
   const [optionalInfo, setOptionalInfo] = useState<OptionalInfo>(initialOptionalInfo);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [step1Attempted, setStep1Attempted] = useState(false);
 
   useEffect(() => {
     // 함수로 한 번 감쌈 — effect 본문에 setState를 직접 두면 react-hooks/set-state-in-effect가
@@ -209,36 +238,44 @@ export default function SpecWizard() {
         />
 
         <h1 className="mt-6 text-xl font-bold leading-snug text-gray-900">
-          {step === 1 && "어느 학교에 다니시나요?"}
-          {step === 2 && "몇 가지만 더 알려주세요"}
+          {step === 1 && "먼저 인적사항을 알려주세요"}
+          {step === 2 && "어느 학교에 다니시나요?"}
           {step === 3 && "해당하는 항목이 있으면 알려주세요"}
         </h1>
         <p className="mt-1 text-sm text-gray-500">
-          {step === 1 && "학교 정보에 맞는 장학금부터 찾아드릴게요"}
-          {/* 2026-08-18 — 게스트도 이제 2단계에서 안 끝나고 3단계로 넘어가서, 공통 문구로
-              통일함(되돌릴 땐 mode별 분기 두 줄을 복구). */}
-          {step === 2 && "공통 조건까지 확인하면 다음 단계로 넘어가요"}
-          {/* {step === 2 && mode === "guest" && "입력하면 바로 매칭 결과를 볼 수 있어요"} */}
-          {/* {step === 2 && mode === "authed" && "공통 조건까지 확인하면 매칭이 끝나요"} */}
+          {step === 1 && "이름·거주지역 같은 기본 정보로 딱 맞는 장학금부터 찾아드릴게요"}
+          {step === 2 && "학교 정보에 맞는 장학금까지 좁혀드릴게요"}
           {step === 3 && "선택 항목이라 없으면 그냥 넘어가도 돼요"}
         </p>
 
-        <div className="mt-5 flex items-center gap-3">
-          <ProgressBar step={step} totalSteps={totalSteps} />
-          <span className="shrink-0 text-xs font-semibold text-gray-400">
-            {step} / {totalSteps}
-          </span>
+        <div className="mt-5">
+          <StepIndicator
+            step={step}
+            totalSteps={totalSteps}
+            onStepClick={(n) => setStep(n as 1 | 2 | 3)}
+          />
         </div>
 
         {step === 1 && (
           <form
             onSubmit={(e) => {
               e.preventDefault();
+              if (!spec.address) {
+                setStep1Attempted(true);
+                return;
+              }
+              setStep1Attempted(false);
               setStep(2);
             }}
             className="mt-6 flex flex-col gap-5"
           >
-            <SchoolFields spec={spec} setSpec={setSpec} derived={derived} showFreshmanHint />
+            <PersonalFields
+              spec={spec}
+              setSpec={setSpec}
+              optionalInfo={optionalInfo}
+              setOptionalInfo={setOptionalInfo}
+              showErrors={step1Attempted}
+            />
 
             <button
               type="submit"
@@ -249,43 +286,6 @@ export default function SpecWizard() {
           </form>
         )}
 
-        {/* 2026-08-18 — UX 배포용으로 게스트도 3단계까지 받도록 바꾸면서, 게스트가 2단계에서
-            바로 매칭을 끝내던 아래 블록은 비활성화(삭제 대신 주석 처리 — 되돌릴 땐 이 블록
-            주석만 풀고 바로 아래 통합 블록의 조건에서 "|| mode === "guest""만 빼면 됨).
-        {step === 2 && mode === "guest" && (
-          <form onSubmit={handleGuestFinish} className="mt-6 flex flex-col gap-5">
-            <CommonFields
-              spec={spec}
-              setSpec={setSpec}
-              derived={derived}
-              optionalInfo={optionalInfo}
-              setOptionalInfo={setOptionalInfo}
-            />
-
-            {error && (
-              <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-500">{error}</p>
-            )}
-
-            <div className="mt-2 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="w-full rounded-2xl bg-neu-surface py-4 text-[15px] font-semibold text-gray-600 shadow-neu-raised transition hover:shadow-neu-raised-lg active:shadow-neu-pressed"
-              >
-                이전
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white shadow-neu-raised transition hover:bg-blue-600 hover:shadow-neu-raised-lg active:shadow-neu-pressed disabled:opacity-50"
-              >
-                {submitting ? "찾는 중..." : "장학금 찾아보기"}
-              </button>
-            </div>
-          </form>
-        )}
-        */}
-
         {step === 2 && (mode === "guest" || mode === "authed") && (
           <form
             onSubmit={(e) => {
@@ -294,12 +294,13 @@ export default function SpecWizard() {
             }}
             className="mt-6 flex flex-col gap-5"
           >
-            <CommonFields
+            <SchoolFields
               spec={spec}
               setSpec={setSpec}
               derived={derived}
               optionalInfo={optionalInfo}
               setOptionalInfo={setOptionalInfo}
+              showFreshmanHint
             />
 
             <div className="mt-2 flex gap-2">

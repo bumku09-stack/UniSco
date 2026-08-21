@@ -150,3 +150,22 @@ export function sidoNameFromRegion(region: string): string {
   if (region === "광주" || region === "전남") return "전남광주통합특별시";
   return SIDO_LIST.find((s) => s.shortName === region)?.name ?? SIDO_LIST[0].name;
 }
+
+/** 다음(카카오) 우편번호 서비스가 돌려주는 sido(예: "대전")를 우리 SIDO_LIST의 정식 명칭
+ * (예: "대전광역시")으로 바꿈 — 주소 검색으로 받은 값도 기존 드롭다운으로 고른 값과 똑같은
+ * 모양이 되게 해서, region_matches() 등 매칭 로직을 전혀 안 건드리기 위함(AddressSearchField
+ * 참고). 다음 API는 shortName과 거의 같은 축약형을 돌려주는 게 보통이라 shortName 우선 매칭,
+ * 정식 명칭이 오는 경우도 대비해서 그다음 fallback으로 확인함. 전남광주통합특별시는 다음
+ * API가 이 통합을 모를 수 있어 "광주"/"전남" 어느 쪽으로 오든 같은 통합 시/도 하나로 합쳐짐
+ * (regionShortName()과 달리 구/군까지는 안 봐도 됨 — 여긴 어느 시/도인지만 정하면 되고,
+ * 구/군 원문은 district에 그대로 저장되니까). 그래도 못 찾으면(다음 쪽 데이터가 우리
+ * 목록에 없는 극히 드문 경우) 원본 sido 문자열을 그대로 반환 — 매칭 로직은 부분 문자열
+ * 비교라 완전히 새 지역명이어도 최소한 그 자체로는 동작함. */
+export function resolveSidoFromDaumAddress(daumSido: string): string {
+  if (daumSido === "광주" || daumSido === "전남") return "전남광주통합특별시";
+  const byShortName = SIDO_LIST.find((s) => s.shortName === daumSido);
+  if (byShortName) return byShortName.name;
+  const byFullName = SIDO_LIST.find((s) => s.name === daumSido);
+  if (byFullName) return byFullName.name;
+  return daumSido;
+}

@@ -4,6 +4,7 @@ import re
 from app.models import (
     UNVERIFIABLE_CONDITIONS,
     AdmissionTrack,
+    DisabilityType,
     EnrollmentStatus,
     ForeignerEligibility,
     GpaBasis,
@@ -93,32 +94,53 @@ def language_test_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
     특수상황)과 같은 원칙으로 통일함(2026-08-04) — 학생이 어학점수를 아예 안 넣었으면
     "해당 없음"이 아니라 "아직 모름"으로 보고 걸러내지 않음(이전엔 스펙 3페이지가 선택
     입력이라는 설계 의도와 반대로, 안 넣으면 그 조건 걸린 장학금이 전부 숨겨지는 버그가
-    있었음). 학생이 실제로 다른 시험 종류를 입력한 경우(예: 장학금은 TOEFL을 요구하는데
-    학생은 TOEIC 점수를 넣은 경우)는 여전히 진짜 불일치라 그대로 제외함 — "안 넣음"과
-    "다른 시험 넣음"을 구분하는 게 핵심."""
+    있었음). 학생이 실제로 다른 시험 종류만 입력한 경우(예: 장학금은 TOEFL을 요구하는데
+    학생은 TOEIC 점수만 넣은 경우)는 여전히 진짜 불일치라 그대로 제외함 — "안 넣음"과
+    "다른 시험만 넣음"을 구분하는 게 핵심.
+
+    2026-08-21 — 시험 하나만 비교하던 걸 여러 개(list) 중 하나만 맞아도 되는 방식으로 확장
+    (사용자 요청 — 토익+토플+JLPT처럼 여러 시험 동시 보유 가능). 요구 종류와 일치하는 게
+    하나도 없으면 "다른 시험만 넣음"으로 보고 제외, 일치하는 게 있으면 그중 하나라도 최소
+    점수를 넘으면 통과."""
     if scholarship.language_test_type is None:
         return True
-    if spec.language_test_type is None:
+    if not spec.language_tests:
         return True
-    if spec.language_test_type != scholarship.language_test_type:
-        return False
-    if spec.language_test_score is None:
+    matching_entries = [t for t in spec.language_tests if t.type == scholarship.language_test_type]
+    if not matching_entries:
         return False
     if scholarship.language_test_min_score is None:
         return True
-    return spec.language_test_score >= scholarship.language_test_min_score
+    return any(t.score >= scholarship.language_test_min_score for t in matching_entries)
 
 
 def disability_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
     """장애인 조건 전체(본인 장애 여부 + 세부유형, matching_gaps.md 12번)를 한 번에 확인.
-    requires_disability/required_disability_type 둘 다 안 걸려있으면 무조건 통과."""
+    requires_disability/required_disability_type 둘 다 안 걸려있으면 무조건 통과.
+
+    2026-08-21 — 장애 유형을 단일 선택에서 특수상황과 같은 복수선택(list)으로 바꾸면서,
+    유형을 아예 안 고른 경우(빈 리스트)도 특수상황과 동일한 leniency 원칙을 적용함 — "장애인"
+    자체는 체크했지만 세부유형까지는 아직 답 안 한 것으로 보고, 유형 조건이 있는 장학금도
+    안 거름. 유형을 하나 이상 골랐을 때만 그중에 요구 유형이 있는지로 좁혀서 확인.
+
+    2026-08-22 — has_disability 자체도 병역처럼 필수에서 선택 입력(None=모름)으로 바꿈 —
+    아예 안 건드리면(None) leniency로 통과시키고, "해당사항 없음"을 명시적으로 고르면
+    (disability_type에 NOT_APPLICABLE) has_disability 값과 무관하게 확정된 "아니오"로 보고
+    무조건 제외함 — 안 건드린 것(모름)과 명시적으로 아니라고 답한 것을 구분하는 게 핵심
+    (이전엔 이 구분이 없어서 "장애인을 아예 안 눌렀을 때도 관련 장학금이 안 보인다"는
+    문제가 있었음)."""
     if not scholarship.requires_disability and scholarship.required_disability_type is None:
+        return True
+    if DisabilityType.NOT_APPLICABLE in spec.disability_type:
+        return False
+    if spec.has_disability is None:
         return True
     if not spec.has_disability:
         return False
     if (
         scholarship.required_disability_type is not None
-        and spec.disability_type != scholarship.required_disability_type
+        and spec.disability_type
+        and scholarship.required_disability_type not in spec.disability_type
     ):
         return False
     return True
@@ -285,8 +307,15 @@ def discharge_type_matches(scholarship: Scholarship, spec: UserSpec) -> bool:
     이상 장기복무 제대군인 대상)에서 발견. required_discharge_type이 걸려있다는 건 최소
     군필(completed)이 전제이므로, 군필이 아닌 학생(미필/면제/ROTC 후보생)은 세부구분
     답변 여부와 무관하게 무조건 탈락 — discharge_type의 leniency("모르면 안 거름")는
-    "군필이긴 한데 세부구분을 아직 답 안 한" 경우에만 적용됨(다른 선택 입력들과 같은 원칙)."""
+    "군필이긴 한데 세부구분을 아직 답 안 한" 경우에만 적용됨(다른 선택 입력들과 같은 원칙).
+
+    2026-08-21 추가 — military_status 자체를 선택 입력(nullable)으로 바꾸면서, "아직 병역
+    상태를 답 안 함"(None)도 다른 선택 입력들과 같은 leniency 원칙을 적용함 — 군필이 아님을
+    확인한 게 아니라 아예 모르는 상태이므로, 위 문단의 "확인된 미필/면제/ROTC" 케이스와는
+    다르게 무조건 탈락시키지 않고 통과시킴."""
     if scholarship.required_discharge_type is None:
+        return True
+    if spec.military_status is None:
         return True
     if spec.military_status != MilitaryStatus.COMPLETED:
         return False
@@ -494,6 +523,7 @@ def is_eligible(scholarship: Scholarship, spec: UserSpec) -> bool:
         return False
     if (
         scholarship.required_military_status is not None
+        and spec.military_status is not None
         and scholarship.required_military_status != spec.military_status
     ):
         return False
@@ -586,7 +616,7 @@ def confirmed_match_count(scholarship: Scholarship, spec: UserSpec) -> int:
         score += 1
     if scholarship.foreigner_eligibility is not None:
         score += 1
-    if scholarship.language_test_type is not None and spec.language_test_type is not None:
+    if scholarship.language_test_type is not None and spec.language_tests:
         score += 1
     if _verifiable_special_status(scholarship) and spec.special_status:
         score += 1
@@ -627,7 +657,7 @@ def unverifiable_condition_count(scholarship: Scholarship, spec: UserSpec) -> in
         count += 1
     if scholarship.max_income_bracket is not None and spec.income_bracket is None:
         count += 1
-    if scholarship.language_test_type is not None and spec.language_test_type is None:
+    if scholarship.language_test_type is not None and not spec.language_tests:
         count += 1
     if scholarship.min_credits_last_semester is not None and spec.credits_last_semester is None:
         count += 1
