@@ -45,7 +45,7 @@ export default function SavedPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white pb-16">
+    <div className="min-h-screen bg-neu-bg pb-16">
       <div className="mx-auto w-full max-w-md px-6 py-6 sm:max-w-2xl md:max-w-4xl lg:max-w-6xl lg:px-10">
         <TopBar right={<Link href="/home" className="text-sm font-semibold text-gray-400">← 홈으로</Link>} />
 
@@ -66,7 +66,7 @@ export default function SavedPage() {
             <p className="text-sm text-gray-400">아직 찜한 장학금이 없어요</p>
             <Link
               href="/home"
-              className="rounded-xl border border-blue-500 px-4 py-2 text-sm font-semibold text-blue-600"
+              className="rounded-xl bg-neu-surface px-4 py-2 text-sm font-semibold text-blue-600 shadow-neu-raised-sm transition hover:shadow-neu-raised active:shadow-neu-pressed"
             >
               추천 장학금 보러 가기
             </Link>

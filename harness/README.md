@@ -67,8 +67,8 @@ python -m harness.run --university 한밭대학교
 남은 건 새 대학 온보딩(대전권에 아직 안 들어간 학교들, 지자체·재단 등 학교 소속과 무관한
 외부 장학금 발굴 채널)과, 아직 실측 벤치마크 없이 초기 판단값으로 박아둔 설정값들
 (`config.py` "7.4 모델 선택" 주석 참고 — 추출 모델 선택, 2중 추출 대상 필드 개수,
-`EXTRACTION_CONCURRENCY`)을 실제 공고문 샘플로 검증하는 것. 이미지 첨부파일 OCR
-(아래 "알려진 한계")과 PDF 미지원도 남아있음.
+`EXTRACTION_CONCURRENCY`)을 실제 공고문 샘플로 검증하는 것. 이미지 첨부파일 OCR과 PDF
+추출은 둘 다 해결됨(아래 "알려진 한계") — 텍스트 레이어 없는 스캔 이미지 PDF만 아직 미지원.
 
 새 대학 하나를 추가하려면(수동):
 
@@ -196,17 +196,30 @@ try/except를 갖고 있어서(2026-08-10, 배치 전체가 안 죽게 하려고
 
 ## 알려진 한계
 
-- **이미지 첨부파일 OCR — 2026-08-15 GitHub Actions(Linux)에서도 되게 고침.** 기존
-  `supabase/tools/extract_text.py`의 `TESSERACT_EXE`/`TESSDATA_DIR`가 데이터 입력을 맡은
-  친구분 Windows 컴퓨터 경로로 하드코딩돼 있던 걸, 그 기본값은 그대로 두고 env var로
-  오버라이드만 가능하게 열었음(그 친구분 로컬 워크플로는 그대로 안 건드림). CI는 apt로
+- **이미지/HWP 첨부파일 — 2026-08-15에 OS 레벨(apt tesseract-ocr) 설정은 고쳤다고 여겼는데,
+  2026-08-18에 실제로 첨부파일 하나를 끝까지 재검증해보다가 더 근본적인 구멍을 발견함:
+  `harness/requirements.txt`에 `pyhwp`/`pytesseract`/`Pillow`/`six` 자체가 아예 안 들어있어서,
+  로컬이든 CI든 `pip install -r requirements.txt`만으로는 HWP·이미지 첨부파일을 만나는 순간
+  `ModuleNotFoundError`로 죽었을 것(사람이 실제로 그런 첨부파일 있는 게시판을 나이트런으로
+  돌려본 적이 없어서 여태 안 드러났던 걸로 보임). 2026-08-15의 apt 설치 + env var 수정은
+  맞는 방향이었지만 "OS 바이너리는 있는데 그걸 부르는 파이썬 패키지가 없는" 절반짜리
+  수정이었음 — 이번에 네 패키지를 전부 `requirements.txt`에 추가하고 빈 venv에 설치해서
+  4개 다 정상 import되는 것까지 확인함. `TESSERACT_EXE`/`TESSDATA_DIR`는 여전히 env var로
+  오버라이드 가능(데이터 입력 담당자 Windows 로컬 기본값은 안 건드림), CI는 apt로
   `tesseract-ocr`/`tesseract-ocr-kor`를 설치하고 `TESSERACT_EXE=tesseract`,
   `TESSDATA_DIR=""`를 넘겨서 씀 — `run.py`는 여전히 실패를 잡아서 해당 항목만 스킵하는
-  방어 로직을 유지(다른 원인의 OCR 실패까지 파이프라인 전체를 죽이면 안 되므로).
+  방어 로직을 유지(다른 원인의 OCR/HWP 실패까지 파이프라인 전체를 죽이면 안 되므로).
 - **dedup 시점의 "이름"은 게시글 제목**임 (설계안 3단계가 LLM 추출 이전이라 아직 정식
   명칭이 없음) — 장학금 정식 명칭과 게시글 제목이 많이 다르면 놓칠 수 있음. 애매하면 그냥
   통과시켜서 LLM 추출까지 가게 두는 쪽으로 설계함(과다매칭이 과소매칭보다 낫다는 기존 원칙과
   같은 방향).
-- **PDF 추출은 아직 없음** — `extract_text.py`가 HWP/HWPX/이미지만 지원함. PDF 첨부파일이 있는
-  게시판을 온보딩하게 되면 그때 `extract_text.py`에 PDF 지원을 추가할 것(하네스 쪽 코드 변경
-  없이 `run.py`의 `_ATTACHMENT_EXTS`에 `.pdf`만 추가하면 됨).
+- **PDF 추출 — 2026-08-18 추가.** `extract_text.py`의 `extract_pdf()`가 poppler의
+  `pdftotext -layout`로 텍스트를 뽑음(`-layout`은 장학 공고문에 흔한 "구분/조건/지급액" 표
+  구조를 공백으로 최대한 보존하기 위함). 로컬은 `brew install poppler`, CI는
+  `harness_nightly.yml`이 `tesseract-ocr`와 같이 apt로 `poppler-utils`를 설치. `run.py`의
+  `_ATTACHMENT_EXTS`에 `.pdf` 추가만으로 끝(예상대로 하네스 쪽 코드 변경 없이 붙음). **텍스트
+  레이어가 없는 스캔 이미지 PDF는 여전히 미지원** — `pdftotext`는 에러 없이 빈 문자열만
+  돌려주는데, 그걸 "추출 성공"으로 착각하면 안 돼서 `extract_pdf()`가 빈 결과를 명시적으로
+  실패 처리함(다른 첨부파일과 동일하게 그 항목만 스킵). 이런 PDF까지 지원하려면 페이지를
+  래스터화(`pdftoppm`)해서 이미지 OCR 경로로 넘기는 방식이 필요한데, 아직 실제로 마주친 적
+  없어서 안 만듦.

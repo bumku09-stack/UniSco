@@ -36,7 +36,7 @@ const initialSpec: SpecForm = {
 
 function ProgressBar({ step, totalSteps }: { step: number; totalSteps: number }) {
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-neu-surface shadow-neu-inset">
       <div
         className="h-full rounded-full bg-blue-500 transition-all duration-300"
         style={{ width: `${(step / totalSteps) * 100}%` }}
@@ -50,12 +50,18 @@ function ProgressBar({ step, totalSteps }: { step: number; totalSteps: number })
 // 없어서 render 본문에서 직접 부르면 SSR이 죽음 — 그래서 항상 "loading"으로 시작해서
 // useEffect(클라이언트 전용) 안에서만 실제로 판단함(홈 화면의 hydration-mismatch 회피
 // 패턴과 동일한 이유).
-//   - 로그인 안 됨(게스트): 1·2단계(학교 정보 + 공통 정보)만 받고 POST /match로 즉석 매칭 →
-//     결과+입력값을 세션에 저장하고 /home으로. 3단계(선택 정보)는 아예 안 보여줌 — 회원가입
-//     후에 마저 입력하도록 유도(/home의 안내 배너 참고).
-//   - 로그인 됨: 기존 3단계 그대로 + POST /users/me/spec. 단, 방금 게스트로 입력해둔 값이
-//     세션에 있으면(회원가입 직후 전환 케이스) 그걸로 폼을 미리 채우고 3단계부터 이어서
-//     입력하게 함 — 1·2단계를 다시 안 치게.
+//   - 로그인 안 됨(게스트): 3단계(학교 정보 + 공통 정보 + 선택 정보) 전부 받고 POST /match로
+//     즉석 매칭 → 결과+입력값을 세션에 저장하고 /home으로.
+//   - 로그인 됨: 3단계 + POST /users/me/spec. 방금 게스트로 입력해둔 값이 세션에 있으면
+//     (회원가입 직후 전환 케이스) 그걸로 폼을 미리 채우고 3단계부터 이어서 입력하게 함 —
+//     1·2단계를 다시 안 치게.
+// 2026-08-18 — UX 배포용으로 게스트도 3단계(선택 정보)까지 받도록 임시로 풀었음(원래는 게스트
+// 2단계에서 바로 매칭 끝, 3단계는 회원가입 후에만 — 아래 원본 설명):
+//   - 로그인 안 됨(게스트, 원래): 1·2단계(학교 정보 + 공통 정보)만 받고 POST /match로 즉석
+//     매칭 → 결과+입력값을 세션에 저장하고 /home으로. 3단계(선택 정보)는 아예 안 보여줌 —
+//     회원가입 후에 마저 입력하도록 유도(/home의 안내 배너 참고).
+// 되돌리려면: 아래 "2026-08-18" 표시된 주석 처리 코드들(totalSteps, handleGuestFinish,
+// step 2/3 JSX, home/page.tsx의 안내 배너 2곳)을 원상복구.
 type Mode = "loading" | "guest" | "authed";
 
 export default function SpecWizard() {
@@ -86,7 +92,10 @@ export default function SpecWizard() {
   }, []);
 
   const derived = deriveSpecFields(spec);
-  const totalSteps = mode === "guest" ? 2 : 3;
+  // 2026-08-18 — UX 배포용으로 게스트도 3단계(선택 정보)까지 받도록 임시로 품 (원래는 게스트
+  // 2단계/로그인 3단계로 갈렸었음, 아래 원본 줄 주석 참고 — 되돌릴 땐 이 줄만 원복하면 됨).
+  const totalSteps = 3;
+  // const totalSteps = mode === "guest" ? 2 : 3;
 
   // 로그인은 됐는데 스펙을 아직 한 번도 저장 안 한 계정(카카오 로그인 직후 등)은 /home으로
   // 못 가고(스펙 없으면 /home이 다시 여기로 돌려보냄) /spec에 갇히는데, 그동안 로그아웃할
@@ -97,12 +106,15 @@ export default function SpecWizard() {
     router.push("/");
   }
 
+  // 2026-08-18 — UX 배포용으로 게스트도 실제 입력한 optionalInfo(선택 정보)를 그대로 넘기게
+  // 바꿈. 원래는 게스트가 3단계 UI 자체를 안 봐서 initialOptionalInfo(빈 값)로 고정 발송했음
+  // (아래 주석 처리된 원본 버전 참고 — 되돌릴 땐 이 함수만 원복하면 됨).
   async function handleGuestFinish(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
     try {
-      const body: UserSpec = specFormToUserSpec(spec, initialOptionalInfo);
+      const body: UserSpec = specFormToUserSpec(spec, optionalInfo);
       const res = await fetch(apiUrl("/match"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -110,7 +122,7 @@ export default function SpecWizard() {
       });
       if (!res.ok) throw new Error(`status ${res.status}`);
       const results = await res.json();
-      saveGuestSpec(spec, initialOptionalInfo);
+      saveGuestSpec(spec, optionalInfo);
       saveGuestResults(results);
       router.push("/home");
     } catch {
@@ -119,6 +131,28 @@ export default function SpecWizard() {
       setSubmitting(false);
     }
   }
+  // async function handleGuestFinish(e: React.FormEvent) {
+  //   e.preventDefault();
+  //   setSubmitting(true);
+  //   setError(null);
+  //   try {
+  //     const body: UserSpec = specFormToUserSpec(spec, initialOptionalInfo);
+  //     const res = await fetch(apiUrl("/match"), {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify(body),
+  //     });
+  //     if (!res.ok) throw new Error(`status ${res.status}`);
+  //     const results = await res.json();
+  //     saveGuestSpec(spec, initialOptionalInfo);
+  //     saveGuestResults(results);
+  //     router.push("/home");
+  //   } catch {
+  //     setError("매칭에 실패했어요. 잠시 후 다시 시도해주세요.");
+  //   } finally {
+  //     setSubmitting(false);
+  //   }
+  // }
 
   async function handleFinalSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -149,7 +183,7 @@ export default function SpecWizard() {
 
   if (mode === "loading") {
     return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-neu-bg">
         <div className="mx-auto w-full max-w-md px-6 py-6 sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
           <TopBar />
         </div>
@@ -158,7 +192,7 @@ export default function SpecWizard() {
   }
 
   return (
-    <div className="min-h-screen bg-white pb-16">
+    <div className="min-h-screen bg-neu-bg pb-16">
       <div className="mx-auto w-full max-w-md px-6 py-6 sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
         <TopBar
           right={
@@ -181,8 +215,11 @@ export default function SpecWizard() {
         </h1>
         <p className="mt-1 text-sm text-gray-500">
           {step === 1 && "학교 정보에 맞는 장학금부터 찾아드릴게요"}
-          {step === 2 && mode === "guest" && "입력하면 바로 매칭 결과를 볼 수 있어요"}
-          {step === 2 && mode === "authed" && "공통 조건까지 확인하면 매칭이 끝나요"}
+          {/* 2026-08-18 — 게스트도 이제 2단계에서 안 끝나고 3단계로 넘어가서, 공통 문구로
+              통일함(되돌릴 땐 mode별 분기 두 줄을 복구). */}
+          {step === 2 && "공통 조건까지 확인하면 다음 단계로 넘어가요"}
+          {/* {step === 2 && mode === "guest" && "입력하면 바로 매칭 결과를 볼 수 있어요"} */}
+          {/* {step === 2 && mode === "authed" && "공통 조건까지 확인하면 매칭이 끝나요"} */}
           {step === 3 && "선택 항목이라 없으면 그냥 넘어가도 돼요"}
         </p>
 
@@ -205,13 +242,16 @@ export default function SpecWizard() {
 
             <button
               type="submit"
-              className="mt-2 w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white transition hover:bg-blue-600 active:scale-[0.99]"
+              className="mt-2 w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white shadow-neu-raised transition hover:bg-blue-600 hover:shadow-neu-raised-lg active:shadow-neu-pressed"
             >
               다음
             </button>
           </form>
         )}
 
+        {/* 2026-08-18 — UX 배포용으로 게스트도 3단계까지 받도록 바꾸면서, 게스트가 2단계에서
+            바로 매칭을 끝내던 아래 블록은 비활성화(삭제 대신 주석 처리 — 되돌릴 땐 이 블록
+            주석만 풀고 바로 아래 통합 블록의 조건에서 "|| mode === "guest""만 빼면 됨).
         {step === 2 && mode === "guest" && (
           <form onSubmit={handleGuestFinish} className="mt-6 flex flex-col gap-5">
             <CommonFields
@@ -230,22 +270,23 @@ export default function SpecWizard() {
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="w-full rounded-2xl border border-gray-200 py-4 text-[15px] font-semibold text-gray-600 transition hover:bg-gray-50"
+                className="w-full rounded-2xl bg-neu-surface py-4 text-[15px] font-semibold text-gray-600 shadow-neu-raised transition hover:shadow-neu-raised-lg active:shadow-neu-pressed"
               >
                 이전
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white transition hover:bg-blue-600 active:scale-[0.99] disabled:opacity-50"
+                className="w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white shadow-neu-raised transition hover:bg-blue-600 hover:shadow-neu-raised-lg active:shadow-neu-pressed disabled:opacity-50"
               >
                 {submitting ? "찾는 중..." : "장학금 찾아보기"}
               </button>
             </div>
           </form>
         )}
+        */}
 
-        {step === 2 && mode === "authed" && (
+        {step === 2 && (mode === "guest" || mode === "authed") && (
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -265,15 +306,50 @@ export default function SpecWizard() {
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="w-full rounded-2xl border border-gray-200 py-4 text-[15px] font-semibold text-gray-600 transition hover:bg-gray-50"
+                className="w-full rounded-2xl bg-neu-surface py-4 text-[15px] font-semibold text-gray-600 shadow-neu-raised transition hover:shadow-neu-raised-lg active:shadow-neu-pressed"
               >
                 이전
               </button>
               <button
                 type="submit"
-                className="w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white transition hover:bg-blue-600 active:scale-[0.99]"
+                className="w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white shadow-neu-raised transition hover:bg-blue-600 hover:shadow-neu-raised-lg active:shadow-neu-pressed"
               >
                 다음
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* 2026-08-18 — UX 배포용으로 새로 추가된 게스트 3단계. authed 버전과 필드는 같지만
+            제출 핸들러(handleGuestFinish, 저장 없이 즉석 매칭)와 버튼 문구가 달라서 별도
+            블록으로 둠. 되돌릴 땐 이 블록만 지우고 위 "2026-08-18" 주석 두 곳도 원복. */}
+        {step === 3 && mode === "guest" && (
+          <form onSubmit={handleGuestFinish} className="mt-6 flex flex-col gap-5">
+            <OptionalFields
+              spec={spec}
+              setSpec={setSpec}
+              optionalInfo={optionalInfo}
+              setOptionalInfo={setOptionalInfo}
+            />
+
+            {error && (
+              <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-500">{error}</p>
+            )}
+
+            <div className="mt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setStep(2)}
+                className="w-full rounded-2xl bg-neu-surface py-4 text-[15px] font-semibold text-gray-600 shadow-neu-raised transition hover:shadow-neu-raised-lg active:shadow-neu-pressed"
+              >
+                이전
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white shadow-neu-raised transition hover:bg-blue-600 hover:shadow-neu-raised-lg active:shadow-neu-pressed disabled:opacity-50"
+              >
+                {submitting ? "찾는 중..." : "장학금 찾아보기"}
               </button>
             </div>
           </form>
@@ -296,14 +372,14 @@ export default function SpecWizard() {
               <button
                 type="button"
                 onClick={() => setStep(2)}
-                className="w-full rounded-2xl border border-gray-200 py-4 text-[15px] font-semibold text-gray-600 transition hover:bg-gray-50"
+                className="w-full rounded-2xl bg-neu-surface py-4 text-[15px] font-semibold text-gray-600 shadow-neu-raised transition hover:shadow-neu-raised-lg active:shadow-neu-pressed"
               >
                 이전
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white transition hover:bg-blue-600 active:scale-[0.99] disabled:opacity-50"
+                className="w-full rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white shadow-neu-raised transition hover:bg-blue-600 hover:shadow-neu-raised-lg active:shadow-neu-pressed disabled:opacity-50"
               >
                 {submitting ? "저장 중..." : "내 장학금 찾기"}
               </button>

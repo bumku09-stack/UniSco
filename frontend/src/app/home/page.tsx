@@ -112,7 +112,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-white pb-16">
+    <div className="min-h-screen bg-neu-bg pb-16">
       <div className="mx-auto w-full max-w-md px-6 py-6 sm:max-w-2xl md:max-w-4xl lg:max-w-6xl lg:px-10">
         <TopBar
           right={
@@ -148,6 +148,25 @@ export default function HomePage() {
           </p>
         )}
 
+        {/* 2026-08-18 — UX 배포용으로 게스트도 /spec에서 이미 상세정보(3단계)까지 입력하고
+            온 상태라 "입력하면 더 정확해진다"는 더 이상 안 맞음 — 저장 쪽으로 문구만 바꿈
+            (되돌릴 땐 아래 원본 블록 주석을 풀고 이 블록을 지우면 됨). */}
+        {guestMode && !loading && !error && (
+          <div className="mt-4 rounded-2xl bg-blue-50 px-4 py-4">
+            <p className="text-sm font-bold text-blue-700">이 결과를 저장해두고 싶으신가요?</p>
+            <p className="mt-1 text-xs leading-relaxed text-blue-600">
+              지금 결과는 새로고침하거나 창을 닫으면 사라져요.
+              회원가입하면 계속 저장해두고 다시 볼 수 있어요.
+            </p>
+            <Link
+              href="/signup"
+              className="mt-3 block w-full rounded-xl bg-blue-500 py-2.5 text-center text-sm font-bold text-white shadow-neu-raised-sm transition hover:bg-blue-600 hover:shadow-neu-raised active:shadow-neu-pressed"
+            >
+              회원가입하고 결과 저장하기
+            </Link>
+          </div>
+        )}
+        {/*
         {guestMode && !loading && !error && (
           <div className="mt-4 rounded-2xl bg-blue-50 px-4 py-4">
             <p className="text-sm font-bold text-blue-700">더 정확한 매칭을 원하시나요?</p>
@@ -163,6 +182,7 @@ export default function HomePage() {
             </Link>
           </div>
         )}
+        */}
 
         {!loading && !error && results !== null && <ScholarshipResults results={results} />}
       </div>
@@ -173,25 +193,31 @@ export default function HomePage() {
           onClick={dismissGuestWarning}
         >
           <div
-            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+            className="w-full max-w-sm rounded-3xl bg-neu-surface p-5 shadow-neu-raised-lg"
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="text-sm font-bold text-gray-900">⚠️ 이 결과, 저장 안 돼있어요</p>
+            <p className="text-sm font-bold text-gray-900">⚠️ 아직 저장되지 않았어요</p>
+            {/* 2026-08-18 — 게스트도 이미 상세정보까지 입력한 상태라 "회원가입 후 상세 정보를
+                입력해주세요"는 안 맞음, 저장만 강조하도록 수정(원본 주석 처리). */}
             <p className="mt-1.5 text-xs leading-relaxed text-gray-500">
+              새로고침하거나 창을 닫으면 사라져요. 계속 보고
+              싶으면 회원가입해서 저장해주세요.
+            </p>
+            {/* <p className="mt-1.5 text-xs leading-relaxed text-gray-500">
               새로고침하거나 창을 닫으면 사라져요. 정보를 저장하고
               싶으면 회원가입 후 상세 정보를 입력해주세요.
-            </p>
+            </p> */}
             <div className="mt-4 flex gap-2">
               <button
                 type="button"
                 onClick={dismissGuestWarning}
-                className="w-full rounded-xl border border-gray-200 py-2.5 text-xs font-bold text-gray-600"
+                className="w-full rounded-xl bg-neu-surface py-2.5 text-xs font-bold text-gray-600 shadow-neu-raised-sm transition active:shadow-neu-pressed"
               >
                 알겠어요
               </button>
               <Link
                 href="/signup"
-                className="w-full rounded-xl bg-blue-500 py-2.5 text-center text-xs font-bold text-white"
+                className="w-full rounded-xl bg-blue-500 py-2.5 text-center text-xs font-bold text-white shadow-neu-raised-sm transition active:shadow-neu-pressed"
               >
                 회원가입하기
               </Link>

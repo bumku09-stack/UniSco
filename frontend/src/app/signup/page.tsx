@@ -13,7 +13,7 @@ import {
   AuthShell,
   KakaoLoginButton,
 } from "@/components/auth-ui";
-import { kakaoAuthorizeUrl, postJson } from "@/lib/auth";
+import { checkUsernameAvailable, kakaoAuthorizeUrl, postJson } from "@/lib/auth";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -27,6 +27,22 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // 아이디를 바꾸면 이전 중복확인 결과는 더 이상 유효하지 않으니 checkedUsername으로 추적해서
+  // "지금 입력된 아이디 == 방금 확인한 그 아이디"일 때만 결과를 보여줌 — 확인 후 아이디를
+  // 수정했는데 예전 "사용 가능" 문구가 그대로 남아있는 걸 방지.
+  const [usernameCheck, setUsernameCheck] = useState<"idle" | "checking" | "available" | "taken" | "error">(
+    "idle"
+  );
+  const [checkedUsername, setCheckedUsername] = useState("");
+
+  async function handleCheckUsername() {
+    if (username.length < 3) return;
+    setUsernameCheck("checking");
+    const result = await checkUsernameAvailable(username);
+    setCheckedUsername(username);
+    setUsernameCheck(result);
+  }
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
@@ -74,7 +90,7 @@ export default function SignupPage() {
 
   return (
     <AuthShell>
-      <AuthLogo />
+      <AuthLogo href="/" />
 
       {step === "signup" ? (
         <>
@@ -84,15 +100,34 @@ export default function SignupPage() {
           </p>
 
           <form onSubmit={handleSignup} className="mt-10 flex flex-col gap-3">
-            <input
-              type="text"
-              required
-              minLength={3}
-              placeholder="아이디"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className={authInputClass}
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                required
+                minLength={3}
+                placeholder="아이디"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className={authInputClass}
+              />
+              <button
+                type="button"
+                onClick={handleCheckUsername}
+                disabled={username.length < 3 || usernameCheck === "checking"}
+                className="shrink-0 rounded-2xl bg-neu-surface px-4 text-sm font-semibold text-gray-600 shadow-neu-raised transition hover:shadow-neu-raised-lg active:shadow-neu-pressed disabled:opacity-50"
+              >
+                중복확인
+              </button>
+            </div>
+            {username === checkedUsername && usernameCheck === "available" && (
+              <p className="-mt-2 text-xs font-medium text-blue-500">사용 가능한 아이디예요</p>
+            )}
+            {username === checkedUsername && usernameCheck === "taken" && (
+              <p className="-mt-2 text-xs font-medium text-red-500">이미 사용 중인 아이디예요</p>
+            )}
+            {username === checkedUsername && usernameCheck === "error" && (
+              <p className="-mt-2 text-xs font-medium text-gray-400">확인에 실패했어요, 다시 시도해주세요</p>
+            )}
             <input
               type="password"
               required

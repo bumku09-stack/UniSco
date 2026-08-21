@@ -38,8 +38,10 @@ function Pagination({
           key={p}
           type="button"
           onClick={() => onChange(p)}
-          className={`flex h-9 w-9 items-center justify-center rounded-xl text-sm font-semibold transition ${
-            p === page ? "bg-blue-500 text-white" : "text-gray-500 hover:bg-gray-100"
+          className={`flex h-9 w-9 items-center justify-center rounded-xl bg-neu-surface text-sm font-semibold transition ${
+            p === page
+              ? "bg-blue-500 text-white shadow-neu-raised-sm"
+              : "text-gray-500 shadow-neu-raised-sm hover:shadow-neu-raised"
           }`}
         >
           {p}
@@ -78,7 +80,7 @@ function ScholarshipCard({
   onToggleSave: (id: number) => void;
 }) {
   return (
-    <li className="relative flex h-full flex-col rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
+    <li className="relative flex h-full flex-col rounded-3xl bg-neu-surface p-5 shadow-neu-raised transition duration-200 hover:shadow-neu-raised-lg">
       {saved !== null && (
         <button
           type="button"
@@ -119,7 +121,7 @@ function ScholarshipCard({
 
       <Link
         href={`/scholarship/${s.id}`}
-        className="mt-4 block w-full rounded-xl border border-blue-500 py-3 text-center text-sm font-bold text-blue-600 transition hover:bg-blue-50 active:scale-[0.99]"
+        className="mt-4 block w-full rounded-2xl bg-neu-surface py-3 text-center text-sm font-bold text-blue-600 shadow-neu-raised-sm transition hover:shadow-neu-raised active:shadow-neu-pressed"
       >
         자세히 보기
       </Link>
@@ -210,12 +212,12 @@ export function ScholarshipResults({
         조건을 자세히 입력할수록 적합도가 더 높은 장학금을 추천해드려요
       </p>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <div className="rounded-2xl bg-blue-50 px-4 py-3">
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <div className="rounded-2xl bg-neu-surface px-4 py-3 shadow-neu-raised">
           <p className="text-xs font-semibold text-blue-500">매칭 건수</p>
           <p className="mt-0.5 text-lg font-bold text-blue-600">{filteredSorted.length}건</p>
         </div>
-        <div className="rounded-2xl bg-blue-50 px-4 py-3">
+        <div className="rounded-2xl bg-neu-surface px-4 py-3 shadow-neu-raised">
           <p className="text-xs font-semibold text-blue-500">매칭 금액 합계</p>
           <p className="mt-0.5 text-lg font-bold text-blue-600">{formatAmount(totalAmount) ?? "0원"}</p>
         </div>
@@ -231,10 +233,10 @@ export function ScholarshipResults({
               setCategoryL2(null);
               setPage(1);
             }}
-            className={`shrink-0 rounded-full border px-3.5 py-2 text-xs font-semibold transition ${
+            className={`shrink-0 rounded-full bg-neu-surface px-3.5 py-2 text-xs font-semibold transition ${
               categoryL1 === c
-                ? "border-blue-500 bg-blue-500 text-white"
-                : "border-gray-200 bg-white text-gray-500"
+                ? "shadow-neu-pressed text-blue-600"
+                : "text-gray-500 shadow-neu-raised-sm hover:shadow-neu-raised"
             }`}
           >
             {c === "all" ? "전체" : CATEGORY_L1_LABEL[c]}
@@ -252,10 +254,10 @@ export function ScholarshipResults({
                 setCategoryL2(categoryL2 === l2 ? null : l2);
                 setPage(1);
               }}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${
+              className={`shrink-0 rounded-full bg-neu-surface px-3 py-1.5 text-[11px] font-semibold transition ${
                 categoryL2 === l2
-                  ? "border-blue-500 bg-blue-50 text-blue-600"
-                  : "border-gray-200 bg-white text-gray-400"
+                  ? "shadow-neu-pressed text-blue-600"
+                  : "text-gray-400 shadow-neu-raised-sm hover:shadow-neu-raised"
               }`}
             >
               {CATEGORY_L2_LABEL[l2] ?? l2}
@@ -276,10 +278,10 @@ export function ScholarshipResults({
             key={opt.value}
             type="button"
             onClick={() => setSortBy(opt.value)}
-            className={`flex-1 rounded-xl border py-2 text-xs font-semibold transition ${
+            className={`flex-1 rounded-xl bg-neu-surface py-2 text-xs font-semibold transition ${
               sortBy === opt.value
-                ? "border-blue-500 bg-blue-50 text-blue-600"
-                : "border-gray-200 bg-white text-gray-500"
+                ? "shadow-neu-pressed text-blue-600"
+                : "text-gray-500 shadow-neu-raised-sm hover:shadow-neu-raised"
             }`}
           >
             {opt.label}

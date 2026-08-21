@@ -99,7 +99,7 @@ function ArrowCta({ href, children }: { href: string; children: React.ReactNode 
   return (
     <Link
       href={href}
-      className="group flex w-full items-center justify-center gap-1.5 rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white transition hover:bg-blue-600 active:scale-[0.99]"
+      className="group flex w-full items-center justify-center gap-1.5 rounded-2xl bg-blue-500 py-4 text-[15px] font-semibold text-white shadow-neu-raised transition hover:bg-blue-600 hover:shadow-neu-raised-lg active:shadow-neu-pressed"
     >
       {children}
       <svg
@@ -169,7 +169,7 @@ export default function LandingPage() {
   }, [router]);
 
   return (
-    <div className="flex min-h-screen flex-col overflow-x-hidden bg-white">
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-neu-bg">
       <section className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 py-16">
         {/* 배경 장식 — 순수 흰 배경이 밋밋하다는 피드백으로 추가. 새 색 없이 기존
             blue-100/blue-50만 아주 옅게 블러 처리해서 존재감은 은은하게만 남김. */}
@@ -184,7 +184,7 @@ export default function LandingPage() {
 
         <div className="relative mx-auto flex w-full max-w-md flex-col sm:max-w-lg md:max-w-xl">
           <div className="mb-10 flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500 text-base font-bold text-white">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500 text-base font-bold text-white shadow-neu-raised-sm">
               U
             </div>
             <span className="text-lg font-bold text-gray-900">UniSco</span>
@@ -229,8 +229,8 @@ export default function LandingPage() {
           <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {FEATURES.map((f, i) => (
               <Reveal key={f.title} delayMs={i * 100}>
-                <div className="group h-full rounded-2xl border border-gray-100 bg-white p-6 shadow-[0_2px_10px_rgba(15,23,42,0.05)] transition duration-200 hover:-translate-y-1 hover:border-blue-100 hover:shadow-[0_8px_24px_rgba(59,130,246,0.12)]">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-500 transition-colors duration-200 group-hover:bg-blue-500 group-hover:text-white">
+                <div className="group h-full rounded-3xl bg-neu-surface p-6 shadow-neu-raised transition duration-200 hover:-translate-y-1 hover:shadow-neu-raised-lg">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-neu-surface text-blue-500 shadow-neu-raised-sm transition-colors duration-200 group-hover:bg-blue-500 group-hover:text-white">
                     {f.icon}
                   </div>
                   <p className="mt-4 font-bold text-gray-900">{f.title}</p>
@@ -264,7 +264,7 @@ export default function LandingPage() {
             />
             {STEPS.map((s, i) => (
               <Reveal key={s.step} delayMs={i * 100}>
-                <div className="relative flex h-9 w-9 items-center justify-center rounded-full bg-blue-500 text-sm font-bold text-white ring-8 ring-white">
+                <div className="relative flex h-9 w-9 items-center justify-center rounded-full bg-blue-500 text-sm font-bold text-white shadow-neu-raised-sm ring-8 ring-neu-bg">
                   {s.step}
                 </div>
                 <p className="mt-3 font-bold text-gray-900">{s.title}</p>
@@ -274,7 +274,7 @@ export default function LandingPage() {
           </div>
         </Reveal>
 
-        <Reveal className="border-t border-gray-100 px-6 py-20 text-center">
+        <Reveal className="px-6 py-20 text-center">
           <h2 className="text-2xl font-bold text-gray-900 sm:text-3xl">지금 바로 시작해보세요</h2>
           <p className="mt-2 text-sm text-gray-500">가입 없이도 1분이면 결과를 확인할 수 있어요</p>
           <div className="mx-auto mt-6 max-w-xs">
