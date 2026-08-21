@@ -28,6 +28,22 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // signup/page.tsx와 동일(2026-08-21) — "비밀번호 재설정" 버튼을 눌러보기 전엔
+  // resetBlockReason을 안 보여줌.
+  const [attemptedReset, setAttemptedReset] = useState(false);
+
+  // 회원가입 페이지와 동일하게(2026-08-21) — 비밀번호 규칙/일치 여부를 다 채우기 전엔
+  // 제출 버튼 자체를 눌러지지 않게 함.
+  const newPasswordOk = passwordRequirementError(newPassword) === null;
+  const newPasswordMatches = newPassword.length > 0 && newPassword === newPasswordConfirm;
+  const canReset = newPasswordOk && newPasswordMatches;
+
+  // 버튼이 왜 안 눌리는지 이유를 항상 옆에 보여줌(2026-08-21 추가, signup/page.tsx와 동일 패턴).
+  const resetBlockReason = !newPasswordOk
+    ? "비밀번호가 영문+숫자+특수문자를 포함한 8자 이상이어야 해요"
+    : !newPasswordMatches
+      ? "비밀번호 확인이 비밀번호랑 일치해야 해요"
+      : null;
 
   async function handleRequest(e: React.FormEvent) {
     e.preventDefault();
@@ -50,15 +66,10 @@ export default function ForgotPasswordPage() {
   async function handleReset(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setAttemptedReset(true);
 
-    const requirementError = passwordRequirementError(newPassword);
-    if (requirementError) {
-      setError(requirementError);
-      return;
-    }
-    if (newPassword !== newPasswordConfirm) {
-      setError("비밀번호가 서로 일치하지 않아요.");
-      return;
+    if (!canReset) {
+      return; // resetBlockReason이 이제 화면에 뜸(아래 JSX 참고)
     }
 
     setLoading(true);
@@ -172,6 +183,9 @@ export default function ForgotPasswordPage() {
             <button type="submit" disabled={loading} className={authPrimaryButtonClass}>
               {loading ? "확인 중..." : "비밀번호 재설정"}
             </button>
+            {attemptedReset && !error && resetBlockReason && (
+              <p className="px-1 text-center text-xs text-gray-400">{resetBlockReason}</p>
+            )}
             <button
               type="button"
               onClick={handleResend}

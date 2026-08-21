@@ -17,13 +17,20 @@ import {
 } from "@/components/auth-ui";
 import { checkUsernameAvailable, kakaoAuthorizeUrl, passwordRequirementError, postJson } from "@/lib/auth";
 
-type UsernameCheckStatus = "idle" | "checking" | "available" | "taken" | "error";
+type UsernameCheckStatus = "idle" | "checking" | "available" | "taken" | "tooShort" | "error";
+
+const stripToUsernameChars = (v: string) => v.replace(/[^a-zA-Z0-9_]/g, "");
 
 export default function SignupPage() {
   const router = useRouter();
   const [step, setStep] = useState<"signup" | "verify">("signup");
 
   const [username, setUsername] = useState("");
+  // 한글 IME 조합 중(예: "ㅇ"→"아"→"안" 순서로 완성되는 도중)엔 필터링을 걸지 않음(2026-08-21
+  // 추가) — 조합 중에 JS가 값을 강제로 고치면 브라우저의 조합 상태가 깨지면서 커서 위치가
+  // 엉키고 이미 입력해둔 영문/숫자까지 같이 지워지는 문제가 있었음("백스페이스 모드"처럼
+  // 보이던 원인). 조합이 끝나는 순간(onCompositionEnd)에만 걸러내면 이 문제가 없음.
+  const [isComposingUsername, setIsComposingUsername] = useState(false);
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [email, setEmail] = useState("");
@@ -37,11 +44,33 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // "다음" 버튼을 한 번이라도 눌러보기 전엔 submitBlockReason을 안 보여줌(2026-08-21 추가) —
+  // 페이지 열자마자 "아이디 중복확인을 완료해주세요"가 계속 떠있으면 거슬리니, 눌러봤는데
+  // 아직 조건이 안 채워졌을 때만 나타나게 함.
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+
+  // 제출 버튼 자체를 막는 조건(2026-08-21 추가) — 기존엔 handleSignup 안에서만 검사해서
+  // 버튼은 눌리는데 에러 메시지만 뜨는 방식이었음. 여기서는 아예 버튼을 비활성화해서
+  // 세 조건(중복확인 완료·비밀번호 규칙·비밀번호 일치)을 다 채우기 전엔 클릭 자체가 안 되게 함.
+  const usernameChecked = usernameCheckStatus === "available" && checkedUsername === username;
+  const passwordOk = passwordRequirementError(password) === null;
+  const passwordMatches = password.length > 0 && password === passwordConfirm;
+  const canSubmit = usernameChecked && passwordOk && passwordMatches;
+
+  // 버튼이 왜 안 눌리는지 이유를 항상 옆에 보여줌(2026-08-21 추가) — 그냥 비활성화만 해두면
+  // 사용자 입장에서 뭘 더 해야 하는지 알 방법이 없어서, 안 채워진 조건 중 첫 번째를 짚어줌.
+  const submitBlockReason = !usernameChecked
+    ? "아이디 중복확인을 완료해주세요"
+    : !passwordOk
+      ? "비밀번호가 영문+숫자+특수문자를 포함한 8자 이상이어야 해요"
+      : !passwordMatches
+        ? "비밀번호 확인이 비밀번호랑 일치해야 해요"
+        : null;
 
   async function handleCheckUsername() {
-    if (username.length < 3) {
-      setUsernameCheckStatus("error");
-      setError("아이디는 3자 이상이어야 해요.");
+    if (username.length < 5) {
+      setUsernameCheckStatus("tooShort");
+      setCheckedUsername(username);
       return;
     }
     setError(null);
@@ -58,20 +87,10 @@ export default function SignupPage() {
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setAttemptedSubmit(true);
 
-    if (usernameCheckStatus !== "available" || checkedUsername !== username) {
-      setError("아이디 중복확인을 먼저 해주세요.");
-      return;
-    }
-
-    const requirementError = passwordRequirementError(password);
-    if (requirementError) {
-      setError(requirementError);
-      return;
-    }
-    if (password !== passwordConfirm) {
-      setError("비밀번호가 서로 일치하지 않아요.");
-      return;
+    if (!canSubmit) {
+      return; // submitBlockReason이 이제 화면에 뜸(아래 JSX 참고)
     }
 
     setLoading(true);
@@ -131,22 +150,38 @@ export default function SignupPage() {
               <input
                 type="text"
                 required
-                minLength={3}
+                minLength={5}
                 maxLength={32}
                 placeholder="아이디"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                // 영문/숫자/밑줄 외 문자(한글 포함)는 걸러내되, 한글 IME 조합 중에는 그대로
+                // 두고 조합이 끝나는 시점(onCompositionEnd)에만 걸러냄 — 위 주석 참고.
+                onCompositionStart={() => setIsComposingUsername(true)}
+                onCompositionEnd={(e) => {
+                  setIsComposingUsername(false);
+                  setUsername(stripToUsernameChars(e.currentTarget.value));
+                }}
+                onChange={(e) =>
+                  setUsername(
+                    isComposingUsername ? e.target.value : stripToUsernameChars(e.target.value)
+                  )
+                }
                 className={authInputClass}
               />
               <button
                 type="button"
                 onClick={handleCheckUsername}
-                disabled={usernameCheckStatus === "checking" || username.length < 3}
+                disabled={usernameCheckStatus === "checking"}
                 className="shrink-0 rounded-2xl bg-neu-surface px-4 text-sm font-semibold text-gray-600 shadow-neu-raised transition hover:shadow-neu-raised-lg active:shadow-neu-pressed disabled:opacity-50"
               >
                 {usernameCheckStatus === "checking" ? "확인 중..." : "중복확인"}
               </button>
             </div>
+            {checkedUsername === username && usernameCheckStatus === "tooShort" && (
+              <p className="-mt-1 px-1 text-xs font-semibold text-red-500">
+                아이디는 5자 이상이어야 해요
+              </p>
+            )}
             {checkedUsername === username && usernameCheckStatus === "available" && (
               <p className="-mt-1 px-1 text-xs font-semibold text-green-600">
                 사용 가능한 아이디예요
@@ -202,6 +237,9 @@ export default function SignupPage() {
             <button type="submit" disabled={loading} className={authPrimaryButtonClass}>
               {loading ? "처리 중..." : "다음"}
             </button>
+            {attemptedSubmit && !error && submitBlockReason && (
+              <p className="px-1 text-center text-xs text-gray-400">{submitBlockReason}</p>
+            )}
           </form>
 
           <KakaoLoginButton onClick={() => (window.location.href = kakaoAuthorizeUrl())} />

@@ -26,6 +26,26 @@ class User(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class PendingSignup(SQLModel, table=True):
+    """인증 코드를 확인하기 전까지는 User 테이블에 아무것도 안 만들고, 여기 임시로만
+    보관함(2026-08-21 추가) — 예전엔 가입 버튼 누르는 순간 바로 User를 만들어서, 오타/존재
+    하지 않는 이메일로 시도한 계정이 인증 안 된 채로 아이디/이메일을 점유해버리는 문제가
+    있었음(ghost_accounts.py의 시간 기반 청소는 그 증상을 완화만 함, 근본 원인은 "아직
+    확정 안 된 걸 미리 저장하는 것"이었음). 이 테이블은 username/email에 유니크 제약이
+    없음 — 어차피 진짜 계정이 아니라서 여러 개 겹쳐도 무해하고, 인증 코드를 맞게 입력한
+    사람만 이 정보로 User를 실제로 생성함(api/auth.py의 verify_code 참고)."""
+
+    id: int | None = Field(default=None, primary_key=True)
+
+    username: str = Field(index=True)
+    email: str = Field(index=True)
+    hashed_password: str
+    code: str
+    expires_at: datetime
+    attempts: int = Field(default=0)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
 class EmailVerification(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
 

@@ -15,7 +15,7 @@ def _validate_password_complexity(value: str) -> str:
 
 
 class SignupRequest(BaseModel):
-    username: str = Field(min_length=3, max_length=32)
+    username: str = Field(min_length=5, max_length=32)
     password: str = Field(min_length=8, max_length=128)
     email: EmailStr
 

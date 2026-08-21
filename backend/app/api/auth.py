@@ -4,7 +4,11 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
 
-from app.core.email import send_password_reset_code, send_verification_code
+from app.core.email import (
+    email_domain_has_mail_server,
+    send_password_reset_code,
+    send_verification_code,
+)
 from app.core.kakao import KakaoAuthError, exchange_code_for_token, fetch_kakao_user
 from app.core.security import (
     InvalidTokenError,
@@ -16,12 +20,12 @@ from app.core.security import (
 )
 from app.db.session import get_session
 from app.models import (
-    EmailVerification,
     ForgotPasswordRequest,
     ForgotPasswordResponse,
     KakaoLoginRequest,
     LoginRequest,
     PasswordReset,
+    PendingSignup,
     RefreshRequest,
     ResendCodeRequest,
     ResetPasswordRequest,
@@ -63,10 +67,12 @@ def _send_code_or_502(email: str, code: str, context: str, send_fn=send_verifica
         ) from e
 
 
-# EmailVerification/PasswordReset은 필드 구성이 동일해서(user_id, code, expires_at, is_used,
-# attempts) 아래 두 헬퍼가 타입만 바꿔가며 공유함 — 2026-08-11 리팩터링, 원래는 verify-code/
-# reset-password, resend-code/forgot-password가 각각 이 로직을 거의 그대로 복붙하고 있었음.
-_OtpModel = EmailVerification | PasswordReset
+# 원래 EmailVerification/PasswordReset 둘 다 이 타입 별칭을 공유했는데(2026-08-11 리팩터링),
+# 2026-08-21에 회원가입 인증 흐름을 PendingSignup 기반으로 바꾸면서 EmailVerification은 더
+# 이상 안 씀(아래 signup/verify_code/resend_code 참고) — PasswordReset(비밀번호 재설정,
+# forgot-password/reset-password)만 남음. 지금은 PasswordReset 하나뿐이라 Union일 필요는
+# 없지만, 나중에 비슷한 OTP 테이블이 또 생기면 다시 Union으로 늘리면 됨.
+_OtpModel = PasswordReset
 
 # resend-code/forgot-password는 로그인 없이(아이디만 알면) 누구나 호출 가능해서, 막아두지
 # 않으면 특정 계정 메일함으로 재발송/재설정 메일을 무한정 스팸으로 보낼 수 있음(2026-08-11,
@@ -152,7 +158,7 @@ def _consume_code(
 
 @router.get("/check-username", response_model=UsernameAvailabilityResponse)
 def check_username(
-    username: str = Query(min_length=3, max_length=32), session: Session = Depends(get_session)
+    username: str = Query(min_length=5, max_length=32), session: Session = Depends(get_session)
 ):
     """회원가입 폼에서 아이디 입력 즉시 중복 여부만 확인하는 용도 — 별도 인증/rate limit
     없음(이메일을 새로 발송하는 resend-code/forgot-password와 달리 스팸 비용이 없고, 어차피
@@ -161,65 +167,131 @@ def check_username(
     return UsernameAvailabilityResponse(available=not exists)
 
 
+def _find_pending_signup_by_identifier(session: Session, identifier: str) -> PendingSignup | None:
+    """PendingSignup은 User와 달리 username/email에 유니크 제약이 없어서(아직 확정된 계정이
+    아니므로 여러 개 겹쳐도 무해함, models/user.py 참고) 같은 아이디/이메일로 여러 번 시도한
+    기록이 남아있을 수 있음 — 그중 제일 최근 시도(=지금 완료하려는 그 시도)를 돌려줌."""
+    return session.exec(
+        select(PendingSignup)
+        .where((PendingSignup.username == identifier) | (PendingSignup.email == identifier))
+        .order_by(PendingSignup.id.desc())
+    ).first()
+
+
 @router.post("/signup", response_model=SignupResponse)
 def signup(body: SignupRequest, session: Session = Depends(get_session)):
+    # 인증 코드를 확인하기 전까지는 User를 아예 안 만듦(2026-08-21 변경) — 예전엔 여기서 바로
+    # User를 만들어서, 오타/존재하지 않는 이메일로 시도한 계정이 인증 안 된 채로 아이디/이메일을
+    # 영구히 점유해버리는 문제가 있었음. 이제는 PendingSignup에 임시로만 보관하고, 실제로
+    # 코드를 맞게 입력한 순간(verify_code)에만 User가 생김 — 그러니 여기서 하는 중복 체크는
+    # "이미 인증 완료된 진짜 계정"하고만 비교하면 됨(다른 사람의 PendingSignup은 신경 안 씀 —
+    # 그 사람이 나중에 코드를 맞게 넣으면 verify_code에서 다시 한번 확인함, 아래 참고).
     if session.exec(select(User).where(User.username == body.username)).first():
         raise HTTPException(status_code=409, detail="이미 사용 중인 아이디입니다.")
     if session.exec(select(User).where(User.email == body.email)).first():
         raise HTTPException(status_code=409, detail="이미 사용 중인 이메일입니다.")
+    if not email_domain_has_mail_server(body.email):
+        raise HTTPException(
+            status_code=422, detail="존재하지 않는 이메일 도메인이에요. 이메일 주소를 다시 확인해주세요."
+        )
 
-    # 메일 발송을 먼저 시도하고, 성공한 경우에만 계정을 만듦 — 순서를 반대로 하면
-    # 발송 실패 시 인증 안 된 계정만 DB에 남아서 같은 아이디/이메일로 재가입도
-    # 안 되고(409) 로그인도 안 되고(인증 미완료) 재발송도 또 같은 이유로 실패하는
-    # 막다른 상태가 됨.
     code = _generate_code()
     _send_code_or_502(body.email, code, "signup")
 
-    user = User(
-        username=body.username, email=body.email, hashed_password=hash_password(body.password)
+    session.add(
+        PendingSignup(
+            username=body.username,
+            email=body.email,
+            hashed_password=hash_password(body.password),
+            code=code,
+            expires_at=datetime.now(UTC) + CODE_TTL,
+        )
     )
-    session.add(user)
     session.commit()
-    session.refresh(user)
-
-    # 방금 만든 유저라 무효화할 기존 코드가 있을 리 없음 — 그래도 _issue_code를 그대로 씀
-    # (resend-code/forgot-password와 동일 헬퍼, "빈 목록이면 그냥 아무것도 안 함"이라 안전함).
-    _issue_code(session, EmailVerification, user.id, code)
 
     return SignupResponse()
 
 
 @router.post("/verify-code", response_model=SignupResponse)
 def verify_code(body: VerifyCodeRequest, session: Session = Depends(get_session)):
-    user = _find_user_by_identifier(session, body.identifier)
-    if user is None:
-        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-    if user.is_verified:
-        raise HTTPException(status_code=400, detail="이미 인증된 계정입니다.")
+    pending = _find_pending_signup_by_identifier(session, body.identifier)
+    if pending is None:
+        raise HTTPException(status_code=404, detail="가입 시도를 찾을 수 없습니다. 다시 가입해주세요.")
 
-    verification = _consume_code(session, EmailVerification, user.id, body.code, "인증 코드")
+    now = datetime.now(UTC)
+    expires_at = pending.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+    if now > expires_at:
+        session.delete(pending)
+        session.commit()
+        raise HTTPException(status_code=400, detail="인증 코드가 만료되었습니다. 재발송해주세요.")
 
-    user.is_verified = True
-    session.add(verification)
+    if pending.attempts >= MAX_ATTEMPTS:
+        session.delete(pending)
+        session.commit()
+        raise HTTPException(status_code=429, detail="시도 횟수를 초과했습니다. 재발송해주세요.")
+
+    if pending.code != body.code:
+        pending.attempts += 1
+        session.add(pending)
+        session.commit()
+        raise HTTPException(status_code=400, detail="인증 코드가 일치하지 않습니다.")
+
+    # 코드가 맞아서 이제 진짜 계정을 만듦 — 근데 이 PendingSignup을 만든 시점 이후로 같은
+    # 아이디/이메일이 이미 다른 경로로(예: 동시에 시도한 다른 사람이 먼저 인증 완료) 정식
+    # 계정이 됐을 수 있음(극히 드문 경우). 마지막으로 한 번 더 확인해서 이 레이스 컨디션을
+    # 막음 — User.username/email의 DB 유니크 제약이 최종 방어선이라 여기서 안 걸러져도 바로
+    # 아래 session.add(user)에서 에러가 나긴 하지만, 그러면 500으로 보이니 미리 깔끔하게 409로.
+    if session.exec(select(User).where(User.username == pending.username)).first():
+        session.delete(pending)
+        session.commit()
+        raise HTTPException(
+            status_code=409, detail="이미 사용 중인 아이디입니다. 다시 가입해주세요."
+        )
+    if session.exec(select(User).where(User.email == pending.email)).first():
+        session.delete(pending)
+        session.commit()
+        raise HTTPException(
+            status_code=409, detail="이미 사용 중인 이메일입니다. 다시 가입해주세요."
+        )
+
+    user = User(
+        username=pending.username,
+        email=pending.email,
+        hashed_password=pending.hashed_password,
+        is_verified=True,
+    )
     session.add(user)
+    session.delete(pending)
     session.commit()
     return SignupResponse(message="이메일 인증이 완료되었습니다.")
 
 
 @router.post("/resend-code", response_model=SignupResponse)
 def resend_code(body: ResendCodeRequest, session: Session = Depends(get_session)):
-    user = _find_user_by_identifier(session, body.identifier)
-    if user is None:
-        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-    if user.is_verified:
-        raise HTTPException(status_code=400, detail="이미 인증된 계정입니다.")
-    _check_not_rate_limited(session, EmailVerification, user.id)
+    pending = _find_pending_signup_by_identifier(session, body.identifier)
+    if pending is None:
+        raise HTTPException(status_code=404, detail="가입 시도를 찾을 수 없습니다. 다시 가입해주세요.")
 
-    # 여기서도 발송을 먼저 시도함 — 실패했는데 기존 유효 코드까지 먼저 지워버리면
-    # 재시도할 방법이 없어짐 (signup과 같은 이유).
+    created_at = pending.created_at
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=UTC)
+    elapsed = datetime.now(UTC) - created_at
+    if elapsed < CODE_REQUEST_COOLDOWN:
+        wait = int((CODE_REQUEST_COOLDOWN - elapsed).total_seconds())
+        raise HTTPException(
+            status_code=429, detail=f"너무 자주 요청했습니다. {wait}초 후 다시 시도해주세요."
+        )
+
     code = _generate_code()
-    _send_code_or_502(user.email, code, "resend-code")
-    _issue_code(session, EmailVerification, user.id, code)
+    _send_code_or_502(pending.email, code, "resend-code")
+    pending.code = code
+    pending.expires_at = datetime.now(UTC) + CODE_TTL
+    pending.attempts = 0
+    pending.created_at = datetime.now(UTC)  # 재발송 쿨다운 기준을 이 시점으로 갱신
+    session.add(pending)
+    session.commit()
 
     return SignupResponse()
 

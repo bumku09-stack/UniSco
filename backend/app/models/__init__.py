@@ -33,7 +33,7 @@ from app.models.enums import (
 from app.models.saved_scholarship import SavedScholarship
 from app.models.saved_spec import SavedSpec
 from app.models.scholarship import Scholarship
-from app.models.user import EmailVerification, PasswordReset, User
+from app.models.user import EmailVerification, PasswordReset, PendingSignup, User
 from app.models.user_spec import SpecStatusResponse, UserSpec
 
 __all__ = [
@@ -58,6 +58,7 @@ __all__ = [
     "LoginRequest",
     "MilitaryStatus",
     "PasswordReset",
+    "PendingSignup",
     "RefreshRequest",
     "ResendCodeRequest",
     "ResetPasswordRequest",

@@ -8,4 +8,5 @@ bcrypt
 pyjwt
 resend
 requests
+dnspython
 ruff
