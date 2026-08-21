@@ -1,7 +1,12 @@
 @import "tailwindcss";
 
+/* 2026-08-19 뉴모피즘 리디자인 — 전면 재설계 아님, 기존 블루 팔레트·레이아웃은 그대로 두고
+   표면 질감(그림자/배경)만 바꾸는 작업. 배경을 순백에서 아주 옅은 블루 톤으로 바꾼 이유는
+   뉴모피즘 원리상 그림자만으로 입체감을 내려면 요소 배경색이 부모 배경과 거의 같아야
+   하는데, 순백(#fff) 위에서는 밝은 쪽 하이라이트가 배경과 구분이 안 돼 그림자 효과 자체가
+   실종됨 — #fff보다 살짝 어두운 블루그레이 바탕이어야 흰 쪽 하이라이트가 "빛"처럼 보임. */
 :root {
-  --background: #ffffff;
+  --background: #eef2f8;
   --foreground: #171717;
 }
 
@@ -12,7 +17,26 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* 다크모드는 일단 안 씀 — 항상 흰 배경 (나중에 디자인 잡으면 재검토) */
+/* Tailwind v4엔 tailwind.config.js의 boxShadow 확장에 대응하는 게 --theme의 --shadow-*
+   토큰임 — 여기 등록하면 shadow-neu-raised 같은 유틸리티 클래스가 자동으로 생김(JS 설정
+   파일 자체가 이 프로젝트엔 없음, postcss.config.mjs만 있음).
+
+   듀얼 쉐도우 색은 순수 회색/흰색이 아니라 배경(#eef2f8)의 블루 톤에 맞춰 어두운 쪽은
+   중성 블랙, 밝은 쪽은 옅은 블루(rgba(210,225,255,~))로 잡음 — 흰색 하이라이트를 그대로
+   쓰면 블루 배경 위에서 붕 떠 보임(요청 원칙 2번, "다크/블루톤 배경이면 흰색 대신 블루
+   계열 하이라이트"). */
+@theme {
+  --color-neu-bg: #eef2f8;
+  --color-neu-surface: #eef2f8;
+
+  --shadow-neu-raised-sm: 3px 3px 6px rgba(0, 0, 0, 0.12), -3px -3px 6px rgba(210, 225, 255, 0.6);
+  --shadow-neu-raised: 6px 6px 12px rgba(0, 0, 0, 0.15), -6px -6px 12px rgba(210, 225, 255, 0.65);
+  --shadow-neu-raised-lg: 9px 9px 18px rgba(0, 0, 0, 0.18), -9px -9px 18px rgba(210, 225, 255, 0.75);
+  --shadow-neu-pressed: inset 3px 3px 6px rgba(0, 0, 0, 0.15), inset -3px -3px 6px rgba(210, 225, 255, 0.6);
+  --shadow-neu-inset: inset 4px 4px 8px rgba(0, 0, 0, 0.15), inset -4px -4px 8px rgba(210, 225, 255, 0.6);
+  --shadow-neu-focus: inset 4px 4px 8px rgba(0, 0, 0, 0.15), inset -4px -4px 8px rgba(210, 225, 255, 0.6),
+    0 0 0 3px rgba(59, 130, 246, 0.35);
+}
 
 body {
   background: var(--background);

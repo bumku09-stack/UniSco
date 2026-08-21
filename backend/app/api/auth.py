@@ -154,8 +154,11 @@ def _consume_code(
 def check_username(
     username: str = Query(min_length=3, max_length=32), session: Session = Depends(get_session)
 ):
-    exists = session.exec(select(User).where(User.username == username)).first()
-    return UsernameAvailabilityResponse(available=exists is None)
+    """회원가입 폼에서 아이디 입력 즉시 중복 여부만 확인하는 용도 — 별도 인증/rate limit
+    없음(이메일을 새로 발송하는 resend-code/forgot-password와 달리 스팸 비용이 없고, 어차피
+    signup 자체가 409로 같은 정보를 이미 노출함)."""
+    exists = session.exec(select(User).where(User.username == username)).first() is not None
+    return UsernameAvailabilityResponse(available=not exists)
 
 
 @router.post("/signup", response_model=SignupResponse)

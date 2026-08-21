@@ -117,7 +117,7 @@ export default function SignupPage() {
 
   return (
     <AuthShell>
-      <AuthLogo />
+      <AuthLogo href="/" />
 
       {step === "signup" ? (
         <>
@@ -142,7 +142,7 @@ export default function SignupPage() {
                 type="button"
                 onClick={handleCheckUsername}
                 disabled={usernameCheckStatus === "checking" || username.length < 3}
-                className="shrink-0 rounded-2xl border border-gray-200 px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
+                className="shrink-0 rounded-2xl bg-neu-surface px-4 text-sm font-semibold text-gray-600 shadow-neu-raised transition hover:shadow-neu-raised-lg active:shadow-neu-pressed disabled:opacity-50"
               >
                 {usernameCheckStatus === "checking" ? "확인 중..." : "중복확인"}
               </button>

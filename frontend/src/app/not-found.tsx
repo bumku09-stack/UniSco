@@ -3,7 +3,7 @@ import { TopBar } from "@/components/form-ui";
 
 export default function NotFound() {
   return (
-    <div className="flex min-h-screen flex-col bg-white">
+    <div className="flex min-h-screen flex-col bg-neu-bg">
       <div className="mx-auto w-full max-w-md px-6 py-6 sm:max-w-lg">
         <TopBar />
         <div className="mt-16 flex flex-col items-center gap-3 text-center">
@@ -11,7 +11,7 @@ export default function NotFound() {
           <p className="text-sm text-gray-500">주소가 잘못됐거나 삭제된 페이지예요.</p>
           <Link
             href="/home"
-            className="mt-3 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-600 active:scale-[0.99]"
+            className="mt-3 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-bold text-white shadow-neu-raised transition hover:bg-blue-600 hover:shadow-neu-raised-lg active:shadow-neu-pressed"
           >
             홈으로 가기
           </Link>
